@@ -283,7 +283,7 @@
   // ---------------- Compartilhar ----------------
   async function share({ title, text, url }) {
     if (navigator.share) {
-      try { await navigator.share({ title, text, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
+      try { await navigator.share({ title, text, url }); track('share', { method: 'native' }); return; } catch (e) { if (e.name === 'AbortError') return; }
     }
     try { await navigator.clipboard.writeText(url || text); toast('🔗 Link copiado!'); } catch { prompt('Copie o link:', url || text); }
   }
@@ -305,6 +305,71 @@
       await api('/subscribe', { method: 'POST', body: { email: f.email.value } });
       f.innerHTML = '<h3>🎉 Inscrição confirmada!</h3><p>Obrigado! Você vai receber as novidades.</p>';
     } catch (err) { toast(err.message); }
+  });
+
+  // ---------------- Medição (GA4/GTM/Pixel/Clarity) com consentimento ----------------
+  const CFG = (() => { try { return JSON.parse($('#chef-config')?.textContent || '{}'); } catch { return {}; } })();
+  const consent = {
+    get: () => { try { return localStorage.getItem('chef:consent'); } catch { return null; } },
+    set(v) {
+      try { localStorage.setItem('chef:consent', v); } catch { /* ignore */ }
+      apply(v);
+      const b = $('.consent');
+      if (b) b.hidden = true;
+    },
+  };
+  let extrasLoaded = false;
+  function loadScript(src) {
+    const el = document.createElement('script');
+    el.async = true;
+    el.src = src;
+    document.head.appendChild(el);
+  }
+  function apply(v) {
+    const g = v === 'granted' ? 'granted' : 'denied';
+    if (window.gtag) window.gtag('consent', 'update', { ad_storage: g, ad_user_data: g, ad_personalization: g, analytics_storage: g });
+    if (window.adsbygoogle) window.adsbygoogle.requestNonPersonalizedAds = g === 'granted' ? 0 : 1;
+    if (g !== 'granted' || extrasLoaded) return;
+    extrasLoaded = true;
+    // Ferramentas que gravam cookies próprios só carregam depois do "Aceitar"
+    if (CFG.pixel) {
+      /* eslint-disable */
+      !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[]}(window,document);
+      /* eslint-enable */
+      window.fbq('init', CFG.pixel);
+      window.fbq('track', 'PageView');
+      loadScript('https://connect.facebook.net/en_US/fbevents.js');
+    }
+    if (CFG.clarity) {
+      window.clarity = window.clarity || function () { (window.clarity.q = window.clarity.q || []).push(arguments); };
+      loadScript(`https://www.clarity.ms/tag/${encodeURIComponent(CFG.clarity)}`);
+    }
+  }
+  if (CFG.consent) {
+    const v = consent.get();
+    if (v) apply(v);
+    else setTimeout(() => { const b = $('.consent'); if (b) b.hidden = false; }, 800);
+  } else apply('granted');
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-consent]');
+    if (b) consent.set(b.dataset.consent);
+    if (e.target.closest('[data-consent-open]')) { const c = $('.consent'); if (c) c.hidden = false; }
+  });
+
+  /** Envia um evento para GA4/GTM/Pixel (somente o que estiver configurado e consentido). */
+  function track(name, params = {}) {
+    try {
+      if (window.gtag) window.gtag('event', name, params);
+      else if (window.dataLayer) window.dataLayer.push({ event: name, ...params });
+      if (window.fbq) window.fbq('trackCustom', name, params);
+    } catch { /* medição nunca quebra a página */ }
+  }
+  // Cliques em links de afiliado e compartilhamentos
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href^="/go/"]');
+    if (a) track('affiliate_click', { product_id: a.getAttribute('href').split('/')[2], link_text: a.textContent.trim().slice(0, 80) });
+    const n = e.target.closest('[data-share-net]');
+    if (n) track('share', { method: n.dataset.shareNet, content_type: 'recipe', item_id: document.querySelector('[data-copy]')?.dataset.copy || '' });
   });
 
   // ---------------- PWA: service worker e instalação ----------------
@@ -370,5 +435,5 @@
   paintFavs();
   renderTimers();
 
-  window.Chef = { $, $$, esc, store, toast, api, favs, paintFavs, shopping, planner, dateKey, fmtQty, unitLabel, timers, fmtTime, share, beep, density, norm };
+  window.Chef = { $, $$, esc, store, toast, api, favs, paintFavs, shopping, planner, dateKey, fmtQty, unitLabel, timers, fmtTime, share, beep, density, norm, track };
 })();

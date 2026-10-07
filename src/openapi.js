@@ -32,7 +32,7 @@ module.exports = function openapi(baseUrl) {
   };
   return {
     openapi: '3.1.0',
-    info: { title: 'Chef API', version: '1.0.0', description: 'API de receitas. Leitura pública; escrita com `Authorization: Bearer <chave>` (gere chaves em /admin/api).' },
+    info: { title: 'Chef API', version: '1.0.0', description: 'API de receitas. Leitura pública; escrita com `Authorization: Bearer <chave>` (gere chaves em /admin/api). Limites por IP: 600 leituras/min e 120 escritas/min (cabeçalhos RateLimit-*). Autores só alteram as próprias receitas.' },
     servers: [{ url: `${baseUrl}/api/v1` }],
     components: { securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } }, schemas: { RecipeInput: recipeInput } },
     paths: {
@@ -67,6 +67,10 @@ module.exports = function openapi(baseUrl) {
       '/products': { get: { summary: 'Produtos de afiliado', security: auth, responses: { 200: { description: 'Lista' } } }, post: { summary: 'Cria produto (ASIN ou link Amazon)', security: auth, responses: { 201: { description: 'Criado' } } } },
       '/ads': { get: { summary: 'Anúncios e posições', security: auth, responses: { 200: { description: 'Lista' } } }, post: { summary: 'Cria anúncio', security: auth, responses: { 201: { description: 'Criado' } } } },
       '/settings': { get: { summary: 'Configurações', security: auth, responses: { 200: { description: 'Objeto' } } }, put: { summary: 'Atualiza configurações', security: auth, responses: { 200: { description: 'Objeto' } } } },
+      '/auth/login': { post: { summary: 'Login (cookie de sessão). Limite: 10 tentativas/15 min por IP e bloqueio da conta após 5 erros', responses: { 200: { description: 'OK' }, 401: { description: 'Credenciais inválidas' }, 429: { description: 'Muitas tentativas' } } } },
+      '/auth/logout-all': { post: { summary: 'Encerra a sessão em todos os aparelhos', security: auth, responses: { 200: { description: 'OK' } } } },
+      '/uploads/{id}': { delete: { summary: 'Remove um arquivo enviado (somente o dono ou admin)', security: auth, parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], responses: { 200: { description: 'Removido' } } } },
+      '/audit': { get: { summary: 'Registro de auditoria (admin)', security: auth, responses: { 200: { description: 'Lista' } } } },
       '/stats': { get: { summary: 'Estatísticas', security: auth, responses: { 200: { description: 'Objeto' } } } },
     },
   };

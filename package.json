@@ -12,11 +12,14 @@
     "start": "node --disable-warning=ExperimentalWarning server.js",
     "dev": "node --disable-warning=ExperimentalWarning --watch server.js",
     "seed": "node --disable-warning=ExperimentalWarning scripts/seed.js",
+    "stress": "node --disable-warning=ExperimentalWarning scripts/stress.js",
+    "audit:secrets": "node scripts/check-secrets.js",
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
   },
   "license": "MIT",
   "dependencies": {
     "cheerio": "^1.2.0",
+    "compression": "^1.8.2",
     "express": "^5.2.1",
     "multer": "^2.4.0",
     "qrcode": "^1.5.4"

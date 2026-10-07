@@ -1,7 +1,7 @@
 /* Chef — página da receita: porções, checklist, progresso, timeline e Modo Cozinha */
 (() => {
   'use strict';
-  const { $, $$, esc, store, toast, api, shopping, planner, dateKey, fmtQty, unitLabel, timers, share } = window.Chef;
+  const { $, $$, esc, store, toast, api, shopping, planner, dateKey, fmtQty, unitLabel, timers, share, track } = window.Chef;
   const dataEl = $('#recipe-data');
   if (!dataEl) return;
   const R = JSON.parse(dataEl.textContent);
@@ -160,7 +160,20 @@
     }
     if (e.target.closest('[data-add-list]')) {
       shopping.addRecipe(R, factor());
+      track('add_to_shopping_list', { item_id: R.code });
       toast(`🛒 ${R.ingredients.length} itens adicionados à lista de compras`);
+    }
+    if (e.target.closest('[data-print]')) { track('print', { item_id: R.code }); window.print(); }
+    const cl = e.target.closest('[data-copy-link]');
+    if (cl) {
+      try { await navigator.clipboard.writeText(cl.dataset.copyLink); toast('🔗 Link copiado!'); } catch { prompt('Copie o link:', cl.dataset.copyLink); }
+      track('share', { method: 'copy_link', item_id: R.code });
+    }
+    const em = e.target.closest('[data-embed]');
+    if (em) {
+      const code = `<iframe src="${location.origin}/embed/${em.dataset.embed}" width="100%" height="160" style="border:0;max-width:560px" loading="lazy" title="${R.title.replace(/"/g, '')}"></iframe>`;
+      try { await navigator.clipboard.writeText(code); toast('📋 Código para incorporar copiado! Cole no seu site ou blog.'); } catch { prompt('Copie o código:', code); }
+      track('share', { method: 'embed', item_id: R.code });
     }
     if (e.target.closest('[data-qr]')) {
       const d = $('.qr-dialog');
@@ -381,7 +394,7 @@
 
   if (cook.el) {
     document.addEventListener('click', (e) => {
-      if (e.target.closest('[data-cook-start]')) cook.start(false);
+      if (e.target.closest('[data-cook-start]')) { cook.start(false); track('cook_mode_start', { item_id: R.code }); }
       if (e.target.closest('[data-cook-resume]')) cook.start(true);
       if (!cook.open) return;
       if (e.target.closest('[data-cook-close]')) cook.close();
@@ -405,6 +418,7 @@
         state.steps = R.steps.map((_, i) => i);
         save();
         api(`/recipes/${R.id}/cooked`, { method: 'POST' }).catch(() => {});
+        track('recipe_cooked', { item_id: R.code });
         const done = store.get('cookedLog', []);
         done.unshift({ id: R.id, slug: R.slug, title: R.title, at: Date.now() });
         store.set('cookedLog', done.slice(0, 200));

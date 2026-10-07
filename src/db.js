@@ -1,5 +1,6 @@
 'use strict';
 const { DatabaseSync } = require('node:sqlite');
+const fs = require('node:fs');
 const config = require('./config');
 
 let db;
@@ -140,12 +141,54 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS recipe_slugs (
+  slug TEXT PRIMARY KEY,
+  recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS uploads (
+  id INTEGER PRIMARY KEY,
+  filename TEXT NOT NULL UNIQUE,
+  mime TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  original_name TEXT DEFAULT '',
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER,
+  action TEXT NOT NULL,
+  detail TEXT DEFAULT '',
+  ip_hash TEXT DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
 `;
+
+// Colunas adicionadas depois da primeira versão (migração automática e idempotente)
+const COLUMNS = [
+  ['users', 'session_version', 'INTEGER NOT NULL DEFAULT 0'],
+  ['recipes', 'seo_title', "TEXT DEFAULT ''"],
+  ['recipes', 'seo_description', "TEXT DEFAULT ''"],
+];
+
+function migrate(d) {
+  for (const [table, col, def] of COLUMNS) {
+    const exists = d.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+    if (!exists) d.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+  }
+}
 
 function open(file = config.dbFile) {
   db = new DatabaseSync(file);
+  // Banco acessível apenas pelo usuário do processo
+  if (file !== ':memory:') for (const f of [file, `${file}-wal`, `${file}-shm`]) { try { fs.chmodSync(f, 0o600); } catch { /* ainda não existe */ } }
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
 }
 

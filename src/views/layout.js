@@ -2,6 +2,7 @@
 const { esc } = require('../util');
 const settings = require('../settings');
 const { renderAd } = require('../monetization');
+const { seoHead, trackingHead, gtmNoscript, consentBanner, jsonLdTags } = require('./head');
 
 const ASSET_VERSION = Date.now().toString(36);
 
@@ -42,22 +43,20 @@ function icon(name, cls = '') {
   return `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 }
 
-function layout({ title, description, body, head = '', canonical = '', image = '', bodyClass = '', jsonLd = null, scripts = [], noindex = false, user = null, nav = '' }) {
+function layout({ title, seoTitle, description, body, head = '', canonical = '', image = '', imageAlt = '', type = 'website', article = null, prev = '', next = '', bodyClass = '', jsonLd = null, scripts = [], noindex = false, user = null, nav = '' }) {
   const s = settings.all();
-  const fullTitle = title ? `${title} · ${s.siteName}` : `${s.siteName} — ${s.tagline}`;
-  const desc = description || s.description;
-  const adsense = s.adsEnabled && s.adsenseClient
-    ? `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${esc(s.adsenseClient)}" crossorigin="anonymous"></script>`
-    : '';
+  const t = seoTitle || title;
+  const fullTitle = t ? `${t} · ${s.siteName}` : `${s.siteName} — ${s.tagline}`;
+  const desc = String(description || s.description).replace(/\s+/g, ' ').trim().slice(0, 300);
   const navItem = (href, ic, label, key) => `<a href="${href}" class="${nav === key ? 'active' : ''}"${nav === key ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></a>`;
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${esc(fullTitle)}</title>
-<meta name="description" content="${esc(desc)}">
+${seoHead({ title: t, fullTitle, description: desc, canonical, image, imageAlt, type, noindex, article, prev, next })}
 <meta name="theme-color" content="${esc(s.themeColor)}">
+<meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -65,23 +64,17 @@ function layout({ title, description, body, head = '', canonical = '', image = '
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="${esc(s.siteName)}">
-<meta property="og:site_name" content="${esc(s.siteName)}">
-<meta property="og:title" content="${esc(title || s.siteName)}">
-<meta property="og:description" content="${esc(desc)}">
-<meta property="og:type" content="${jsonLd && jsonLd['@type'] === 'Recipe' ? 'article' : 'website'}">
-${canonical ? `<link rel="canonical" href="${esc(canonical)}"><meta property="og:url" content="${esc(canonical)}">` : ''}
-${image ? `<meta property="og:image" content="${esc(image)}"><meta name="twitter:card" content="summary_large_image">` : ''}
-${noindex ? '<meta name="robots" content="noindex">' : ''}
 <link rel="alternate" type="application/rss+xml" title="${esc(s.siteName)}" href="/feed.xml">
 <style>:root{--brand:${esc(s.themeColor)}}</style>
 <script>try{var t=localStorage.getItem('chef:theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="stylesheet" href="/css/app.css?v=${ASSET_VERSION}">
-${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>` : ''}
-${adsense}
+${jsonLdTags(jsonLd)}
+${trackingHead()}
 ${head}
 ${s.headHtml || ''}
 </head>
 <body class="${esc(bodyClass)}">
+${gtmNoscript()}
 <a class="skip" href="#main">Pular para o conteúdo</a>
 <header class="topbar">
   <div class="wrap topbar-in">
@@ -112,10 +105,10 @@ ${renderAd('footer')}
     <div>
       <strong>${esc(s.siteName)}</strong>
       <p>${esc(s.tagline)}</p>
-      <p class="social">${Object.entries(s.social || {}).filter(([, v]) => v).map(([k, v]) => `<a href="${esc(v)}" rel="me noopener" target="_blank">${esc(k)}</a>`).join(' · ')}</p>
+      <p class="social">${Object.entries(s.social || {}).filter(([, v]) => v).map(([k, v]) => `<a href="${esc(v)}" rel="me noopener" target="_blank">${esc(k === 'x' ? 'X' : k)}</a>`).join(' · ')}</p>
     </div>
     <div class="footer-links">
-      <a href="/sobre">Sobre</a><a href="/categorias">Categorias</a><a href="/feed.xml">RSS</a><a href="/api/docs">API</a><a href="/conversor">Conversor de medidas</a><a href="/admin">Entrar</a>
+      <a href="/sobre">Sobre</a><a href="/categorias">Categorias</a><a href="/conversor">Conversor de medidas</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos de uso</a>${s.consentBanner ? '<button class="link" data-consent-open>Cookies</button>' : ''}<a href="/feed.xml">RSS</a><a href="/api/docs">API</a><a href="/admin" rel="nofollow">Entrar</a>
     </div>
   </div>
 </footer>
@@ -127,6 +120,7 @@ ${renderAd('footer')}
   ${navItem('/planejador', 'calendar', 'Cardápio', 'plan')}
 </nav>
 <div class="toast" role="status" aria-live="polite"></div>
+${consentBanner()}
 <div class="install-banner" hidden>
   <span>${icon('download')} Instale o app ${esc(s.siteName)} para usar offline</span>
   <button class="btn btn-sm" data-install>Instalar</button>

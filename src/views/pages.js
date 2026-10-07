@@ -4,6 +4,7 @@ const { layout, icon } = require('./layout');
 const c = require('./components');
 const { renderAd } = require('../monetization');
 const settings = require('../settings');
+const { organizationLd, websiteLd, itemListLd, breadcrumbLd } = require('./head');
 
 const esc = u.esc;
 
@@ -42,7 +43,7 @@ ${categories.length ? `<section class="wrap cat-strip" aria-label="Categorias">$
   ${!latest.length ? `<section class="empty-state"><h2>Nenhuma receita publicada ainda</h2><p>${user ? '<a class="btn btn-primary" href="/admin/receitas/nova">Criar a primeira receita</a> ou <a href="/admin/importar">importar de uma URL</a>' : 'Volte em breve!'}</p></section>` : ''}
   ${s.newsletterEnabled ? `<form class="newsletter newsletter-wide" data-newsletter><div><h3>Receitas novas no seu e-mail</h3><p>Uma vez por semana, sem spam.</p></div><input type="email" name="email" placeholder="seu@email.com" required><button class="btn btn-primary">Inscrever</button></form>` : ''}
 </div>`;
-  return layout({ body, nav: 'home', user, canonical: '', jsonLd: { '@context': 'https://schema.org', '@type': 'WebSite', name: s.siteName, potentialAction: { '@type': 'SearchAction', target: '/busca?q={search_term_string}', 'query-input': 'required name=search_term_string' } } });
+  return layout({ body, nav: 'home', user, jsonLd: [organizationLd(), websiteLd(), latest.length ? itemListLd(latest) : null] });
 }
 
 function filters(q, categories) {
@@ -61,7 +62,7 @@ function filters(q, categories) {
   </form>`;
 }
 
-function listing({ title, intro = '', result, q = {}, categories, basePath = '/busca', user, nav = 'search', canonical = '' }) {
+function listing({ title, intro = '', result, q = {}, categories, basePath = '/busca', user, nav = 'search', canonical = '', description = '', crumbs = null, indexable = false }) {
   const qs = (page) => {
     const p = new URLSearchParams(Object.entries({ ...q, page }).filter(([, v]) => v !== undefined && v !== ''));
     return `${basePath}?${p}`;
@@ -75,7 +76,18 @@ function listing({ title, intro = '', result, q = {}, categories, basePath = '/b
     ${c.grid(result.items, { adHtml: renderAd('home_inline') })}
     ${c.pagination(result.page, result.pages, qs)}
   </div>`;
-  return layout({ title, body, user, nav, canonical, noindex: !!q.q });
+  // Páginas de busca/filtro não são indexadas (conteúdo duplicado); categorias e tags sim
+  const filtered = ['q', 'maxTime', 'difficulty', 'sort', 'diet', 'ingredients'].some((k) => q[k]);
+  const pageHref = (p) => (p > 1 ? `${basePath}?page=${p}` : basePath);
+  return layout({
+    title: result.page > 1 ? `${title} — página ${result.page}` : title,
+    description: description || `${result.total} receitas: ${title}. Receitas testadas com passo a passo, timers e modo cozinha.`,
+    body, user, nav, canonical,
+    noindex: filtered || !indexable || !result.total,
+    prev: !filtered && result.page > 1 ? pageHref(result.page - 1) : '',
+    next: !filtered && result.page < result.pages ? pageHref(result.page + 1) : '',
+    jsonLd: [result.items.length ? itemListLd(result.items) : null, crumbs ? breadcrumbLd(crumbs) : null],
+  });
 }
 
 function categoriesPage({ categories, user }) {
@@ -85,8 +97,8 @@ function categoriesPage({ categories, user }) {
 }
 
 /** Páginas que são renderizadas no cliente a partir do armazenamento local (funcionam offline). */
-function clientPage({ title, nav, user, body, scripts = [] }) {
-  return layout({ title, nav, user, body: `<div class="wrap">${body}</div>`, scripts: ['/js/tools.js', ...scripts], noindex: true });
+function clientPage({ title, nav, user, body, scripts = [], indexable = false, description = '' }) {
+  return layout({ title, description, nav, user, body: `<div class="wrap">${body}</div>`, scripts: ['/js/tools.js', ...scripts], noindex: !indexable });
 }
 
 function favorites(user) {
@@ -116,7 +128,7 @@ function fridge({ user, q }) {
 }
 
 function converter(user) {
-  return clientPage({ title: 'Conversor de medidas', nav: '', user, body: `<header class="page-head"><h1>Conversor de medidas</h1><p>Converta xícaras e colheres em gramas e mililitros (valores aproximados).</p></header>
+  return clientPage({ title: 'Conversor de medidas de cozinha (xícara, colher, gramas)', description: 'Converta xícaras e colheres em gramas e mililitros para farinha, açúcar, manteiga, chocolate e mais. Tabela de temperatura do forno.', indexable: true, nav: '', user, body: `<header class="page-head"><h1>Conversor de medidas</h1><p>Converta xícaras e colheres em gramas e mililitros (valores aproximados).</p></header>
     <form class="converter" data-converter>
       <input type="number" step="any" min="0" value="1" name="amount" aria-label="Quantidade">
       <select name="unit" aria-label="Unidade"><option value="xícara">xícara</option><option value="colher de sopa">colher de sopa</option><option value="colher de chá">colher de chá</option><option value="copo">copo americano</option><option value="ml">ml</option><option value="g">g</option></select>
@@ -134,7 +146,38 @@ function about({ user, author }) {
   const s = settings.all();
   const body = `<div class="wrap narrow prose"><h1>Sobre</h1>${author?.avatar ? `<img class="avatar-lg" src="${esc(author.avatar)}" alt="">` : ''}${u.miniMarkdown(s.aboutText)}${author?.bio ? u.miniMarkdown(author.bio) : ''}
   <h2>Como usar</h2><ul><li><b>Busque por código:</b> cada receita tem um código curto (ex.: <code>#K7M2QX</code>). Digite na busca ou acesse <code>/c/K7M2QX</code>.</li><li><b>Modo cozinha:</b> tela cheia com um passo por vez, timers automáticos, leitura em voz alta e comandos de voz. A tela não apaga enquanto você cozinha.</li><li><b>Ajuste porções:</b> as quantidades são recalculadas automaticamente.</li><li><b>Instale o app:</b> no celular, use "Adicionar à tela inicial" para usar offline.</li></ul></div>`;
-  return layout({ title: 'Sobre', body, user });
+  return layout({ title: 'Sobre', description: String(s.aboutText || '').slice(0, 160), body, user, jsonLd: author ? { '@context': 'https://schema.org', '@type': 'ProfilePage', mainEntity: { '@type': 'Person', name: author.name, description: author.bio || undefined, image: author.avatar || undefined, sameAs: Object.values(s.social || {}).filter(Boolean) } } : null });
+}
+
+function legalPage({ user, kind }) {
+  const s = settings.all();
+  const name = esc(s.siteName);
+  const privacy = `<h1>Política de privacidade</h1>
+  <p>Esta política explica como o <b>${name}</b> trata dados pessoais, conforme a Lei Geral de Proteção de Dados (LGPD — Lei 13.709/2018).</p>
+  <h2>Dados que coletamos</h2><ul>
+  <li><b>Comentários e avaliações:</b> nome e texto que você escreve. Seu endereço IP é guardado apenas de forma irreversível (hash) para combater spam.</li>
+  <li><b>Newsletter:</b> seu e-mail, somente se você se inscrever. Você pode pedir a remoção a qualquer momento.</li>
+  <li><b>Favoritos, lista de compras, cardápio e progresso nas receitas:</b> ficam salvos <i>apenas no seu aparelho</i> e não são enviados para nós.</li>
+  <li><b>Medição de audiência e anúncios</b> (Google Analytics, Google AdSense, Meta Pixel, Microsoft Clarity, quando ativos): usam cookies <i>somente após o seu consentimento</i>. Sem consentimento, os anúncios exibidos não são personalizados.</li></ul>
+  <h2>Cookies</h2><p>Usamos um cookie técnico para manter o login do painel. Cookies de medição e publicidade só são ativados se você clicar em “Aceitar”. Você pode mudar sua escolha em <button class="link" data-consent-open>preferências de cookies</button>.</p>
+  <h2>Links de afiliado</h2><p>${esc(s.amazonDisclosure)}</p>
+  <h2>Seus direitos</h2><p>Você pode solicitar acesso, correção ou exclusão dos seus dados entrando em contato pelos nossos canais${Object.values(s.social || {}).some(Boolean) ? ' nas redes sociais' : ''}.</p>
+  <p><small>Última atualização: ${new Date().getFullYear()}.</small></p>`;
+  const terms = `<h1>Termos de uso</h1>
+  <p>Ao usar o <b>${name}</b>, você concorda com estes termos.</p>
+  <h2>Conteúdo</h2><p>As receitas, textos, fotos e vídeos pertencem aos seus autores. Você pode compartilhar links e usar o recurso “Incorporar”, mas não pode copiar o conteúdo integral sem autorização.</p>
+  <h2>Comentários</h2><p>Comentários ofensivos, spam ou com propaganda podem ser removidos sem aviso.</p>
+  <h2>Responsabilidade</h2><p>As informações nutricionais e conversões de medidas são aproximadas. Verifique alergias e restrições alimentares antes de preparar uma receita.</p>
+  <h2>API</h2><p>O uso da API está sujeito a limites de requisições. Chaves de acesso são pessoais e podem ser revogadas em caso de abuso.</p>`;
+  return layout({ title: kind === 'privacy' ? 'Política de privacidade' : 'Termos de uso', user, body: `<div class="wrap narrow prose">${kind === 'privacy' ? privacy : terms}</div>` });
+}
+
+/** Cartão para incorporar a receita em outros sites (iframe). */
+function embed({ r, base }) {
+  const time = u.formatMinutes(r.total_minutes);
+  const s = settings.all();
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><link rel="canonical" href="${esc(base)}/receita/${esc(r.slug)}"><title>${esc(r.title)}</title><link rel="stylesheet" href="/css/app.css"><style>:root{--brand:${esc(s.themeColor)}}body{padding:0;background:transparent}.embed{display:flex;gap:14px;padding:12px;border:1px solid var(--line);border-radius:18px;background:var(--surface);text-decoration:none;font-family:var(--font)}.embed img{width:120px;height:120px;object-fit:cover;border-radius:12px}.embed h1{font-size:1.15rem;margin:0 0 4px}.embed p{margin:0 0 6px;color:var(--ink-2);font-size:.9rem}.embed small{color:var(--brand);font-weight:700}</style></head>
+  <body><a class="embed" href="${esc(base)}/receita/${esc(r.slug)}?utm_source=embed&utm_medium=iframe" target="_blank" rel="noopener">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : ''}<span><h1>${esc(r.title)}</h1><p>${esc(r.description || '')}</p><p>${time ? `⏱ ${time} · ` : ''}#${esc(r.code)}</p><small>Ver receita completa no ${esc(s.siteName)} →</small></span></a></body></html>`;
 }
 
 function notFound(user, message = 'Página não encontrada') {
@@ -147,7 +190,8 @@ function offline() {
 
 function apiDocs(base) {
   const body = `<div class="wrap narrow prose"><h1>API do ${esc(settings.all().siteName)}</h1>
-  <p>API REST em JSON. Leitura pública (CORS liberado); escrita exige uma chave gerada em <a href="/admin/api">Painel → API</a>.</p>
+  <p>API REST em JSON. Leitura pública (CORS liberado); escrita exige uma chave gerada em <a href="/admin/api">Painel → API</a>, enviada <b>somente</b> no cabeçalho <code>Authorization: Bearer …</code> (nunca na URL).</p>
+  <p><b>Limites:</b> 600 leituras e 120 escritas por minuto por IP (veja os cabeçalhos <code>RateLimit-Remaining</code> e <code>Retry-After</code>); 20 importações por minuto; corpo JSON até 1 MB (20 MB na importação em lote); até 20 arquivos de ${Number(process.env.MAX_UPLOAD_MB) || 200} MB por envio.</p>
   <p>Especificação OpenAPI: <a href="/api/v1/openapi.json"><code>/api/v1/openapi.json</code></a></p>
   <h2>Exemplos</h2>
   <pre><code># Buscar por palavra-chave
@@ -173,9 +217,9 @@ curl -X POST "${esc(base)}/api/v1/import" \\
 curl -X POST "${esc(base)}/api/v1/uploads" -H "Authorization: Bearer SUA_CHAVE" -F "files=@foto.jpg"</code></pre>
   <h2>Endpoints</h2>
   <table class="table"><tbody>
-  ${[['GET', '/recipes', 'Lista/busca (q, code, category, tag, diet, maxTime, difficulty, ingredients, sort, page, perPage)'], ['GET', '/recipes/{id|código|slug}', 'Detalhe'], ['GET', '/recipes/code/{código}', 'Busca exata por código'], ['POST', '/recipes', 'Criar 🔑'], ['PUT/PATCH', '/recipes/{ref}', 'Atualizar 🔑'], ['DELETE', '/recipes/{ref}', 'Remover 🔑'], ['POST', '/recipes/{ref}/duplicate', 'Duplicar 🔑'], ['GET/POST', '/recipes/{ref}/comments', 'Comentários e notas'], ['GET', '/search/suggest?q=', 'Autocomplete'], ['POST', '/import', 'Importar por URL 🔑'], ['POST', '/import/json', 'Importar JSON em lote 🔑'], ['GET', '/export', 'Backup completo 🔑'], ['POST', '/uploads', 'Fotos e vídeos 🔑'], ['GET/POST', '/categories', 'Categorias'], ['GET', '/tags', 'Tags'], ['GET/POST/PUT/DELETE', '/products', 'Produtos de afiliado 🔑'], ['GET/POST/PUT/DELETE', '/ads', 'Anúncios 🔑'], ['GET/PUT', '/settings', 'Configurações 🔑'], ['GET', '/stats', 'Estatísticas 🔑']].map(([m, p, d]) => `<tr><td><code>${m}</code></td><td><code>/api/v1${esc(p)}</code></td><td>${d}</td></tr>`).join('')}
+  ${[['GET', '/recipes', 'Lista/busca (q, code, category, tag, diet, maxTime, difficulty, ingredients, sort, page, perPage)'], ['GET', '/recipes/{id|código|slug}', 'Detalhe'], ['GET', '/recipes/code/{código}', 'Busca exata por código'], ['POST', '/recipes', 'Criar 🔑'], ['PUT/PATCH', '/recipes/{ref}', 'Atualizar 🔑'], ['DELETE', '/recipes/{ref}', 'Remover 🔑'], ['POST', '/recipes/{ref}/duplicate', 'Duplicar 🔑'], ['GET/POST', '/recipes/{ref}/comments', 'Comentários e notas'], ['GET', '/search/suggest?q=', 'Autocomplete'], ['POST', '/import', 'Importar por URL 🔑'], ['POST', '/import/json', 'Importar JSON em lote 🔑'], ['GET', '/export', 'Backup completo 🔑'], ['POST', '/uploads', 'Fotos e vídeos 🔑'], ['GET/POST', '/categories', 'Categorias'], ['GET', '/tags', 'Tags'], ['GET/POST/PUT/DELETE', '/products', 'Produtos de afiliado 🔑'], ['GET/POST/PUT/DELETE', '/ads', 'Anúncios 🔑'], ['GET/PUT', '/settings', 'Configurações 🔑'], ['GET', '/stats', 'Estatísticas 🔑'], ['POST', '/auth/logout-all', 'Sair de todos os aparelhos 🔑'], ['DELETE', '/uploads/{id}', 'Remover arquivo 🔑'], ['GET', '/audit', 'Auditoria (admin) 🔑']].map(([m, p, d]) => `<tr><td><code>${m}</code></td><td><code>/api/v1${esc(p)}</code></td><td>${d}</td></tr>`).join('')}
   </tbody></table></div>`;
   return layout({ title: 'API', body });
 }
 
-module.exports = { home, listing, categoriesPage, favorites, shoppingList, planner, fridge, converter, about, notFound, offline, apiDocs };
+module.exports = { legalPage, embed, home, listing, categoriesPage, favorites, shoppingList, planner, fridge, converter, about, notFound, offline, apiDocs };

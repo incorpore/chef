@@ -22,13 +22,14 @@ ${user ? `<aside class="admin-nav">
   ${item('/admin/receitas', 'list', 'Receitas', 'recipes')}
   ${item('/admin/receitas/nova', 'plus', 'Nova receita', 'new')}
   ${item('/admin/importar', 'download', 'Importar', 'import')}
-  ${item('/admin/categorias', 'layers', 'Categorias', 'cats')}
+  ${user.role === 'admin' ? item('/admin/categorias', 'layers', 'Categorias', 'cats') : ''}
   ${item('/admin/comentarios', 'star', 'Comentários', 'comments')}
-  ${item('/admin/produtos', 'cart', 'Afiliados Amazon', 'products')}
+  ${user.role === 'admin' ? item('/admin/produtos', 'cart', 'Afiliados Amazon', 'products') : ''}
   ${user.role === 'admin' ? item('/admin/anuncios', 'flame', 'Anúncios', 'ads') : ''}
   ${item('/admin/api', 'qr', 'API', 'api')}
   ${user.role === 'admin' ? item('/admin/configuracoes', 'edit', 'Configurações', 'settings') : ''}
   ${user.role === 'admin' ? item('/admin/usuarios', 'users', 'Usuários', 'users') : ''}
+  ${user.role === 'admin' ? item('/admin/auditoria', 'list', 'Auditoria', 'audit') : ''}
   <button class="logout" data-logout>${icon('x')}<span>Sair</span></button>
 </aside>` : ''}
 <main class="admin-main">${body}</main>
@@ -39,13 +40,14 @@ ${scripts.map((s2) => `<script src="${s2}?v=${ASSET_VERSION}" defer></script>`).
 </body></html>`;
 }
 
-function authPage({ mode, next = '/admin' }) {
+function authPage({ mode, next = '/admin', needsToken = false, prefillToken = '' }) {
   const setup = mode === 'setup';
   const body = `<div class="auth-box">
     <div class="brand-big">${icon('chef')}</div>
     <h1>${setup ? 'Bem-vindo! Vamos configurar seu site' : 'Entrar no painel'}</h1>
     <form data-auth="${setup ? 'setup' : 'login'}" data-next="${esc(next)}">
-      ${setup ? '<label>Nome do site<input name="siteName" value="Chef" required></label><label>Seu nome<input name="name" required></label>' : ''}
+      ${setup && needsToken ? `<label>Token de instalação<input name="setupToken" value="${esc(prefillToken)}" required autocomplete="off"><small>Aparece no log do servidor na primeira inicialização (ou defina SETUP_TOKEN).</small></label>` : ''}
+      ${setup ? '<label>Nome do site<input name="siteName" value="Chef" required maxlength="60"></label><label>Seu nome<input name="name" required maxlength="80"></label>' : ''}
       <label>E-mail<input type="email" name="email" required autocomplete="username"></label>
       <label>Senha<input type="password" name="password" required minlength="8" autocomplete="${setup ? 'new-password' : 'current-password'}"></label>
       <button class="btn btn-primary btn-block">${setup ? 'Criar conta de administrador' : 'Entrar'}</button>
@@ -143,7 +145,7 @@ function editor({ user, recipe, categories, products }) {
           ${field('Cozinha', `<input name="cuisine" value="${esc(r.cuisine)}" placeholder="Brasileira, Italiana…">`)}
           ${field('Tags', `<input name="tags" value="${esc(r.tags.join(', '))}" placeholder="bolo, café da tarde, fácil">`, 'Separe por vírgula')}
           ${field('Dietas', `<input name="diets" value="${esc(r.diets.join(', '))}" placeholder="vegetariana, sem glúten, sem lactose">`)}
-          <label class="check"><input type="checkbox" name="featured"${r.featured ? ' checked' : ''}> Destacar na página inicial</label>
+          ${user.role === 'admin' ? `<label class="check"><input type="checkbox" name="featured"${r.featured ? ' checked' : ''}> Destacar na página inicial</label>` : ''}
         </section>
         <section class="panel">
           <h2>Produtos de afiliado</h2>
@@ -152,6 +154,12 @@ function editor({ user, recipe, categories, products }) {
         <section class="panel">
           <h2>Nutrição <small>(por porção)</small></h2>
           <div class="row2">${[['calories', 'Calorias', 'kcal'], ['protein', 'Proteínas', 'g'], ['carbs', 'Carboidratos', 'g'], ['fat', 'Gorduras', 'g'], ['fiber', 'Fibras', 'g'], ['sodium', 'Sódio', 'mg']].map(([k, l, ph]) => field(l, `<input name="nutrition.${k}" value="${esc(n[k] || '')}" placeholder="${ph}">`)).join('')}</div>
+        </section>
+        <section class="panel">
+          <h2>SEO (Google)</h2>
+          ${field('Título para o Google', `<input name="seo_title" value="${esc(r.seo_title || '')}" maxlength="120" placeholder="Gerado a partir do título" data-count="60">`, 'Ideal: até 60 caracteres. Use a palavra-chave principal (ex.: “Bolo de cenoura fofinho”).')}
+          ${field('Descrição para o Google', `<textarea name="seo_description" rows="3" maxlength="320" placeholder="Gerada automaticamente se vazia" data-count="155">${esc(r.seo_description || '')}</textarea>`, 'Ideal: 120 a 155 caracteres.')}
+          <div class="serp" data-serp aria-label="Prévia no Google"><small data-serp-url></small><strong data-serp-title></strong><p data-serp-desc></p></div>
         </section>
         <section class="panel">
           <h2>Fonte</h2>
@@ -273,6 +281,22 @@ function settingsPage({ user }) {
       ${field('Texto "Sobre"', `<textarea name="aboutText" rows="5">${v('aboutText')}</textarea>`)}
     </section>
     <section class="panel"><h2>Redes sociais</h2><div class="row3">${Object.keys(s.social).map((k) => field(k, `<input name="social.${k}" value="${esc(s.social[k])}" placeholder="https://">`)).join('')}</div></section>
+    <section class="panel"><h2>Google Analytics, Tag Manager e pixels</h2>
+      <p><small>Basta colar os IDs — os scripts são inseridos automaticamente e respeitam o consentimento de cookies (LGPD / Consent Mode v2).</small></p>
+      <div class="row2">${field('Google Analytics 4 (ID de medição)', `<input name="ga4Id" value="${v('ga4Id')}" placeholder="G-XXXXXXXXXX">`)}${field('Google Tag Manager', `<input name="gtmId" value="${v('gtmId')}" placeholder="GTM-XXXXXXX">`)}
+      ${field('Meta (Facebook/Instagram) Pixel', `<input name="metaPixelId" value="${v('metaPixelId')}" placeholder="123456789012345">`)}${field('Microsoft Clarity', `<input name="clarityId" value="${v('clarityId')}" placeholder="abcd1234ef">`)}</div>
+      <label class="check"><input type="checkbox" name="consentBanner"${s.consentBanner ? ' checked' : ''}> Exibir aviso de cookies e pedir consentimento (recomendado — exigido pela LGPD e pelo Google AdSense)</label>
+      ${field('Texto do aviso de cookies', `<input name="privacyText" value="${v('privacyText')}">`)}
+    </section>
+    <section class="panel"><h2>Verificação de propriedade</h2>
+      <p><small>Cole apenas o código do atributo <code>content</code> da meta tag fornecida por cada serviço.</small></p>
+      <div class="row2">${field('Google Search Console', `<input name="googleSiteVerification" value="${v('googleSiteVerification')}">`)}${field('Bing Webmaster', `<input name="bingSiteVerification" value="${v('bingSiteVerification')}">`)}
+      ${field('Pinterest', `<input name="pinterestVerification" value="${v('pinterestVerification')}">`)}${field('Facebook (domínio)', `<input name="facebookDomainVerification" value="${v('facebookDomainVerification')}">`)}</div>
+    </section>
+    <section class="panel"><h2>Compartilhamento</h2>
+      <div class="row2">${field('Botões de compartilhar (ordem)', `<input name="shareNetworks" value="${v('shareNetworks')}">`, 'Opções: whatsapp, pinterest, facebook, telegram, x, email')}${field('@ no X/Twitter', `<input name="twitterHandle" value="${v('twitterHandle')}" placeholder="@seusite">`)}</div>
+      ${field('Imagem padrão para compartilhamento (1200×630)', `<input name="defaultOgImage" value="${v('defaultOgImage')}" placeholder="https://... ou /uploads/...">`, 'Usada quando a página não tem foto própria.')}
+    </section>
     <section class="panel"><h2>Amazon Associados</h2>
       <div class="row2">${field('Tag de associado', `<input name="amazonTag" value="${v('amazonTag')}" placeholder="seusite-20">`)}${field('Aviso de afiliado', `<input name="amazonDisclosure" value="${v('amazonDisclosure')}">`)}</div>
     </section>
@@ -285,7 +309,7 @@ function settingsPage({ user }) {
       <label class="check"><input type="checkbox" name="newsletterEnabled"${s.newsletterEnabled ? ' checked' : ''}> Mostrar formulário de newsletter</label>
       <p><a href="/api/v1/subscribers?format=csv">Baixar inscritos (CSV)</a></p>
     </section>
-    <section class="panel"><h2>Avançado</h2>${field('HTML extra no &lt;head&gt;', `<textarea name="headHtml" rows="4" placeholder="Google Analytics, Pixel, verificação do Search Console…">${v('headHtml')}</textarea>`)}</section>
+    <section class="panel"><h2>Avançado</h2>${field('HTML extra no &lt;head&gt;', `<textarea name="headHtml" rows="4" placeholder="Outras ferramentas de medição">${v('headHtml')}</textarea>`, 'Atenção: código inserido aqui roda em todas as páginas. Use apenas códigos de fontes confiáveis.')}</section>
     <button class="btn btn-primary btn-lg">Salvar configurações</button>
   </form>
   <section class="panel"><h2>Minha conta</h2><form data-account class="row3">${field('Nome', `<input name="name" value="${esc(user.name)}">`)}${field('Senha atual', '<input type="password" name="currentPassword" autocomplete="current-password">')}${field('Nova senha', '<input type="password" name="password" minlength="8" autocomplete="new-password">')}${field('Bio', `<textarea name="bio" rows="2">${esc(user.bio || '')}</textarea>`)}${field('Foto (URL)', `<input name="avatar" value="${esc(user.avatar || '')}">`)}<div><button class="btn">Atualizar conta</button></div></form></section>` });
@@ -305,4 +329,15 @@ function usersPage({ user }) {
     <table class="table table-admin"><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th></th></tr></thead><tbody data-user-rows></tbody></table>` });
 }
 
-module.exports = { adminLayout, authPage, dashboard, recipeList, editor, importPage, categoriesPage, commentsPage, productsPage, adsPage, settingsPage, apiPage, usersPage };
+function auditPage({ user }) {
+  return simplePage({ user, title: 'Auditoria', active: 'audit', body: `
+    <section class="panel"><p>Registro das ações sensíveis (logins, falhas de login, chaves de API, configurações, exclusões). IPs são guardados apenas como hash.</p>
+    <button class="btn btn-ghost btn-sm" data-logout-all>Sair de todos os aparelhos</button></section>
+    <table class="table table-admin"><thead><tr><th>Quando</th><th>Usuário</th><th>Ação</th><th>Detalhe</th><th>IP (hash)</th></tr></thead><tbody data-audit-rows></tbody></table>` });
+}
+
+function forbidden({ user }) {
+  return simplePage({ user, title: 'Sem permissão', active: '', body: '<section class="panel"><p>Você só pode editar as suas próprias receitas.</p><p><a class="btn" href="/admin/receitas">Voltar</a></p></section>' });
+}
+
+module.exports = { auditPage, forbidden, adminLayout, authPage, dashboard, recipeList, editor, importPage, categoriesPage, commentsPage, productsPage, adsPage, settingsPage, apiPage, usersPage };

@@ -4,8 +4,16 @@ const { layout, icon } = require('./layout');
 const c = require('./components');
 const { renderAd, renderProducts, productsForIngredients, productLink } = require('../monetization');
 const settings = require('../settings');
+const { breadcrumbLd } = require('./head');
 
 const esc = u.esc;
+
+// Dietas reconhecidas pelo Google (schema.org/RestrictedDiet)
+const DIET_SCHEMA = {
+  vegana: 'https://schema.org/VeganDiet', vegano: 'https://schema.org/VeganDiet', vegetariana: 'https://schema.org/VegetarianDiet', vegetariano: 'https://schema.org/VegetarianDiet',
+  'sem gluten': 'https://schema.org/GlutenFreeDiet', 'sem lactose': 'https://schema.org/LowLactoseDiet', 'low carb': 'https://schema.org/LowCalorieDiet', diabetica: 'https://schema.org/DiabeticDiet',
+  'baixo sodio': 'https://schema.org/LowSaltDiet', halal: 'https://schema.org/HalalDiet', kosher: 'https://schema.org/KosherDiet',
+};
 
 function jsonLd(r, base) {
   const s = settings.all();
@@ -14,28 +22,33 @@ function jsonLd(r, base) {
     '@context': 'https://schema.org',
     '@type': 'Recipe',
     name: r.title,
-    description: r.description,
+    description: r.seo_description || r.description || autoDescription(r),
     image: [r.cover, ...r.images.map((i) => i.url)].filter(Boolean).map(abs),
-    author: { '@type': 'Person', name: r.author_name || s.authorName || s.siteName },
+    author: { '@type': 'Person', name: r.author_name || s.authorName || s.siteName, url: `${base}/sobre` },
+    publisher: { '@id': `${base}/#organization` },
+    inLanguage: 'pt-BR',
+    mainEntityOfPage: `${base}/receita/${r.slug}`,
+    suitableForDiet: r.diets.map((d) => DIET_SCHEMA[u.stripAccents(d).toLowerCase()]).filter(Boolean),
     datePublished: r.published_at || r.created_at,
     dateModified: r.updated_at,
     prepTime: u.minutesToIso(r.prep_minutes),
     cookTime: u.minutesToIso(r.cook_minutes),
     totalTime: u.minutesToIso(r.total_minutes),
-    recipeYield: `${r.servings} ${r.servings_unit}`,
     recipeCategory: r.category?.name,
     recipeCuisine: r.cuisine || undefined,
-    keywords: r.tags.join(', ') || undefined,
+    keywords: [...r.tags, r.cuisine, r.category?.name].filter(Boolean).join(', ') || undefined,
     recipeIngredient: r.ingredients.map((i) => i.raw),
+    recipeYield: [String(r.servings), `${r.servings} ${r.servings_unit}`],
     recipeInstructions: r.steps.map((st, i) => ({ '@type': 'HowToStep', position: i + 1, text: st.text, url: `${base}/receita/${r.slug}#passo-${i + 1}`, image: st.image ? abs(st.image) : undefined })),
     identifier: r.code,
     url: `${base}/receita/${r.slug}`,
   };
-  if (r.rating.count) ld.aggregateRating = { '@type': 'AggregateRating', ratingValue: r.rating.average, ratingCount: r.rating.count };
+  if (r.rating.count) ld.aggregateRating = { '@type': 'AggregateRating', ratingValue: r.rating.average, ratingCount: r.rating.count, bestRating: 5, worstRating: 1 };
   if (r.nutrition) {
     const n = r.nutrition;
     ld.nutrition = { '@type': 'NutritionInformation', calories: n.calories, proteinContent: n.protein, carbohydrateContent: n.carbs, fatContent: n.fat, fiberContent: n.fiber, sodiumContent: n.sodium, sugarContent: n.sugar };
   }
+  if (!ld.suitableForDiet.length) delete ld.suitableForDiet;
   if (r.video) {
     ld.video = { '@type': 'VideoObject', name: r.title, description: r.description || r.title, thumbnailUrl: r.video.type === 'youtube' ? `https://i.ytimg.com/vi/${r.video.id}/hqdefault.jpg` : abs(r.cover), uploadDate: r.published_at || r.created_at, contentUrl: r.video.type === 'file' ? abs(r.video.url) : undefined, embedUrl: r.video.type === 'youtube' ? `https://www.youtube.com/embed/${r.video.id}` : r.video.type === 'vimeo' ? `https://player.vimeo.com/video/${r.video.id}` : undefined };
   }
@@ -125,6 +138,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
       <nav class="crumbs"><a href="/">Início</a> › ${r.category ? `<a href="/categoria/${esc(r.category.slug)}">${esc(r.category.name)}</a> › ` : ''}<span>${esc(r.title)}</span></nav>
       ${r.status !== 'published' ? '<span class="chip chip-warn">Rascunho</span>' : ''}
       <h1>${esc(r.title)}</h1>
+      <p class="byline">Por <a href="/sobre" rel="author">${esc(r.author_name || settings.all().authorName || settings.all().siteName)}</a> · <time datetime="${esc(r.published_at || r.created_at)}">${fmtDate(r.published_at || r.created_at)}</time>${r.updated_at && (r.updated_at || '').slice(0, 10) !== (r.published_at || r.created_at || '').slice(0, 10) ? ` · atualizada em <time datetime="${esc(r.updated_at)}">${fmtDate(r.updated_at)}</time>` : ''}</p>
       <button class="code-badge" data-copy="${esc(r.code)}" title="Copiar código">${icon('qr')} Código <b>#${esc(r.code)}</b></button>
       ${r.description ? `<p class="lead">${esc(r.description)}</p>` : ''}
       <div class="meta-pills">
@@ -142,9 +156,10 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
         <button class="icon-btn lg" data-add-list aria-label="Adicionar à lista de compras">${icon('cart')}</button>
         <button class="icon-btn lg" data-add-plan aria-label="Adicionar ao cardápio">${icon('calendar')}</button>
         <button class="icon-btn lg" data-qr aria-label="QR code">${icon('qr')}</button>
-        <button class="icon-btn lg" onclick="window.print()" aria-label="Imprimir">${icon('print')}</button>
+        <button class="icon-btn lg" data-print aria-label="Imprimir">${icon('print')}</button>
         ${user ? `<a class="icon-btn lg" href="/admin/receitas/${r.id}" aria-label="Editar">${icon('edit')}</a>` : ''}
       </div>
+      ${shareBar(r, base)}
       <div class="resume-banner" hidden>${icon('layers')} Você parou no passo <b data-resume-step></b>. <button class="btn btn-sm" data-cook-resume>Continuar</button> <button class="link" data-progress-reset>Recomeçar</button></div>
     </div>
   </header>
@@ -153,7 +168,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
 
   <div class="recipe-layout">
     <div class="recipe-main">
-      ${r.story ? `<section class="story prose">${u.miniMarkdown(r.story)}</section>` : ''}
+      ${r.story ? `<a class="jump" href="#ingredientes">${icon('arrowR')} Ir direto para a receita</a><section class="story prose">${u.miniMarkdown(r.story)}</section>` : ''}
       ${renderAd('recipe_top')}
       ${r.video ? `<section id="video" class="video-section"><h2>${icon('play')} Vídeo</h2>${c.videoEmbed(r.video, r.title)}</section>` : ''}
 
@@ -238,18 +253,70 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
 <dialog class="qr-dialog"><div class="qr-box"><img alt="QR code da receita" width="240" height="240"><p>Aponte a câmera para abrir a receita<br><b>#${esc(r.code)}</b></p><button class="btn" data-close-dialog>Fechar</button></div></dialog>
 <script type="application/json" id="recipe-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`;
 
+  const crumbs = [['Início', '/'], ...(r.category ? [[r.category.name, `/categoria/${r.category.slug}`]] : []), [r.title, `/receita/${r.slug}`]];
   return layout({
     title: r.title,
-    description: r.description || `Receita de ${r.title}`,
+    seoTitle: r.seo_title || seoTitle(r),
+    description: r.seo_description || r.description || autoDescription(r),
     canonical: `${base}/receita/${r.slug}`,
-    image: r.cover ? (r.cover.startsWith('/') ? base + r.cover : r.cover) : '',
-    jsonLd: jsonLd(r, base),
+    image: r.cover || '',
+    imageAlt: r.title,
+    type: 'article',
+    article: { published: r.published_at || r.created_at, modified: r.updated_at, section: r.category?.name, tags: r.tags },
+    jsonLd: [jsonLd(r, base), breadcrumbLd(crumbs)],
     body,
     bodyClass: 'page-recipe',
     scripts: ['/js/recipe.js'],
     noindex: r.status !== 'published',
     user,
   });
+}
+
+/** Título otimizado (até ~60 caracteres no Google): "Bolo de cenoura: receita fácil e passo a passo". */
+function seoTitle(r) {
+  if (/^receita/i.test(r.title) || r.title.length > 40) return r.title;
+  const suffix = r.difficulty === 1 ? ': receita fácil e passo a passo' : ': receita passo a passo';
+  return `${r.title}${(r.title + suffix).length <= 62 ? suffix : ''}`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(/T|Z$/.test(iso) ? iso : `${iso.replace(' ', 'T')}Z`);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+}
+
+/** Descrição automática para SEO quando o autor não escreveu uma (até ~155 caracteres). */
+function autoDescription(r) {
+  const parts = [`Receita de ${r.title}`];
+  if (r.total_minutes) parts.push(`pronta em ${u.formatMinutes(r.total_minutes)}`);
+  parts.push(`rende ${String(r.servings).replace('.', ',')} ${r.servings_unit}`);
+  const ings = r.ingredients.slice(0, 4).map((i) => i.name.toLowerCase()).join(', ');
+  return `${parts.join(', ')}. ${ings ? `Leva ${ings}. ` : ''}Passo a passo com timers e modo cozinha.`.slice(0, 160);
+}
+
+/** Barra de compartilhamento: links diretos funcionam mesmo sem JavaScript. */
+function shareBar(r, base) {
+  const s = settings.all();
+  const url = `${base}/receita/${r.slug}`;
+  const enc = encodeURIComponent;
+  const text = `${r.title} — receita #${r.code}`;
+  const img = r.cover ? (r.cover.startsWith('/') ? base + r.cover : r.cover) : '';
+  const utm = (src) => `${url}?utm_source=${src}&utm_medium=social&utm_campaign=share`;
+  const nets = {
+    whatsapp: ['WhatsApp', `https://wa.me/?text=${enc(`${text}\n${utm('whatsapp')}`)}`, '#25D366'],
+    pinterest: ['Pinterest', `https://pinterest.com/pin/create/button/?url=${enc(utm('pinterest'))}&media=${enc(img)}&description=${enc(text)}`, '#E60023'],
+    facebook: ['Facebook', `https://www.facebook.com/sharer/sharer.php?u=${enc(utm('facebook'))}`, '#1877F2'],
+    telegram: ['Telegram', `https://t.me/share/url?url=${enc(utm('telegram'))}&text=${enc(text)}`, '#26A5E4'],
+    x: ['X', `https://x.com/intent/post?url=${enc(utm('x'))}&text=${enc(text)}${s.twitterHandle ? `&via=${enc(s.twitterHandle.replace(/^@/, ''))}` : ''}`, '#000'],
+    email: ['E-mail', `mailto:?subject=${enc(r.title)}&body=${enc(`${text}\n\n${url}`)}`, '#6b625a'],
+  };
+  const enabled = String(s.shareNetworks || '').split(',').filter((k) => nets[k]);
+  return `<div class="share-bar" aria-label="Compartilhar">
+    <span>Compartilhar:</span>
+    ${enabled.map((k) => `<a class="share-btn share-${k}" href="${esc(nets[k][1])}" target="_blank" rel="noopener nofollow" data-share-net="${k}" style="--c:${nets[k][2]}" title="Compartilhar no ${nets[k][0]}">${nets[k][0]}</a>`).join('')}
+    <button class="share-btn" data-copy-link="${esc(url)}">Copiar link</button>
+    <button class="share-btn" data-embed="${esc(r.code)}">Incorporar</button>
+  </div>`;
 }
 
 const NUTRI_LABELS = { calories: 'Calorias', protein: 'Proteínas', carbs: 'Carboidratos', fat: 'Gorduras', saturatedFat: 'Gord. saturadas', fiber: 'Fibras', sugar: 'Açúcares', sodium: 'Sódio' };

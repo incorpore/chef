@@ -2,4 +2,12 @@ node_modules/
 data/
 uploads/
 .env
+.env.*
+!.env.example
 *.log
+*.db
+*.db-*
+*.sqlite
+*.pem
+*.key
+.secret

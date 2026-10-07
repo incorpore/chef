@@ -4,9 +4,14 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 
 const root = path.resolve(__dirname, '..');
+
+// Carrega variáveis de um arquivo .env (fora do git e fora da pasta pública), se existir
+const envFile = process.env.ENV_FILE || path.join(root, '.env');
+if (fs.existsSync(envFile) && typeof process.loadEnvFile === 'function') process.loadEnvFile(envFile);
+
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
 const uploadsDir = path.resolve(process.env.UPLOADS_DIR || path.join(root, 'uploads'));
-fs.mkdirSync(dataDir, { recursive: true });
+fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 fs.mkdirSync(uploadsDir, { recursive: true });
 
 // Segredo para assinar sessões. Se não for definido, um é gerado e salvo em data/.
@@ -32,4 +37,5 @@ module.exports = {
   baseUrl: (process.env.BASE_URL || '').replace(/\/$/, ''),
   maxUploadMb: Number(process.env.MAX_UPLOAD_MB) || 200,
   isProd: process.env.NODE_ENV === 'production',
+  setupToken: process.env.SETUP_TOKEN || '',
 };

@@ -1,5 +1,5 @@
 /* Chef — Service Worker: offline, cache de receitas e notificações de timer */
-const VERSION = 'chef-v1';
+const VERSION = 'chef-v2';
 const STATIC = `${VERSION}-static`;
 const PAGES = `${VERSION}-pages`;
 const IMAGES = `${VERSION}-images`;
@@ -20,11 +20,17 @@ async function trim(cacheName, max) {
 }
 
 // Páginas: rede primeiro, cache como fallback (receitas visitadas ficam disponíveis offline)
+/** Nunca guarda respostas privadas (páginas de quem está logado, rascunhos, dados do painel). */
+function cacheable(res) {
+  const cc = res.headers.get('cache-control') || '';
+  return res.ok && !/no-store|private/.test(cc);
+}
+
 async function networkFirst(req) {
   const cache = await caches.open(PAGES);
   try {
     const res = await fetch(req);
-    if (res.ok) { cache.put(req, res.clone()); trim(PAGES, 150); }
+    if (cacheable(res)) { cache.put(req, res.clone()); trim(PAGES, 150); }
     return res;
   } catch {
     const hit = (await cache.match(req, { ignoreSearch: false })) || (await caches.match(req, { ignoreSearch: true }));
@@ -50,8 +56,9 @@ self.addEventListener('fetch', (e) => {
   if (url.origin === location.origin) {
     if (url.pathname.startsWith('/admin') || url.pathname.startsWith('/go/') || url.pathname === '/surpresa') return;
     if (url.pathname.startsWith('/api/')) {
-      // API de leitura: rede primeiro com fallback (para cardápio/lista offline)
-      e.respondWith(fetch(req).then((res) => { if (res.ok) caches.open(PAGES).then((c) => c.put(req, res.clone())); return res; }).catch(() => caches.match(req)));
+      // Só a API pública de leitura vai para o cache offline (nunca chaves, estatísticas, exportação…)
+      if (!/^\/api\/v1\/(recipes|search\/suggest|categories|tags)(\/|$|\?)/.test(url.pathname + url.search)) return;
+      e.respondWith(fetch(req).then((res) => { if (cacheable(res)) { const copy = res.clone(); caches.open(PAGES).then((c) => c.put(req, copy)); } return res; }).catch(() => caches.match(req)));
       return;
     }
     if (req.mode === 'navigate') return e.respondWith(networkFirst(req));
@@ -64,11 +71,12 @@ self.addEventListener('fetch', (e) => {
   if (req.destination === 'image') e.respondWith(staleWhileRevalidate(req, IMAGES));
 });
 
-// Mensagens da página: guardar uma receita favorita para leitura offline
+// Mensagens da página: guardar uma receita favorita para leitura offline / limpar ao sair
 self.addEventListener('message', (e) => {
-  if (e.data?.type === 'cache-url') {
-    caches.open(PAGES).then((c) => c.add(e.data.url)).catch(() => {});
+  if (e.data?.type === 'cache-url' && /^\/receita\/[\w-]+$/.test(e.data.url)) {
+    fetch(e.data.url, { credentials: 'omit' }).then((res) => { if (cacheable(res)) return caches.open(PAGES).then((c) => c.put(e.data.url, res)); }).catch(() => {});
   }
+  if (e.data?.type === 'logout') caches.delete(PAGES);
 });
 
 self.addEventListener('notificationclick', (e) => {

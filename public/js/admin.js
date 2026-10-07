@@ -15,7 +15,44 @@
       location.href = f.dataset.next?.startsWith('/') ? f.dataset.next : '/admin';
     } catch (ex) { err.textContent = ex.message; err.hidden = false; }
   });
-  on('[data-logout]', 'click', async () => { await api('/auth/logout', { method: 'POST' }); location.href = '/'; });
+  const clearOffline = () => navigator.serviceWorker?.controller?.postMessage({ type: 'logout' });
+  on('[data-logout]', 'click', async () => { await api('/auth/logout', { method: 'POST' }); clearOffline(); location.href = '/'; });
+  on('[data-logout-all]', 'click', async () => {
+    if (!confirm('Encerrar a sessão em todos os aparelhos (inclusive este)?')) return;
+    await api('/auth/logout-all', { method: 'POST' });
+    clearOffline();
+    location.href = '/admin/login';
+  });
+
+  // Auditoria
+  const auditRows = $('[data-audit-rows]');
+  if (auditRows) {
+    api('/audit').then(({ items }) => {
+      auditRows.innerHTML = items.map((a) => `<tr><td>${esc(new Date(`${a.created_at.replace(' ', 'T')}Z`).toLocaleString('pt-BR'))}</td><td>${esc(a.email || '—')}</td><td><code>${esc(a.action)}</code></td><td>${esc(a.detail)}</td><td><small>${esc(a.ip_hash)}</small></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Sem registros</td></tr>';
+    });
+  }
+
+  // Contadores de caracteres e prévia do resultado no Google
+  $$('[data-count]').forEach((el) => {
+    const small = el.closest('.field')?.querySelector('small');
+    const ideal = Number(el.dataset.count);
+    const paint = () => { if (small) small.dataset.count = `${el.value.length}/${ideal}`; small?.classList.toggle('over', el.value.length > ideal); };
+    el.addEventListener('input', paint);
+    paint();
+  });
+  const serp = $('[data-serp]');
+  if (serp) {
+    const f = serp.closest('form');
+    const paint = () => {
+      const title = f.seo_title.value || f.title.value || 'Título da receita';
+      const desc = f.seo_description.value || f.description.value || 'A descrição aparece aqui. Escreva algo que convença a pessoa a clicar.';
+      $('[data-serp-url]', serp).textContent = `${location.host} › receita › ${(f.title.value || 'nova-receita').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+      $('[data-serp-title]', serp).textContent = title.length > 60 ? `${title.slice(0, 57)}…` : title;
+      $('[data-serp-desc]', serp).textContent = desc.length > 155 ? `${desc.slice(0, 152)}…` : desc;
+    };
+    f.addEventListener('input', paint);
+    paint();
+  }
 
   // ---------------- Painel ----------------
   const stats = $('[data-stats]');
@@ -187,8 +224,8 @@
     const collect = () => {
       const fd = new FormData(editor);
       const data = {};
-      for (const k of ['title', 'description', 'story', 'video', 'ingredients', 'tips', 'code', 'category_id', 'prep_minutes', 'cook_minutes', 'rest_minutes', 'servings', 'servings_unit', 'difficulty', 'cuisine', 'tags', 'diets', 'source_name', 'source_url', 'status']) data[k] = fd.get(k) ?? '';
-      data.featured = editor.featured.checked;
+      for (const k of ['title', 'description', 'story', 'video', 'ingredients', 'tips', 'code', 'category_id', 'seo_title', 'seo_description', 'prep_minutes', 'cook_minutes', 'rest_minutes', 'servings', 'servings_unit', 'difficulty', 'cuisine', 'tags', 'diets', 'source_name', 'source_url', 'status']) data[k] = fd.get(k) ?? '';
+      if (editor.featured) data.featured = editor.featured.checked;
       data.products = fd.getAll('products').map(Number);
       data.nutrition = {};
       for (const [k, v] of fd) if (k.startsWith('nutrition.') && v) data.nutrition[k.slice(10)] = v;

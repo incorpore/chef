@@ -110,3 +110,10 @@ body.admin { padding: 0; display: flex; min-height: 100vh; }
 .tabs button.active { background: var(--brand); color: #fff; border-color: transparent; }
 .key-reveal { margin-top: 12px; padding: 12px; border-radius: 12px; background: color-mix(in srgb, var(--warn) 14%, var(--surface)); }
 .comment-admin p { margin: 8px 0; }
+
+.field small[data-count]::after { content: " · " attr(data-count); font-variant-numeric: tabular-nums; }
+.field small.over::after { color: var(--danger); font-weight: 700; }
+.serp { padding: 12px 14px; border-radius: 12px; background: #fff; color: #202124; font-family: Arial, sans-serif; border: 1px solid var(--line); }
+.serp small { color: #4d5156; font-size: .78rem; display: block; }
+.serp strong { display: block; color: #1a0dab; font-size: 1.1rem; font-weight: 400; margin: 2px 0; }
+.serp p { margin: 0; font-size: .85rem; color: #4d5156; line-height: 1.4; }

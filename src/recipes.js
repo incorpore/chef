@@ -1,6 +1,7 @@
 'use strict';
 const db = require('./db');
 const u = require('./util');
+const { cleanText } = require('./security');
 
 function hydrate(row) {
   if (!row) return null;
@@ -37,7 +38,8 @@ function uniqueCode(d, wanted, excludeId) {
 function uniqueSlug(d, base, excludeId) {
   const root = u.slugify(base);
   let slug = root;
-  for (let i = 2; d.prepare('SELECT 1 FROM recipes WHERE slug = ? AND id IS NOT ?').get(slug, excludeId ?? null); i++) slug = `${root}-${i}`;
+  const taken = (sl) => d.prepare('SELECT 1 FROM recipes WHERE slug = ? AND id IS NOT ?').get(sl, excludeId ?? null) || d.prepare('SELECT 1 FROM recipe_slugs WHERE slug = ? AND recipe_id IS NOT ?').get(sl, excludeId ?? null);
+  for (let i = 2; taken(slug); i++) slug = `${root}-${i}`;
   return slug;
 }
 
@@ -47,55 +49,98 @@ function clampInt(v, min, max, def) {
   return Math.min(max, Math.max(min, n));
 }
 
-/** Normaliza o payload vindo de formulário/API/importador. Aceita textos ou listas estruturadas. */
+// Limites de tamanho (validação no servidor — nunca confie só no formulário)
+const LIMITS = {
+  title: 200, description: 500, story: 50000, tips: 10000, cuisine: 60, servings_unit: 40, source_url: 2000, source_name: 200,
+  seo_title: 120, seo_description: 320, url: 2000, caption: 300, ingredients: 300, ingredient: 500, steps: 200, step: 5000, images: 40, tags: 30, tag: 40, diets: 15, products: 50,
+};
+
+function bad(msg) {
+  return Object.assign(new Error(msg), { status: 400 });
+}
+
+function text(input, k, max = LIMITS[k]) {
+  const v = cleanText(input[k] ?? '').trim();
+  if (v.length > max) throw bad(`O campo "${k}" excede ${max} caracteres`);
+  return v;
+}
+
+function safeUrl(v, field) {
+  const s = cleanText(v ?? '').trim();
+  if (!s) return '';
+  if (s.length > LIMITS.url || !u.isSafeUrl(s)) throw bad(`URL inválida em "${field}" (use http(s):// ou /uploads/...)`);
+  return s;
+}
+
+/** Normaliza e valida o payload vindo de formulário/API/importador. Aceita textos ou listas estruturadas. */
 function normalizeInput(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw bad('Corpo da requisição inválido');
   const out = {};
-  const has = (k) => input[k] !== undefined;
-  for (const k of ['title', 'description', 'story', 'tips', 'cuisine', 'servings_unit', 'source_url', 'source_name']) if (has(k)) out[k] = String(input[k] ?? '').trim();
-  if (has('cover')) out.cover = u.isSafeUrl(input.cover) ? String(input.cover || '') : '';
+  const has = (k) => input[k] !== undefined && input[k] !== null;
+  for (const k of ['title', 'description', 'story', 'tips', 'cuisine', 'servings_unit', 'source_name', 'seo_title', 'seo_description']) if (has(k)) out[k] = text(input, k);
+  if (has('source_url')) out.source_url = safeUrl(input.source_url, 'source_url');
+  if (has('cover')) out.cover = safeUrl(input.cover, 'cover');
   if (has('images')) {
-    out.images = (Array.isArray(input.images) ? input.images : [])
-      .map((i) => (typeof i === 'string' ? { url: i, caption: '' } : { url: i.url, caption: String(i.caption || '') }))
-      .filter((i) => i.url && u.isSafeUrl(i.url));
+    if (!Array.isArray(input.images)) throw bad('"images" deve ser uma lista');
+    if (input.images.length > LIMITS.images) throw bad(`Máximo de ${LIMITS.images} imagens`);
+    out.images = input.images
+      .map((i) => (typeof i === 'string' ? { url: i, caption: '' } : { url: i?.url, caption: cleanText(i?.caption || '', LIMITS.caption) }))
+      .filter((i) => i.url)
+      .map((i) => ({ url: safeUrl(i.url, 'images'), caption: i.caption }));
   }
   if (has('video')) {
-    const v = u.parseVideo(input.video);
-    out.video = v && u.isSafeUrl(v.url) ? v : null;
+    const raw = typeof input.video === 'object' ? input.video.url : input.video;
+    const url = safeUrl(raw, 'video');
+    out.video = url ? u.parseVideo(url) : null;
   }
   if (has('ingredients')) {
-    out.ingredients = typeof input.ingredients === 'string'
-      ? u.parseIngredientsText(input.ingredients)
-      : (input.ingredients || []).map((i) => (typeof i === 'string' ? u.parseIngredient(i) : { ...u.parseIngredient(i.raw || [i.quantity, i.unit, i.name].filter(Boolean).join(' ')), ...pick(i, ['quantity', 'quantityMax', 'unit', 'name', 'note', 'group', 'productId']) }));
+    const list = typeof input.ingredients === 'string'
+      ? u.parseIngredientsText(cleanText(input.ingredients, LIMITS.ingredients * LIMITS.ingredient))
+      : Array.isArray(input.ingredients) ? input.ingredients.map((i) => {
+          if (typeof i === 'string') return u.parseIngredient(cleanText(i, LIMITS.ingredient));
+          if (!i || typeof i !== 'object') throw bad('Ingrediente inválido');
+          const base = u.parseIngredient(cleanText(i.raw || [i.quantity, i.unit, i.name].filter(Boolean).join(' '), LIMITS.ingredient));
+          const extra = pick(i, ['unit', 'name', 'note', 'group']);
+          for (const k of Object.keys(extra)) extra[k] = cleanText(extra[k], LIMITS.ingredient);
+          for (const k of ['quantity', 'quantityMax']) if (i[k] !== undefined) extra[k] = i[k] === null || i[k] === '' ? null : Number.isFinite(Number(i[k])) ? Math.max(0, Math.min(1e6, Number(i[k]))) : null;
+          return { ...base, ...extra };
+        }) : (() => { throw bad('"ingredients" deve ser texto ou lista'); })();
+    if (list.length > LIMITS.ingredients) throw bad(`Máximo de ${LIMITS.ingredients} ingredientes`);
+    out.ingredients = list;
   }
   if (has('steps')) {
-    out.steps = typeof input.steps === 'string'
-      ? u.parseStepsText(input.steps)
-      : (input.steps || []).map((s) => {
-          const text = String(typeof s === 'string' ? s : s.text || '').trim();
-          const base = { text, group: '', image: '', timer: (u.detectTimers(text)[0] || {}).seconds || null };
-          if (typeof s === 'object') {
-            if (s.group) base.group = String(s.group);
-            if (s.image && u.isSafeUrl(s.image)) base.image = String(s.image);
+    const list = typeof input.steps === 'string'
+      ? u.parseStepsText(cleanText(input.steps, LIMITS.steps * LIMITS.step))
+      : Array.isArray(input.steps) ? input.steps.map((s) => {
+          const t = cleanText(typeof s === 'string' ? s : s?.text || '').trim();
+          if (t.length > LIMITS.step) throw bad(`Passo longo demais (máx. ${LIMITS.step} caracteres)`);
+          const base = { text: t, group: '', image: '', timer: (u.detectTimers(t)[0] || {}).seconds || null };
+          if (s && typeof s === 'object') {
+            if (s.group) base.group = cleanText(s.group, 120);
+            if (s.image) base.image = safeUrl(s.image, 'steps.image');
             if (s.timer !== undefined && s.timer !== '') base.timer = s.timer ? clampInt(s.timer, 0, 172800, null) : null;
           }
           return base;
-        }).filter((s) => s.text);
+        }).filter((s) => s.text) : (() => { throw bad('"steps" deve ser texto ou lista'); })();
+    if (list.length > LIMITS.steps) throw bad(`Máximo de ${LIMITS.steps} passos`);
+    out.steps = list;
   }
   for (const k of ['prep_minutes', 'cook_minutes', 'rest_minutes']) if (has(k)) out[k] = clampInt(input[k], 0, 100000, 0);
-  if (has('servings')) out.servings = Math.max(0.5, Number(String(input.servings).replace(',', '.')) || 4);
+  if (has('servings')) out.servings = Math.min(10000, Math.max(0.5, Number(String(input.servings).replace(',', '.')) || 4));
   if (has('difficulty')) out.difficulty = clampInt(input.difficulty, 1, 3, 2);
-  if (has('category_id')) out.category_id = input.category_id ? Number(input.category_id) || null : null;
+  if (input.category_id !== undefined) out.category_id = input.category_id ? clampInt(input.category_id, 1, Number.MAX_SAFE_INTEGER, null) : null;
   if (has('nutrition')) {
-    const n = input.nutrition && typeof input.nutrition === 'object' ? input.nutrition : null;
-    out.nutrition = n ? Object.fromEntries(Object.entries(n).filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([k, v]) => [k, String(v)])) : null;
+    const n = typeof input.nutrition === 'object' && !Array.isArray(input.nutrition) ? input.nutrition : null;
+    const allowed = ['calories', 'protein', 'carbs', 'fat', 'saturatedFat', 'fiber', 'sugar', 'sodium'];
+    out.nutrition = n ? Object.fromEntries(Object.entries(n).filter(([k, v]) => allowed.includes(k) && v !== '' && v !== null && v !== undefined).map(([k, v]) => [k, cleanText(v, 40)])) : null;
     if (out.nutrition && !Object.keys(out.nutrition).length) out.nutrition = null;
   }
-  if (has('diets')) out.diets = toList(input.diets);
+  if (has('diets')) out.diets = toList(input.diets).slice(0, LIMITS.diets).map((x) => cleanText(x, LIMITS.tag));
   if (has('status')) out.status = ['draft', 'published'].includes(input.status) ? input.status : 'draft';
   if (has('featured')) out.featured = input.featured === true || input.featured === 'on' || input.featured === 'true' || input.featured === 1 ? 1 : 0;
-  if (has('tags')) out.tags = toList(input.tags).map((t) => t.toLowerCase()).slice(0, 30);
-  if (has('products')) out.products = (Array.isArray(input.products) ? input.products : toList(input.products)).map(Number).filter(Boolean);
-  if (has('code')) out.code = input.code;
+  if (has('tags')) out.tags = [...new Set(toList(input.tags).map((t) => cleanText(t, LIMITS.tag).toLowerCase()).filter(Boolean))].slice(0, LIMITS.tags);
+  if (has('products')) out.products = (Array.isArray(input.products) ? input.products : toList(input.products)).map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, LIMITS.products);
+  if (input.code !== undefined) out.code = input.code === null ? '' : cleanText(input.code, 40);
   return out;
 }
 
@@ -110,7 +155,7 @@ function toList(v) {
   return String(v || '').split(',').map((x) => x.trim()).filter(Boolean);
 }
 
-const COLUMNS = ['title', 'description', 'story', 'cover', 'images', 'video', 'ingredients', 'steps', 'tips', 'prep_minutes', 'cook_minutes', 'rest_minutes', 'servings', 'servings_unit', 'difficulty', 'cuisine', 'category_id', 'nutrition', 'diets', 'source_url', 'source_name', 'status', 'featured'];
+const COLUMNS = ['title', 'description', 'story', 'cover', 'images', 'video', 'ingredients', 'steps', 'tips', 'prep_minutes', 'cook_minutes', 'rest_minutes', 'servings', 'servings_unit', 'difficulty', 'cuisine', 'category_id', 'nutrition', 'diets', 'source_url', 'source_name', 'status', 'featured', 'seo_title', 'seo_description'];
 const JSON_COLS = new Set(['images', 'video', 'ingredients', 'steps', 'nutrition', 'diets']);
 
 function toDbValue(k, v) {
@@ -182,8 +227,14 @@ function update(id, input) {
       vals.push(uniqueCode(d, data.code || null, id));
     }
     if (data.title && data.title !== current.title && input.keepSlug !== true) {
-      sets.push('slug = ?');
-      vals.push(uniqueSlug(d, data.title, id));
+      const slug = uniqueSlug(d, data.title, id);
+      if (slug !== current.slug) {
+        sets.push('slug = ?');
+        vals.push(slug);
+        // Guarda o endereço antigo para redirecionar com 301 (não perde posição no Google nem links compartilhados)
+        d.prepare('INSERT OR REPLACE INTO recipe_slugs (slug, recipe_id) VALUES (?, ?)').run(current.slug, id);
+        d.prepare('DELETE FROM recipe_slugs WHERE slug = ?').run(slug);
+      }
     }
     if (data.status === 'published' && !current.published_at) {
       sets.push('published_at = ?');
@@ -209,6 +260,14 @@ function getById(id) {
 }
 function getBySlug(slug) {
   return hydrate(db.get().prepare('SELECT * FROM recipes WHERE slug = ?').get(slug));
+}
+/** Slug antigo → receita atual (para redirecionamento 301). */
+function getByOldSlug(slug) {
+  const r = db.get().prepare('SELECT recipe_id FROM recipe_slugs WHERE slug = ?').get(slug);
+  return r ? getById(r.recipe_id) : null;
+}
+function allIds() {
+  return db.get().prepare('SELECT id FROM recipes ORDER BY id').all().map((r) => r.id);
 }
 function getByCode(code) {
   const c = u.normalizeCode(code);
@@ -243,13 +302,23 @@ function search(opts = {}) {
     where.push('r.status = ?');
     params.push(opts.status || 'published');
   }
+  // Autores veem as publicadas + os próprios rascunhos; nunca os rascunhos dos outros
+  if (opts.ownerId) {
+    where.push("(r.status = 'published' OR r.author_id = ?)");
+    params.push(opts.ownerId);
+  }
+  if (opts.authorId) {
+    where.push('r.author_id = ?');
+    params.push(opts.authorId);
+  }
 
   let exactCode = null;
   const q = String(opts.q || '').trim();
   const codeCandidate = opts.code || (/^#?[A-Za-z0-9-]{3,16}$/.test(q) ? q : null);
   if (codeCandidate) {
-    const r = d.prepare(`SELECT id FROM recipes r WHERE r.code = ?${opts.status !== 'any' ? ' AND r.status = ?' : ''}`).get(...[u.normalizeCode(codeCandidate)].concat(opts.status !== 'any' ? [opts.status || 'published'] : []));
-    if (r) exactCode = getById(r.id);
+    const r = d.prepare('SELECT id, status, author_id FROM recipes WHERE code = ?').get(u.normalizeCode(codeCandidate));
+    const visible = r && (opts.status === 'any' ? !opts.ownerId || r.status === 'published' || r.author_id === opts.ownerId : r.status === (opts.status || 'published'));
+    if (visible) exactCode = getById(r.id);
     if (opts.code) {
       return { items: exactCode ? [exactCode] : [], total: exactCode ? 1 : 0, page: 1, perPage, pages: 1, exactCode };
     }
@@ -407,6 +476,9 @@ function toPublic(r, baseUrl = '') {
     rating: r.rating,
     source_url: r.source_url,
     source_name: r.source_name,
+    seo_title: r.seo_title || '',
+    seo_description: r.seo_description || '',
+    author_id: r.author_id,
     status: r.status,
     featured: r.featured,
     views: r.views,
@@ -418,7 +490,7 @@ function toPublic(r, baseUrl = '') {
 }
 
 module.exports = {
-  create, update, remove, getById, getBySlug, getByCode, find, search, suggest, related, products, adjacent,
+  create, update, remove, getById, getBySlug, getByOldSlug, allIds, getByCode, find, LIMITS, search, suggest, related, products, adjacent,
   incrementViews, incrementCooked, allTags, categories, toPublic, normalizeInput, reindexAll: () => {
     const d = db.get();
     for (const r of d.prepare('SELECT id FROM recipes').all()) indexFts(d, r.id);

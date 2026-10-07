@@ -482,3 +482,19 @@ dialog::backdrop { background: rgb(0 0 0 / 50%); backdrop-filter: blur(4px); }
 .cooking .toast { top: calc(72px + env(safe-area-inset-top)); bottom: auto; transform: translate(-50%, -20px); }
 .cooking .toast.show { transform: translate(-50%, 0); }
 .cooking .install-banner { display: none; }
+
+/* Compartilhamento */
+.byline { color: var(--ink-3); font-size: .9rem; margin: -.25rem 0 .75rem; }
+.byline a { color: var(--ink-2); }
+.share-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 14px; font-size: .85rem; color: var(--ink-3); }
+.share-btn { display: inline-flex; align-items: center; padding: .35em .8em; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font: 600 .8rem var(--font); text-decoration: none; cursor: pointer; }
+.share-btn[style] { border-color: color-mix(in srgb, var(--c) 40%, var(--line)); color: var(--c); }
+:root[data-theme="dark"] .share-x { color: var(--ink); }
+.share-btn:hover { background: var(--surface-2); }
+.jump { display: inline-flex; align-items: center; gap: .4em; margin: 16px 0 0; font-weight: 600; color: var(--brand); text-decoration: none; }
+/* Aviso de cookies (LGPD) */
+.consent { position: fixed; z-index: 95; left: 12px; right: 12px; bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 14px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-lg); font-size: .9rem; }
+.consent p { margin: 0; flex: 1 1 260px; }
+.consent div { display: flex; gap: 8px; }
+@media (min-width: 900px) { .consent { left: 24px; right: auto; max-width: 560px; bottom: 24px; } }
+.footer-links .link { color: var(--ink-2); text-decoration: none; font-size: inherit; }

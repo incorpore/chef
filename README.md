@@ -37,8 +37,31 @@ Site/sistema para publicar e compartilhar suas receitas, com **busca por palavra
 ### Funções de blog de receitas
 Favoritos (funcionam offline), lista de compras que **soma ingredientes** de várias receitas, **cardápio semanal** que gera a lista de compras, conversor de medidas, avaliações com estrelas e comentários moderados (com anti‑spam), "Fiz esta receita!", receitas relacionadas, anterior/próxima, "Me surpreenda", newsletter (exporta CSV), categorias com ícone, tags, dietas, informação nutricional, dicas, história da receita, versão para impressão e compartilhamento (WhatsApp/Web Share).
 
-### SEO e PWA
-JSON‑LD `Recipe` completo (com rich results no Google), Open Graph, `sitemap.xml` com imagens, RSS, `robots.txt` e URLs amigáveis. O PWA tem manifest, ícones *maskable*, atalhos e service worker com offline: as receitas visitadas e favoritadas ficam disponíveis sem internet. A interface tem barra de abas no estilo app nativo, tema claro/escuro e convite de instalação.
+### Compartilhar
+- Botões de **WhatsApp, Pinterest (Rich Pins), Facebook, Telegram, X e e‑mail**, que funcionam até sem JavaScript. Os links carregam **UTM**, para você ver no Analytics de onde vieram as visitas.
+- **Copiar link**, compartilhamento nativo do celular, **link curto** `/c/CODIGO` e **QR code**.
+- **"Incorporar"**: gera um `<iframe>` com o cartão da receita para outros blogs, com link de volta para o seu site.
+- Imagens e textos de pré‑visualização (Open Graph e Twitter Card) em todas as páginas, com imagem padrão configurável.
+
+### Google AdSense, Analytics e outros (Painel → Configurações)
+Basta colar os IDs; os scripts são inseridos automaticamente:
+- **Google Analytics 4**, **Google Tag Manager**, **Google AdSense** (com `ads.txt` e a meta `google-adsense-account`), **Meta Pixel** e **Microsoft Clarity**.
+- **Aviso de cookies (LGPD) com Google Consent Mode v2**: nada é rastreado antes do "Aceitar". Sem consentimento, o AdSense mostra anúncios não personalizados, e o Pixel e o Clarity só carregam após o aceite.
+- Páginas de **Política de privacidade** e **Termos de uso**, exigidas pelo AdSense.
+- **Verificação de propriedade**: Google Search Console, Bing, Pinterest e Facebook.
+- **Eventos enviados automaticamente**: `share`, `affiliate_click`, `cook_mode_start`, `recipe_cooked`, `add_to_shopping_list` e `print`.
+
+### SEO (boas práticas)
+- `title` otimizado (≤ 60 caracteres) e `meta description` (≤ 160 caracteres), editáveis por receita com **prévia do Google** no editor; se ficarem vazios, são gerados automaticamente.
+- `canonical` absoluto, `hreflang`, `robots` com `max-image-preview:large`, Open Graph `article` e `og:image` absoluta.
+- Dados estruturados: **Recipe** completo (inclui dietas `suitableForDiet`, vídeo, nota e nutrição), **BreadcrumbList**, **Organization**, **WebSite** com caixa de busca e **ItemList**.
+- Busca e filtros com `noindex`; categorias e tags indexáveis, com `rel=prev/next`; página inexistente responde 404.
+- **Redirecionamento 301 automático** quando o título (e o endereço) de uma receita muda; barra final também redireciona com 301.
+- `sitemap.xml` com imagens, categorias e tags; RSS com `atom:link`; `robots.txt`; autor e datas visíveis (E‑E‑A‑T); link "Ir direto para a receita".
+- **Desempenho**: compressão gzip/brotli, ETag e microcache de páginas (home 8× mais rápida no teste de carga).
+
+### PWA
+O PWA tem manifest, ícones *maskable*, atalhos e service worker com offline: as receitas visitadas e favoritadas ficam disponíveis sem internet. A interface tem barra de abas no estilo app nativo, tema claro/escuro e convite de instalação.
 
 ### Painel
 Painel com estatísticas, editor de receitas (grupos de ingredientes com pré‑visualização, passos que podem ser reordenados, timers detectados, colar texto, Ctrl+S), duplicar, rascunho/publicado, destaque, categorias, comentários, produtos, anúncios, chaves de API, usuários (admin/autor) e configurações (nome, cor, logo, redes sociais, AdSense, tag Amazon, HTML extra no `<head>` para Analytics).
@@ -53,7 +76,16 @@ npm run seed      # opcional: categorias e receitas de exemplo
 npm start         # http://localhost:3000
 ```
 
-Acesse `/admin` para criar a conta de administrador. Para desenvolvimento, use `npm run dev`. Para rodar os testes, use `npm test`.
+Acesse `/admin` para criar a conta de administrador. Em produção, o primeiro acesso exige o **token de instalação**, que aparece no log ao iniciar (ou defina `SETUP_TOKEN`, ou `ADMIN_EMAIL`/`ADMIN_PASSWORD`). Copie `.env.example` para `.env` e preencha.
+
+| Comando | O que faz |
+|---|---|
+| `npm run dev` | Servidor com recarga automática |
+| `npm test` | 61 testes: funcionalidades, **segurança (ataques)** e **SEO** |
+| `npm run stress` | Teste de carga e de limites da API (2.000 receitas, 32 conexões) |
+| `npm run audit:secrets` | Procura senhas/chaves vazadas nos arquivos **e no histórico do Git** |
+
+Segurança: veja **[SECURITY.md](SECURITY.md)** (checklist de 21 itens com a prova de cada um).
 
 ### Docker
 ```bash
@@ -70,7 +102,11 @@ docker run -p 3000:3000 -v chef-data:/app/data -v chef-uploads:/app/uploads -e B
 | `UPLOADS_DIR` | `./uploads` | Fotos e vídeos enviados |
 | `SESSION_SECRET` | gerado | Segredo para assinar sessões |
 | `MAX_UPLOAD_MB` | `200` | Tamanho máximo por arquivo |
-| `NODE_ENV` | — | `production` ativa cookies `Secure` e cache de estáticos |
+| `NODE_ENV` | — | `production` ativa cookies `Secure`, HSTS e cache de estáticos |
+| `TRUST_PROXY` | `0` | Número de proxies reversos na frente (use `1` atrás de Nginx/Caddy/Cloudflare) |
+| `SETUP_TOKEN` | gerado | Token exigido em `/admin/setup` em produção |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | — | Cria o administrador na primeira inicialização |
+| `PAGE_CACHE_SECONDS` | `15` | Microcache de páginas para visitantes (0 desliga) |
 
 > Em produção, use HTTPS (necessário para PWA, microfone e notificações), por exemplo com Caddy ou Nginx na frente.
 

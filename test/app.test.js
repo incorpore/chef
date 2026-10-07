@@ -141,7 +141,7 @@ test('página da receita tem JSON-LD, código e modo cozinha', async () => {
   assert.match(r.data, /data-cook-start/);
   assert.match(r.data, /data-timer="2400"/);
   assert.match(r.data, /2 ½ xícaras de/);
-  const ld = JSON.parse(r.data.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)[1]);
+  const ld = JSON.parse(r.data.match(/<script nonce="[^"]+" type="application\/ld\+json">(.*?)<\/script>/s)[1]);
   assert.equal(ld.totalTime, 'PT1H');
   assert.equal(ld.recipeInstructions.length, 2);
   const qr = await req('GET', '/qr/BOLO01.svg', { auth: 'none' });
@@ -213,9 +213,9 @@ test('anúncios aparecem na posição configurada', async () => {
   await req('PUT', '/api/v1/settings', { body: { adsEnabled: false } });
   const page2 = await req('GET', '/receita/bolo-de-cenoura', { auth: 'none' });
   assert.doesNotMatch(page2.data, /meu-banner/);
-  await req('PUT', '/api/v1/settings', { body: { adsEnabled: true, adsenseClient: 'ca-pub-123' } });
+  await req('PUT', '/api/v1/settings', { body: { adsEnabled: true, adsenseClient: 'ca-pub-1234567890123456' } });
   const adsTxt = await req('GET', '/ads.txt', { auth: 'none' });
-  assert.match(adsTxt.data, /pub-123/);
+  assert.match(adsTxt.data, /pub-1234567890123456/);
 });
 
 test('importação por URL a partir de JSON-LD', async () => {
