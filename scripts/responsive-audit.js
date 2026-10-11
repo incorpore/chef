@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Auditoria de responsividade: abre o site num navegador real em 7 larguras de tela (320 → 1366 px)
+ * Auditoria de responsividade: abre o site num navegador real em 8 larguras de tela (300 → 1366 px)
  * e procura qualquer elemento que saia da tela ou transborde do próprio espaço — inclusive no modo
  * cozinha (cada passo), com timers, avisos e banners abertos, e nas telas do painel.
  *
@@ -17,7 +17,7 @@ try { ({ chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')); }
   process.exit(2);
 }
 
-const WIDTHS = (process.env.WIDTHS || '320,360,390,414,768,1024,1366').split(',').map(Number);
+const WIDTHS = (process.env.WIDTHS || '300,320,360,390,414,768,1024,1366').split(',').map(Number);
 const SHOTS = process.env.SHOTS === '1';
 const SHOT_DIR = path.join(process.cwd(), 'responsive-shots');
 const LONG = 'SuperCalifragilisticoExpialidociousIngredienteSemEspacosNenhumParaTestarQuebra';

@@ -34,7 +34,7 @@ jobs:
       - run: npm run audit:secrets
 
   responsividade:
-    name: Responsividade (7 larguras de tela, navegador real)
+    name: Responsividade (8 larguras de tela, navegador real)
     needs: testes
     runs-on: ubuntu-latest
     steps:
