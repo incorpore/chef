@@ -17,6 +17,16 @@ function createApp() {
   app.set('etag', 'strong');
   app.set('query parser', 'simple'); // evita objetos aninhados vindos da URL (?a[b]=c)
 
+  // Verificação de saúde (Docker HEALTHCHECK / ZimaOS): responde rápido e confere o banco
+  app.get('/healthz', (req, res) => {
+    try {
+      require('./db').get().prepare('SELECT 1').get();
+      res.set('Cache-Control', 'no-store').json({ ok: true, version: require('../package.json').version, uptime: Math.round(process.uptime()) });
+    } catch {
+      res.status(503).json({ ok: false });
+    }
+  });
+
   app.use(sec.headers);
   app.use(compression({ threshold: 1024 }));
 

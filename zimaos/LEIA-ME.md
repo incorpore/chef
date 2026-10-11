@@ -1,0 +1,211 @@
+# 🍳 Chef no ZimaOS — guia passo a passo
+
+Este guia explica, sem complicação, como colocar o seu site de receitas para rodar no **ZimaOS**
+(ZimaBoard, ZimaBlade, ZimaCube ou qualquer PC com ZimaOS/CasaOS).
+
+---
+
+## Como funciona (em 30 segundos)
+
+```
+ Você muda o código      O GitHub monta a "caixinha"        O ZimaOS baixa a caixinha
+ e envia ao GitHub  ───▶  (imagem Docker) e testa tudo  ───▶  e liga o site na sua casa
+                          sozinho, em ~5 minutos              http://IP-do-Zima:8484
+```
+
+- **Imagem Docker** = uma "caixinha" com o programa pronto para rodar. Você não precisa instalar
+  Node.js nem nada no ZimaOS.
+- **GitHub Actions** = um robô do GitHub. A cada mudança no código, ele **roda os 61 testes**,
+  monta a imagem, **testa a imagem simulando um ZimaOS** e só então a publica em
+  `ghcr.io/incorpore/chef`.
+- **docker-compose** = a "receita de instalação": diz qual imagem usar, qual porta abrir e
+  onde guardar seus dados. O ZimaOS lê esse arquivo e faz o resto.
+
+Seus dados ficam **fora** da caixinha, em pastas do ZimaOS. Por isso você pode atualizar ou
+reinstalar o app sem perder nada:
+
+| Pasta no ZimaOS | O que guarda |
+|---|---|
+| `/DATA/AppData/chef/data` | Banco de dados (receitas, usuários, configurações) |
+| `/DATA/AppData/chef/uploads` | Fotos e vídeos |
+
+---
+
+## Passo 1 — Deixar a imagem pública no GitHub (só uma vez)
+
+O GitHub cria a imagem sozinho na primeira vez que o código é enviado. Mas, por padrão, ela nasce
+**privada**, e o ZimaOS não consegue baixar imagem privada sem senha. Para torná-la pública:
+
+1. Abra **https://github.com/incorpore/chef/actions** e confira se o último
+   **"Imagem Docker"** está com ✅ verde. Se estiver amarelo 🟡, espere terminar (cerca de 5 a 10 minutos).
+2. Abra **https://github.com/orgs/incorpore/packages** (ou o seu perfil → aba **Packages**)
+   e clique em **chef**.
+3. À direita, clique em **Package settings**.
+4. Role até **Danger Zone** → **Change visibility** → escolha **Public** → digite `chef` para
+   confirmar.
+
+> **Prefere manter privada?** Tudo bem. Crie um *token* no GitHub em
+> *Settings → Developer settings → Personal access tokens (classic)*, marcando só
+> **`read:packages`**. Depois, no terminal do ZimaOS (passo 7), rode uma vez:
+> `sudo docker login ghcr.io -u SEU_USUARIO_GITHUB` e cole o token como senha.
+
+---
+
+## Passo 2 — Instalar no ZimaOS
+
+1. Abra o painel do ZimaOS no navegador (ex.: `http://192.168.0.50`).
+2. Abra a **App Store**.
+3. Clique no **"+"** no canto superior direito → **Instalar um app personalizado**
+   (*Install a customized app*).
+4. No canto superior direito da janela que abriu, clique em **Importar** (*Import*).
+5. Copie **todo** o conteúdo do arquivo [`docker-compose.yml`](docker-compose.yml) desta pasta e
+   cole na caixa. Clique em **Enviar** (*Submit*).
+6. O ZimaOS preenche o formulário sozinho. **Antes de instalar**, procure a variável
+   **`SETUP_TOKEN`** e troque `troque-este-codigo` por um código só seu, por exemplo
+   `cozinha-da-maria-2026`. Anote esse código.
+7. Clique em **Instalar** (*Install*). Em 1 ou 2 minutos aparece o ícone 🍳 **Chef** no painel.
+
+> ⚠️ Se você esquecer de trocar o `SETUP_TOKEN`, o Chef **recusa** criar o administrador e avisa
+> o motivo. Isso é proposital: ninguém da sua rede consegue "tomar" o seu site com o código de
+> exemplo. Para corrigir: clique nos **⋮** do app → **Configurações**, troque o valor e salve.
+
+---
+
+## Passo 3 — Primeiro acesso
+
+1. Clique no ícone do **Chef** no painel do ZimaOS ou abra `http://IP-DO-ZIMAOS:8484/admin`.
+2. Preencha:
+   - **Token de instalação**: o código que você escolheu no passo 2;
+   - **Nome do site**, **seu nome**, **e-mail** e **senha** (mínimo de 8 caracteres; evite senhas óbvias).
+3. Pronto! Você já está no painel. Crie sua primeira receita ou importe uma por URL.
+
+> Depois desse primeiro acesso, o `SETUP_TOKEN` não serve para mais nada. O login passa a ser
+> o seu e-mail e a sua senha.
+
+### Quer ver o site já com receitas de exemplo?
+
+No terminal do ZimaOS (veja o passo 7), rode:
+
+```sh
+sudo docker exec -u 1000:1000 chef node --disable-warning=ExperimentalWarning scripts/seed.js
+```
+
+> Use sempre o `-u 1000:1000`. Ele roda o comando como o mesmo usuário do app, para não
+> bagunçar as permissões do banco.
+
+---
+
+## Passo 4 — Usar no celular como app
+
+1. No celular, conectado ao **mesmo Wi‑Fi**, abra `http://IP-DO-ZIMAOS:8484`.
+2. No Android/Chrome, toque em **⋮ → Instalar app** ou **Adicionar à tela inicial**. No iPhone/Safari, toque em
+   **Compartilhar → Adicionar à Tela de Início**.
+
+> Alguns recursos do navegador só funcionam com **HTTPS**: microfone (comandos de voz),
+> notificações dos timers e instalação completa como app. Na rede de casa, por HTTP, as receitas,
+> a busca, os timers e o modo cozinha funcionam normalmente. Para ter tudo, veja o passo 6.
+
+---
+
+## Passo 5 — Atualizar para a versão mais nova
+
+Sempre que o código mudar no GitHub, o robô gera uma imagem nova (`latest`). Para trazê‑la:
+
+**Pelo painel:** se o ZimaOS mostrar o aviso de atualização no app Chef, clique em **Atualizar**.
+
+**Pelo terminal** (funciona sempre):
+
+```sh
+sudo docker pull ghcr.io/incorpore/chef:latest
+sudo docker compose -f /var/lib/casaos/apps/chef/docker-compose.yml up -d
+```
+
+Seus dados **não são apagados** em atualizações, porque ficam em `/DATA/AppData/chef`.
+
+> Quer travar numa versão específica? Troque `latest` por `sha-abc1234` (a etiqueta aparece no
+> resumo de cada execução em *Actions*) ou, se criar versões no GitHub (tag `v1.2.0`), use `1.2.0`.
+
+---
+
+## Passo 6 (opcional) — Abrir para a internet com domínio e HTTPS
+
+Para o site ser visto por qualquer pessoa (e o Google indexar suas receitas):
+
+1. Use um **túnel** com HTTPS automático. Os mais simples são o **Cloudflare Tunnel** (grátis) e o
+   **Tailscale Funnel**. Outra opção é o **Nginx Proxy Manager**, que também roda como app no ZimaOS.
+2. Aponte o túnel ou proxy para `http://IP-DO-ZIMAOS:8484`.
+3. Nas configurações do app Chef no ZimaOS, mude:
+   - `BASE_URL` → `https://receitas.seudominio.com.br`
+   - `TRUST_PROXY` → `1`
+4. Salve. Com HTTPS, o Chef liga sozinho as proteções extras: cookie seguro, HSTS e
+   `upgrade-insecure-requests`.
+
+> Por que `TRUST_PROXY=1`? Atrás de um proxy, todos os visitantes parecem vir do mesmo IP (o do
+> proxy). Com `1`, o Chef lê o IP real enviado pelo proxy, e os limites de tentativas de login
+> continuam funcionando por pessoa. **Não** use `1` sem proxy: alguém poderia forjar o IP.
+
+---
+
+## Passo 7 — Terminal do ZimaOS (quando precisar)
+
+No ZimaOS, abra **Configurações → Geral → Acesso para desenvolvedores** e ative o **SSH**. Depois, no
+seu computador:
+
+```sh
+ssh SEU_USUARIO@IP-DO-ZIMAOS
+```
+
+Comandos úteis:
+
+| Para… | Comando |
+|---|---|
+| Ver os registros (logs) do app | `sudo docker logs --tail 100 chef` |
+| Ver se está saudável | `sudo docker ps --filter name=chef` (deve aparecer `healthy`) |
+| Reiniciar | `sudo docker restart chef` |
+| Testar por dentro | `curl http://localhost:8484/healthz` → `{"ok":true,...}` |
+| Redefinir senha esquecida | `sudo docker exec -it -u 1000:1000 chef node scripts/reset-password.js seu@email.com` |
+
+---
+
+## Backup (importante!)
+
+Escolha uma das opções:
+
+- **Tudo de uma vez:** copie a pasta `/DATA/AppData/chef` inteira, pelo app **Arquivos** do ZimaOS ou
+  pela rede (SMB), para um HD externo ou para a nuvem. Pare o app antes da cópia para garantir um banco consistente.
+- **Só as receitas:** no painel do Chef, vá em **Receitas → Exportar backup**. É um arquivo JSON, que pode ser importado
+  de volta em **Importar → Em lote**.
+
+---
+
+## Problemas comuns
+
+| O que aparece | Causa | Solução |
+|---|---|---|
+| Erro ao instalar: *pull access denied* / *unauthorized* | A imagem ainda é privada ou ainda não foi criada | Faça o **passo 1** e confira o ✅ em *Actions* |
+| *port is already allocated* | Outro app já usa a porta 8484 | Nas configurações do app, troque a porta do host para `8485` (ou outra) |
+| "O SETUP_TOKEN ainda é o de exemplo" | Você não trocou o código | Edite o app, troque o `SETUP_TOKEN` e salve |
+| "Token de instalação inválido" | O código digitado é diferente do configurado | Confira maiúsculas, minúsculas e espaços |
+| Esqueci a senha | — | No terminal: `sudo docker exec -it -u 1000:1000 chef node scripts/reset-password.js seu@email.com` e digite a nova senha |
+| Fotos não aparecem depois de restaurar um backup | Dono dos arquivos errado | Reinicie o app: ele corrige as permissões sozinho ao iniciar |
+| O ícone do app não aparece no painel | O repositório do GitHub é privado | É só estético; o app funciona normalmente |
+
+---
+
+## Detalhes técnicos (para curiosos)
+
+- **Arquiteturas:** `amd64` (ZimaBoard, ZimaCube, PCs) e `arm64` (Raspberry Pi e similares). O Docker
+  escolhe a certa sozinho.
+- **Leve:** cerca de 64 MB de download e ~30 MB de RAM em uso, com limite de 512 MB no compose.
+- **Seguro por padrão:**
+  - O app **não roda como root**: ao iniciar, ele ajusta as pastas para o usuário `1000` e "abaixa" os privilégios.
+  - A pasta do banco fica com permissão `700`.
+  - O segredo de sessão é gerado sozinho e salvo em `data/.secret`.
+- **Saúde:** o Docker consulta `/healthz` a cada 30 s e marca o container como `healthy`.
+- **Desligamento limpo:** um `docker stop` fecha o banco corretamente, sem risco de corromper.
+- **Logs** limitados a 3 arquivos de 10 MB, para não lotar o disco.
+- **Testado automaticamente:** em toda mudança, o GitHub roda
+  [`scripts/smoke-test.sh`](../scripts/smoke-test.sh) na imagem. Esse teste:
+  - simula as pastas do ZimaOS criadas como root e o acesso por HTTP pelo IP;
+  - verifica a instalação com e sem token, o login, a criação de receita e o envio de foto;
+  - reinicia o container e confere que nada se perdeu.

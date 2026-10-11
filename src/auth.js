@@ -3,7 +3,13 @@ const crypto = require('node:crypto');
 const config = require('./config');
 const db = require('./db');
 
-const COOKIE = config.isProd ? '__Host-chef_session' : 'chef_session';
+// Em HTTPS o cookie usa o prefixo __Host- e a flag Secure. Em HTTP puro (ex.: http://IP-do-ZimaOS:8484
+// na rede local) o navegador recusaria um cookie Secure e o login nunca funcionaria.
+const COOKIE_PLAIN = 'chef_session';
+const COOKIE_SECURE = '__Host-chef_session';
+const COOKIE = COOKIE_PLAIN;
+const isSecure = (req) => !!(req && req.secure);
+const cookieName = (req) => (isSecure(req) ? COOKIE_SECURE : COOKIE_PLAIN);
 const SESSION_DAYS = 30;
 const DUMMY_HASH = `scrypt$${'0'.repeat(32)}$${'0'.repeat(128)}`;
 
@@ -59,11 +65,13 @@ function parseCookies(header) {
 }
 
 function setSessionCookie(res, user) {
-  res.setHeader('Set-Cookie', `${COOKIE}=${createSessionToken(user)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}${config.isProd ? '; Secure' : ''}`);
+  const req = res.req;
+  res.setHeader('Set-Cookie', `${cookieName(req)}=${createSessionToken(user)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}${isSecure(req) ? '; Secure' : ''}`);
 }
 
 function clearSessionCookie(res) {
-  res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${config.isProd ? '; Secure' : ''}`);
+  const req = res.req;
+  res.setHeader('Set-Cookie', [`${COOKIE_PLAIN}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`, ...(isSecure(req) ? [`${COOKIE_SECURE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure`] : [])]);
 }
 
 function publicUser(u) {
@@ -95,7 +103,8 @@ function loadUser(req, res, next) {
     req.user = row;
     req.viaApiKey = true;
   } else {
-    const s = readSessionToken(parseCookies(req.headers.cookie)[COOKIE]);
+    const jar = parseCookies(req.headers.cookie);
+    const s = readSessionToken(isSecure(req) ? jar[COOKIE_SECURE] || jar[COOKIE_PLAIN] : jar[COOKIE_PLAIN]);
     if (s) {
       const u = d.prepare('SELECT * FROM users WHERE id = ?').get(s.id);
       if (u && (u.session_version || 0) === s.version) req.user = u;
@@ -199,6 +208,12 @@ function setupToken() {
   return generatedSetupToken;
 }
 
+const PLACEHOLDER_TOKENS = ['troque-este-codigo', 'change-me', 'changeme'];
+/** Token de exemplo do docker-compose não vale: obriga a pessoa a escolher o seu. */
+function isPlaceholderToken() {
+  return PLACEHOLDER_TOKENS.includes(String(config.setupToken).trim().toLowerCase());
+}
+
 /** Cria o administrador a partir de ADMIN_EMAIL / ADMIN_PASSWORD, se definidos e não houver usuários. */
 function bootstrapAdmin() {
   if (userCount() > 0) return null;
@@ -213,5 +228,5 @@ function bootstrapAdmin() {
 module.exports = {
   COOKIE, hashPassword, verifyPassword, setSessionCookie, clearSessionCookie, loadUser, requireUser, requireAdmin, isAdmin, canEditRecipe,
   sameOrigin, createApiKey, publicUser, userCount, createUser, validatePassword, authenticate, bumpSessionVersion, audit,
-  parseCookies, readSessionToken, createSessionToken, setupToken, bootstrapAdmin, safeEqual, EMAIL_RE,
+  parseCookies, readSessionToken, createSessionToken, setupToken, bootstrapAdmin, safeEqual, EMAIL_RE, isPlaceholderToken,
 };

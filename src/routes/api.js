@@ -62,6 +62,7 @@ router.get('/openapi.json', (req, res) => res.json(openapi(baseUrl(req))));
 // ---------------- Autenticação ----------------
 router.post('/auth/setup', rateLimit('setup', 10, 15 * 60e3), (req, res) => {
   if (auth.userCount() > 0) return res.status(409).json({ error: 'O sistema já foi configurado' });
+  if (auth.isPlaceholderToken()) return res.status(403).json({ error: 'O SETUP_TOKEN ainda é o de exemplo ("troque-este-codigo"). Edite o app no ZimaOS, troque o valor e salve.' });
   const token = auth.setupToken();
   if (token && !auth.safeEqual(String(req.body?.setupToken || ''), token)) return res.status(403).json({ error: 'Token de instalação inválido (veja o log do servidor ou a variável SETUP_TOKEN)' });
   const id = auth.createUser({ ...req.body, role: 'admin' });

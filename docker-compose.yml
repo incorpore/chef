@@ -1,0 +1,31 @@
+# Chef — Docker Compose genérico (qualquer servidor Linux, Synology, Unraid, VPS…)
+# Para o ZimaOS use zimaos/docker-compose.yml (já tem ícone e caminhos do ZimaOS).
+#
+#   1. Troque SETUP_TOKEN
+#   2. docker compose up -d
+#   3. Abra http://IP-DO-SERVIDOR:8484/admin
+services:
+  chef:
+    image: ghcr.io/incorpore/chef:latest
+    # Para gerar a imagem a partir do código em vez de baixar, descomente:
+    # build: .
+    container_name: chef
+    restart: unless-stopped
+    ports:
+      - "8484:3000"
+    environment:
+      SETUP_TOKEN: troque-este-codigo
+      TZ: America/Sao_Paulo
+      PUID: "1000"
+      PGID: "1000"
+      BASE_URL: ""
+      TRUST_PROXY: "0"
+      MAX_UPLOAD_MB: "200"
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

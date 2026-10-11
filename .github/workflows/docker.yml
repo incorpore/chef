@@ -1,0 +1,107 @@
+# Gera e publica a imagem Docker do Chef no GitHub Container Registry (ghcr.io).
+# Roda sozinho a cada push. A imagem só é publicada se TODOS os testes passarem.
+name: Imagem Docker
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    name: Testes (funcionalidades, segurança e SEO)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # histórico completo para a busca de segredos
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run audit:secrets
+
+  imagem:
+    name: Construir, testar e publicar a imagem
+    needs: testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Nome da imagem (minúsculas)
+        id: nome
+        run: echo "imagem=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3 # permite gerar a versão arm64
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Etiquetas da imagem
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.nome.outputs.imagem }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-,format=short
+
+      - name: Construir imagem de teste (amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: chef:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Teste de fumaça (simula o ZimaOS)
+        run: sh scripts/smoke-test.sh chef:ci
+
+      - name: Login no GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publicar imagem (amd64 + arm64)
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Resumo
+        if: github.event_name != 'pull_request'
+        run: |
+          {
+            echo "### ✅ Imagem publicada"
+            echo
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo
+            echo "No ZimaOS use: \`${{ steps.nome.outputs.imagem }}:latest\`"
+          } >> "$GITHUB_STEP_SUMMARY"

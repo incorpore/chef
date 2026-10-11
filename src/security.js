@@ -10,7 +10,7 @@ const config = require('./config');
  * CSP "strict-dynamic": só executam scripts com o nonce desta resposta (e os que eles carregarem,
  * como AdSense, gtag e Pixel). Scripts injetados por um atacante não têm nonce e são bloqueados.
  */
-function buildCsp(nonce, { embed = false } = {}) {
+function buildCsp(nonce, { embed = false, secure = false } = {}) {
   const directives = [
     "default-src 'self'",
     `script-src 'nonce-${nonce}' 'strict-dynamic' https: 'unsafe-inline'`, // https:/unsafe-inline só valem em navegadores antigos sem suporte a nonce
@@ -27,7 +27,7 @@ function buildCsp(nonce, { embed = false } = {}) {
     "worker-src 'self'",
     "manifest-src 'self'",
   ];
-  if (config.isProd) directives.push('upgrade-insecure-requests');
+  if (secure) directives.push('upgrade-insecure-requests'); // só em HTTPS: em HTTP local quebraria CSS/JS
   return directives.join('; ');
 }
 
@@ -39,7 +39,7 @@ function headers(req, res, next) {
   res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), payment=(), usb=(), microphone=(self), screen-wake-lock=(self)');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('X-DNS-Prefetch-Control', 'on');
-  if (config.isProd) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   const embed = req.path.startsWith('/embed/');
   if (req.path.startsWith('/api/')) {
     res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
@@ -48,7 +48,7 @@ function headers(req, res, next) {
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox");
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   } else {
-    res.setHeader('Content-Security-Policy', buildCsp(nonce, { embed }));
+    res.setHeader('Content-Security-Policy', buildCsp(nonce, { embed, secure: req.secure }));
     if (!embed) res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   }
   // Toda tag <script> do HTML gerado pelo servidor recebe o nonce. Conteúdo vindo de usuários é sempre

@@ -46,7 +46,7 @@ function authPage({ mode, next = '/admin', needsToken = false, prefillToken = ''
     <div class="brand-big">${icon('chef')}</div>
     <h1>${setup ? 'Bem-vindo! Vamos configurar seu site' : 'Entrar no painel'}</h1>
     <form data-auth="${setup ? 'setup' : 'login'}" data-next="${esc(next)}">
-      ${setup && needsToken ? `<label>Token de instalação<input name="setupToken" value="${esc(prefillToken)}" required autocomplete="off"><small>Aparece no log do servidor na primeira inicialização (ou defina SETUP_TOKEN).</small></label>` : ''}
+      ${setup && needsToken ? `<label>Token de instalação<input name="setupToken" value="${esc(prefillToken)}" required autocomplete="off"><small>É o valor de <b>SETUP_TOKEN</b> que você colocou no docker-compose (ou o código mostrado no log do app).</small></label>` : ''}
       ${setup ? '<label>Nome do site<input name="siteName" value="Chef" required maxlength="60"></label><label>Seu nome<input name="name" required maxlength="80"></label>' : ''}
       <label>E-mail<input type="email" name="email" required autocomplete="username"></label>
       <label>Senha<input type="password" name="password" required minlength="8" autocomplete="${setup ? 'new-password' : 'current-password'}"></label>

@@ -84,19 +84,29 @@ Acesse `/admin` para criar a conta de administrador. Em produção, o primeiro a
 | `npm test` | 61 testes: funcionalidades, **segurança (ataques)** e **SEO** |
 | `npm run stress` | Teste de carga e de limites da API (2.000 receitas, 32 conexões) |
 | `npm run audit:secrets` | Procura senhas/chaves vazadas nos arquivos **e no histórico do Git** |
+| `sh scripts/smoke-test.sh IMAGEM` | Testa a imagem Docker como se fosse o ZimaOS (instalação, login, upload, reinício) |
+| `node scripts/reset-password.js EMAIL` | Redefine uma senha esquecida |
 
 Segurança: veja **[SECURITY.md](SECURITY.md)** (checklist de 21 itens com a prova de cada um).
 
-### Docker
+### 🏠 ZimaOS / CasaOS (recomendado para casa)
+O GitHub gera a imagem `ghcr.io/incorpore/chef` sozinho a cada mudança (amd64 + arm64) e só a publica se todos os testes passarem.
+Para instalar no ZimaOS, siga o guia passo a passo **[zimaos/LEIA-ME.md](zimaos/LEIA-ME.md)** e use o arquivo [`zimaos/docker-compose.yml`](zimaos/docker-compose.yml).
+
+### Docker (qualquer servidor)
 ```bash
-docker build -t chef .
-docker run -p 3000:3000 -v chef-data:/app/data -v chef-uploads:/app/uploads -e BASE_URL=https://seusite.com.br chef
+# edite SETUP_TOKEN em docker-compose.yml e depois:
+docker compose up -d
+# abra http://IP-DO-SERVIDOR:8484/admin
 ```
+Para gerar a imagem a partir do código: `docker build -t chef .`. Para testar a imagem simulando o ZimaOS: `sh scripts/smoke-test.sh chef`.
 
 ### Variáveis de ambiente
 | Variável | Padrão | Descrição |
 |---|---|---|
-| `PORT` | `3000` | Porta HTTP |
+| `PORT` | `3000` | Porta HTTP (dentro do container) |
+| `PUID` / `PGID` | `1000` | Usuário/grupo dono dos arquivos (Docker) |
+| `TZ` | `America/Sao_Paulo` | Fuso horário (Docker) |
 | `BASE_URL` | auto | URL pública (usada em sitemap, RSS, QR e JSON‑LD) |
 | `DATA_DIR` | `./data` | Banco SQLite e segredo de sessão |
 | `UPLOADS_DIR` | `./uploads` | Fotos e vídeos enviados |

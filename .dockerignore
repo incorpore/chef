@@ -2,4 +2,13 @@ node_modules
 data
 uploads
 .git
+.github
+.env
+.env.*
 test
+*.md
+*.log
+*.png
+!public/**
+docker-compose*.yml
+zimaos

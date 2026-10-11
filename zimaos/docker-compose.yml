@@ -1,0 +1,116 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Chef — receitas para o ZimaOS / CasaOS
+#  Como instalar: App Store → "+" (canto superior direito) → "Instalar um app
+#  personalizado" → "Importar" → cole este arquivo.  Guia completo: zimaos/LEIA-ME.md
+#
+#  ANTES DE INSTALAR, troque o valor de SETUP_TOKEN abaixo por uma senha sua.
+# ─────────────────────────────────────────────────────────────────────────────
+name: chef
+services:
+  chef:
+    image: ghcr.io/incorpore/chef:latest
+    container_name: chef
+    restart: unless-stopped
+    ports:
+      - target: 3000
+        published: "8484"
+        protocol: tcp
+    environment:
+      # Código pedido UMA vez, no primeiro acesso, para criar o administrador.
+      # Troque por algo só seu (ex.: minha-cozinha-2026).
+      SETUP_TOKEN: troque-este-codigo
+      TZ: America/Sao_Paulo
+      # Dono dos arquivos nas pastas do ZimaOS (1000 = usuário padrão)
+      PUID: "1000"
+      PGID: "1000"
+      # Deixe vazio na rede local. Ao publicar com domínio, ex.: https://receitas.meusite.com.br
+      BASE_URL: ""
+      # Use 1 se acessar por Cloudflare Tunnel, Nginx Proxy Manager, Tailscale Funnel etc.
+      TRUST_PROXY: "0"
+      MAX_UPLOAD_MB: "200"
+    volumes:
+      - type: bind
+        source: /DATA/AppData/chef/data
+        target: /app/data
+      - type: bind
+        source: /DATA/AppData/chef/uploads
+        target: /app/uploads
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    x-casaos:
+      envs:
+        - container: SETUP_TOKEN
+          description:
+            en_us: One-time code to create the admin account on first access
+            pt_br: Código usado uma única vez para criar o administrador
+        - container: TZ
+          description:
+            en_us: Time zone
+            pt_br: Fuso horário
+        - container: PUID
+          description:
+            en_us: User ID that owns the files
+            pt_br: ID do usuário dono dos arquivos
+        - container: PGID
+          description:
+            en_us: Group ID that owns the files
+            pt_br: ID do grupo dono dos arquivos
+        - container: BASE_URL
+          description:
+            en_us: Public address (only when using your own domain)
+            pt_br: Endereço público (só se usar domínio próprio)
+        - container: TRUST_PROXY
+          description:
+            en_us: Set 1 when behind a reverse proxy or tunnel
+            pt_br: Use 1 se estiver atrás de proxy reverso ou túnel
+        - container: MAX_UPLOAD_MB
+          description:
+            en_us: Max upload size per file (MB)
+            pt_br: Tamanho máximo por arquivo enviado (MB)
+      ports:
+        - container: "3000"
+          description:
+            en_us: Web interface
+            pt_br: Interface web
+      volumes:
+        - container: /app/data
+          description:
+            en_us: Database and settings (back this up)
+            pt_br: Banco de dados e configurações (faça backup)
+        - container: /app/uploads
+          description:
+            en_us: Photos and videos
+            pt_br: Fotos e vídeos das receitas
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: chef
+  author: incorpore
+  developer: incorpore
+  category: Utilities
+  icon: https://raw.githubusercontent.com/incorpore/chef/HEAD/public/icons/icon-512.png
+  title:
+    en_us: Chef
+    pt_br: Chef
+  tagline:
+    en_us: Your recipe blog with cook mode
+    pt_br: Seu blog de receitas com modo cozinha
+  description:
+    en_us: Recipe blog (PWA) with step-by-step cook mode, timers, search by code, photos and videos, API, URL import, AdSense and Amazon affiliates.
+    pt_br: Blog de receitas (PWA) com modo cozinha passo a passo, timers, busca por código, fotos e vídeos, API, importação por URL, AdSense e afiliados Amazon.
+  tips:
+    before_install:
+      en_us: Change SETUP_TOKEN before installing. On first access open /admin and type it.
+      pt_br: Troque o SETUP_TOKEN antes de instalar. No primeiro acesso, abra /admin e digite esse código.
+  index: /
+  port_map: "8484"
+  scheme: http
