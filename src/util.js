@@ -24,6 +24,8 @@ function slugify(s) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+    .slice(0, 81)
+    .replace(/-[^-]*$|-$/, (m, i, str) => (str.length > 80 ? '' : m)) // corta na última palavra inteira
     .slice(0, 80) || 'receita';
 }
 

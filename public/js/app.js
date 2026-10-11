@@ -24,7 +24,8 @@
   function toast(msg, ms = 2600) {
     const el = $('.toast');
     if (!el) return;
-    el.textContent = msg;
+    el.innerHTML = `<span class="toast-text">${esc(msg)}</span>`;
+    el.title = msg;
     el.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.remove('show'), ms);
@@ -178,6 +179,9 @@
     const sec = s % 60;
     return h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
   }
+  const RING = 2 * Math.PI * 14;
+  const timerLeft = (t) => (t.paused ? t.remaining : t.endAt - Date.now());
+  let dockKey = '';
   function renderTimers() {
     let dock = $('.timer-dock');
     const list = timers.all();
@@ -187,18 +191,58 @@
       dock.className = 'timer-dock';
       document.body.appendChild(dock);
     }
+    // Mesmo conjunto de timers e estados: só atualiza o relógio (não recria os botões a cada segundo)
+    const key = list.map((t) => `${t.id}:${t.done}:${t.paused}`).join('|');
+    if (key === dockKey && dock.children.length === list.length) {
+      list.forEach((t, i) => {
+        const el = dock.children[i];
+        const left = timerLeft(t);
+        el.querySelector('.t-time').textContent = t.done ? 'Pronto!' : fmtTime(left / 1000);
+        el.querySelector('.fg').setAttribute('stroke-dashoffset', RING * (1 - Math.max(0, Math.min(1, left / (t.duration * 1000)))));
+      });
+      return;
+    }
+    dockKey = key;
     dock.innerHTML = list.map((t) => {
-      const left = t.paused ? t.remaining : t.endAt - Date.now();
+      const left = timerLeft(t);
       const frac = Math.max(0, Math.min(1, left / (t.duration * 1000)));
-      const C = 2 * Math.PI * 14;
-      return `<div class="timer${t.done ? ' done' : ''}${t.paused ? ' paused' : ''}" data-tid="${t.id}">
-        <svg class="t-ring" viewBox="0 0 34 34"><circle class="bg" cx="17" cy="17" r="14"/><circle class="fg" cx="17" cy="17" r="14" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - frac)}"/></svg>
-        <span><span class="t-time">${t.done ? 'Pronto!' : fmtTime(left / 1000)}</span><br><span class="t-label">${esc(t.label)}</span></span>
+      return `<div class="timer${t.done ? ' done' : ''}${t.paused ? ' paused' : ''}" data-tid="${t.id}" title="${esc(t.label)}">
+        <svg class="t-ring" viewBox="0 0 34 34" aria-hidden="true"><circle class="bg" cx="17" cy="17" r="14"/><circle class="fg" cx="17" cy="17" r="14" stroke-dasharray="${RING}" stroke-dashoffset="${RING * (1 - frac)}"/></svg>
+        <span class="t-info"><span class="t-time">${t.done ? 'Pronto!' : fmtTime(left / 1000)}</span><span class="t-label">${esc(t.label)}</span></span>
         ${t.done ? '' : `<button data-tpause aria-label="${t.paused ? 'Continuar' : 'Pausar'}">${t.paused ? '▶' : '❚❚'}</button><button data-tadd aria-label="Mais 1 minuto">+1</button>`}
         <button data-tclose aria-label="Fechar timer">✕</button>
       </div>`;
     }).join('');
+    // Timer novo aparece à vista (o mais recente fica no fim da fileira)
+    dock.scrollLeft = dock.scrollWidth;
+    layoutFloats();
   }
+
+  /**
+   * "Pilha" de elementos flutuantes no rodapé: banner (cookies/instalar) → timers → aviso.
+   * Mede a altura de cada camada e expõe em variáveis CSS para uma nunca cobrir a outra.
+   */
+  function layoutFloats() {
+    const root = document.documentElement.style;
+    // offsetParent é sempre null em elementos position:fixed, por isso a checagem usa display/hidden
+    const visible = (el) => el && !el.hidden && getComputedStyle(el).display !== 'none';
+    const banner = [$('.consent'), $('.install-banner')].filter(visible).reduce((h, el) => Math.max(h, el.getBoundingClientRect().height + 10), 0);
+    const dock = $('.timer-dock');
+    const dockH = dock && dock.children.length ? dock.getBoundingClientRect().height + 6 : 0;
+    if (dock) {
+      dock.classList.toggle('many', dock.children.length > 1);
+      dock.classList.toggle('scrolls', dock.scrollWidth > dock.clientWidth + 2);
+    }
+    root.setProperty('--banner-h', `${Math.round(banner)}px`);
+    root.setProperty('--dock-h', `${Math.round(dockH)}px`);
+  }
+  if ('ResizeObserver' in window) {
+    const ro = new ResizeObserver(() => layoutFloats());
+    for (const sel of ['.consent', '.install-banner']) { const el = $(sel); if (el) ro.observe(el); }
+    new MutationObserver(() => layoutFloats()).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden', 'class'] });
+  }
+  addEventListener('resize', () => layoutFloats());
+
   function tickTimers() {
     const list = timers.all();
     let changed = false;
@@ -434,6 +478,7 @@
 
   paintFavs();
   renderTimers();
+  layoutFloats();
 
-  window.Chef = { $, $$, esc, store, toast, api, favs, paintFavs, shopping, planner, dateKey, fmtQty, unitLabel, timers, fmtTime, share, beep, density, norm, track };
+  window.Chef = { $, $$, esc, store, toast, api, favs, paintFavs, shopping, planner, dateKey, fmtQty, unitLabel, timers, fmtTime, share, beep, density, norm, track, layoutFloats };
 })();

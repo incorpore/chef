@@ -14,6 +14,7 @@
     "seed": "node --disable-warning=ExperimentalWarning scripts/seed.js",
     "stress": "node --disable-warning=ExperimentalWarning scripts/stress.js",
     "audit:secrets": "node scripts/check-secrets.js",
+    "audit:responsive": "node --disable-warning=ExperimentalWarning scripts/responsive-audit.js",
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
   },
   "license": "MIT",

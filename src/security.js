@@ -41,7 +41,7 @@ function headers(req, res, next) {
   res.setHeader('X-DNS-Prefetch-Control', 'on');
   if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   const embed = req.path.startsWith('/embed/');
-  if (req.path.startsWith('/api/')) {
+  if (req.path.startsWith('/api/v1/')) { // só a API JSON; /api/docs é uma página normal com CSS
     res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
   } else if (req.path.startsWith('/uploads/')) {
     // Arquivos enviados nunca executam nada, mesmo que alguém consiga enviar algo malicioso

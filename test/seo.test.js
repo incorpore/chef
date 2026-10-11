@@ -150,6 +150,13 @@ test('páginas obrigatórias para AdSense: privacidade e termos', async () => {
   assert.match((await get('/')).text, /href="\/privacidade"/);
 });
 
+test('documentação da API é uma página normal (CSS carregado, não bloqueado pela política da API)', async () => {
+  const r = await get('/api/docs');
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-security-policy'), /style-src 'self'/);
+  assert.doesNotMatch(r.headers.get('content-security-policy'), /^default-src 'none'/);
+});
+
 test('desempenho: HTML comprimido (gzip/brotli) e estáticos com ETag', async () => {
   const r = await fetch(`${base}/receitas`, { headers: { 'accept-encoding': 'gzip, br' } });
   assert.match(r.headers.get('content-encoding') || '', /gzip|br/);

@@ -33,9 +33,34 @@ jobs:
       - run: npm test
       - run: npm run audit:secrets
 
+  responsividade:
+    name: Responsividade (7 larguras de tela, navegador real)
+    needs: testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Instalar navegador (Playwright + Chromium)
+        run: |
+          npm i --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Procurar elementos fora da tela (celular, tablet e computador)
+        run: SHOTS=1 npm run audit:responsive
+      - name: Guardar capturas de tela
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-responsividade
+          path: responsive-shots/
+          retention-days: 7
+
   imagem:
     name: Construir, testar e publicar a imagem
-    needs: testes
+    needs: [testes, responsividade]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
