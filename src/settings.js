@@ -32,6 +32,11 @@ const DEFAULTS = {
   adsTxt: '',
   headHtml: '',
   commentsModeration: true,
+  // E-mail (as credenciais SMTP ficam só nas variáveis de ambiente)
+  siteUrl: '',
+  notifyComments: true,
+  newsletterDoubleOptIn: true,
+  newsletterWelcome: true,
   newsletterEnabled: true,
   recipesPerPage: 12,
 };
@@ -68,6 +73,7 @@ const PATTERNS = {
   logo: [/^((https:\/\/|\/)[^\s"'<>]{1,1000})?$/, 'URL do logo inválida'],
   defaultOgImage: [/^((https:\/\/|\/)[^\s"'<>]{1,1000})?$/, 'URL da imagem padrão inválida'],
   shareNetworks: [/^[a-z,]{0,200}$/, 'Lista de redes inválida'],
+  siteUrl: [/^(https?:\/\/[a-z0-9.-]+(:\d{1,5})?)?$/i, 'Endereço do site inválido (ex.: https://receitas.meusite.com.br, sem barra no final)'],
 };
 const MAX_LEN = { headHtml: 20000, adsTxt: 20000, aboutText: 20000, privacyText: 1000, description: 320, siteName: 60, tagline: 120, amazonDisclosure: 300, authorName: 80 };
 

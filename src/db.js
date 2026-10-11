@@ -166,11 +166,45 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
+
+-- Links de "esqueci minha senha" e convites (token guardado só como hash, uso único)
+CREATE TABLE IF NOT EXISTS password_resets (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  purpose TEXT NOT NULL DEFAULT 'reset',
+  expires_at TEXT NOT NULL,
+  used_at TEXT DEFAULT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Envios da newsletter (retomados automaticamente se o servidor reiniciar)
+CREATE TABLE IF NOT EXISTS newsletter_campaigns (
+  id INTEGER PRIMARY KEY,
+  recipe_id INTEGER REFERENCES recipes(id) ON DELETE SET NULL,
+  subject TEXT NOT NULL,
+  intro TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'sending',
+  total INTEGER NOT NULL DEFAULT 0,
+  sent INTEGER NOT NULL DEFAULT 0,
+  failed INTEGER NOT NULL DEFAULT 0,
+  cursor INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT DEFAULT '',
+  created_by INTEGER,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  finished_at TEXT DEFAULT NULL
+);
 `;
 
 // Colunas adicionadas depois da primeira versão (migração automática e idempotente)
 const COLUMNS = [
   ['users', 'session_version', 'INTEGER NOT NULL DEFAULT 0'],
+  // Newsletter com confirmação dupla: pending → confirmed → unsubscribed
+  ['subscribers', 'status', "TEXT NOT NULL DEFAULT 'confirmed'"],
+  ['subscribers', 'token_hash', "TEXT DEFAULT ''"],
+  ['subscribers', 'token_expires', 'TEXT DEFAULT NULL'],
+  ['subscribers', 'confirmed_at', 'TEXT DEFAULT NULL'],
+  ['subscribers', 'unsubscribed_at', 'TEXT DEFAULT NULL'],
   ['recipes', 'seo_title', "TEXT DEFAULT ''"],
   ['recipes', 'seo_description', "TEXT DEFAULT ''"],
 ];

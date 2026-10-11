@@ -21,6 +21,14 @@ services:
       BASE_URL: ""
       TRUST_PROXY: "0"
       MAX_UPLOAD_MB: "200"
+      # E-mail (opcional) — vazio = desligado. Veja zimaos/LEIA-ME.md
+      SMTP_HOST: ""
+      SMTP_PORT: "587"
+      SMTP_USER: ""
+      SMTP_PASS: ""
+      MAIL_FROM: ""
+      MAIL_ADMIN: ""
+      MAIL_RATE_PER_MIN: "30"
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads

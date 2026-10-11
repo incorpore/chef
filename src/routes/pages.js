@@ -11,6 +11,7 @@ const { recipePage } = require('../views/recipe');
 const { outboundUrl } = require('../monetization');
 const auth = require('../auth');
 const cache = require('../cache');
+const notify = require('../notify');
 const sec = require('../security');
 
 const router = express.Router();
@@ -133,6 +134,25 @@ router.get('/embed/:code', (req, res) => {
   const r = recipes.getByCode(req.params.code);
   if (!r || r.status !== 'published') return res.status(404).send('Receita não encontrada');
   res.send(pages.embed({ r, base: base(req) }));
+});
+
+// ---------------- Newsletter: confirmar e cancelar inscrição ----------------
+router.get('/newsletter/confirmar', (req, res) => {
+  const ok = notify.confirmSubscription(String(req.query.t || ''));
+  res.status(ok ? 200 : 400).send(pages.newsletterPage({ user: req.user, kind: ok ? 'confirmed' : 'invalid' }));
+});
+// GET só mostra a pergunta (leitores de link dos provedores de e-mail abrem links sozinhos)
+router.get('/newsletter/sair', (req, res) => {
+  const email = String(req.query.e || '').slice(0, 254);
+  const token = String(req.query.t || '').slice(0, 64);
+  res.set('Referrer-Policy', 'no-referrer').send(pages.newsletterPage({ user: req.user, kind: email && token ? 'ask' : 'invalid', email, token }));
+});
+// POST cancela: vem do botão da página ou do "cancelar inscrição" em um clique do Gmail/Yahoo (RFC 8058)
+router.post('/newsletter/sair', sec.rateLimit('unsub', 30, 60e3), (req, res) => {
+  const email = String(req.body?.e || req.query.e || '').slice(0, 254);
+  const token = String(req.body?.t || req.query.t || '').slice(0, 64);
+  const ok = notify.unsubscribe(email, token);
+  res.status(ok ? 200 : 400).send(pages.newsletterPage({ user: req.user, kind: ok ? 'left' : 'invalid' }));
 });
 
 router.get('/offline', (req, res) => res.send(pages.offline()));

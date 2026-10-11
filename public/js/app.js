@@ -388,8 +388,11 @@
     if (!f) return;
     e.preventDefault();
     try {
-      await api('/subscribe', { method: 'POST', body: { email: f.email.value } });
-      f.innerHTML = '<h3>🎉 Inscrição confirmada!</h3><p>Obrigado! Você vai receber as novidades.</p>';
+      const r = await api('/subscribe', { method: 'POST', body: { email: f.email.value } });
+      f.innerHTML = r.pending
+        ? '<h3>📬 Quase lá!</h3><p>Enviamos um link de confirmação para o seu e-mail. Clique nele para começar a receber as receitas (confira também o spam).</p>'
+        : '<h3>🎉 Inscrição confirmada!</h3><p>Obrigado! Você vai receber as novidades.</p>';
+      track('sign_up', { method: 'newsletter' });
     } catch (err) { toast(err.message); }
   });
 

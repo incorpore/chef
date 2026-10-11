@@ -27,6 +27,29 @@ Rode tudo com `npm test`, os limites com `npm run stress` e a busca por segredos
 | 20 | **Testa como um estranho** | `test/security.test.js` simula três pessoas (admin, autor e estranho) com cookies separados e tenta cada ataque. | `npm test` |
 | 21 | **Auditoria completa** | Revisão linha a linha do código (achados abaixo) + registro de auditoria em `/admin/auditoria`: logins, falhas, bloqueios, chaves, configurações, exclusões e importações (IP só como hash). | — |
 
+## E‑mail (SMTP)
+
+- As credenciais do SMTP ficam **somente em variáveis de ambiente**. Não são gravadas no banco, não aparecem no painel e não vão para o Git.
+- Envio sempre criptografado: a porta 587 exige STARTTLS, e o mínimo é TLS 1.2. O Nodemailer roda com `disableFileAccess`/`disableUrlAccess`.
+- **Redefinição de senha:**
+  - o link é de uso único e vale 1 hora;
+  - o token é guardado como **SHA‑256**;
+  - a resposta é sempre genérica (não revela se o e‑mail existe);
+  - o limite é de 5 pedidos/15 min por IP e 3 por hora por conta;
+  - redefinir encerra todas as sessões.
+- **Proteção contra envenenamento de link:**
+  - o endereço usado nos e‑mails nunca vem do cabeçalho `Host`;
+  - a ordem é `BASE_URL` → configuração "Endereço do site" → origem aprendida no login do admin (só quando `Origin` = `Host`).
+- **Conteúdo e cabeçalhos:**
+  - comentários e textos da newsletter são escapados no HTML do e‑mail;
+  - os assuntos têm quebras de linha removidas (sem injeção de cabeçalho).
+- **Newsletter:**
+  - duplo opt‑in com token de 7 dias;
+  - descadastro com token HMAC e `List-Unsubscribe` em 1 clique (RFC 8058);
+  - o link GET só pergunta, e o descadastro acontece no POST (scanners de e‑mail não descadastram ninguém);
+  - envio controlado por minuto, com pausa automática se o SMTP começar a falhar.
+- Testes: `test/email.test.js`, que inclui um servidor SMTP real com autenticação.
+
 ## Achados da auditoria (e correções)
 
 | Achado | Risco | Correção |

@@ -16,6 +16,10 @@ if (!process.env.SESSION_SECRET) console.log(`🔑 Segredo de sessão gerado e g
 if (config.isProd && !config.baseUrl) console.log('ℹ️  BASE_URL não definida: o endereço é detectado pelo navegador. Ao publicar com domínio próprio, defina BASE_URL=https://seusite.com.br');
 
 const app = createApp();
+// Retoma envios da newsletter que estavam em andamento quando o servidor parou
+require('./src/notify').kick();
+const mailStatus = require('./src/mail').status();
+console.log(mailStatus.configured ? `✉️  E-mail ativo via ${mailStatus.host}:${mailStatus.port}` : '✉️  E-mail não configurado (opcional: defina SMTP_HOST, SMTP_USER, SMTP_PASS)');
 const server = app.listen(config.port, () => {
   console.log(`🍳 Chef rodando na porta ${config.port} (dados em ${config.dataDir}, fotos em ${config.uploadsDir})`);
 });

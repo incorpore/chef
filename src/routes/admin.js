@@ -4,6 +4,8 @@ const auth = require('../auth');
 const db = require('../db');
 const recipes = require('../recipes');
 const v = require('../views/admin');
+const mail = require('../mail');
+const notify = require('../notify');
 
 const router = express.Router();
 
@@ -23,6 +25,15 @@ router.get('/login', (req, res) => {
   const next = safeNext(req.query.next);
   if (req.user) return res.redirect(next);
   res.send(v.authPage({ mode: 'login', next }));
+});
+
+// Recuperação de senha e convite: páginas públicas (o link do e-mail é a prova de identidade)
+router.get('/esqueci', (req, res) => res.send(v.forgotPage({ mailReady: mail.isConfigured() && !!mail.siteUrl() })));
+router.get('/redefinir', (req, res) => {
+  const token = String(req.query.t || '').slice(0, 100);
+  const row = notify.findResetToken(token);
+  res.set('Referrer-Policy', 'no-referrer'); // o token não vaza para outros sites
+  res.status(row ? 200 : 400).send(v.resetPage({ token, valid: !!row, invite: row?.purpose === 'invite' || req.query.convite === '1', email: row?.email }));
 });
 
 router.use((req, res, next) => {
@@ -55,6 +66,7 @@ router.get('/api', (req, res) => res.send(v.apiPage({ user: req.user })));
 router.get('/anuncios', auth.requireAdmin, (req, res) => res.send(v.adsPage({ user: req.user })));
 router.get('/configuracoes', auth.requireAdmin, (req, res) => res.send(v.settingsPage({ user: req.user })));
 router.get('/usuarios', auth.requireAdmin, (req, res) => res.send(v.usersPage({ user: req.user })));
+router.get('/newsletter', auth.requireAdmin, (req, res) => res.send(v.newsletterAdminPage({ user: req.user, preselect: String(req.query.receita || '').replace(/\D/g, '') })));
 router.get('/auditoria', auth.requireAdmin, (req, res) => res.send(v.auditPage({ user: req.user })));
 
 module.exports = router;

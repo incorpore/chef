@@ -180,6 +180,21 @@ function embed({ r, base }) {
   <body><a class="embed" href="${esc(base)}/receita/${esc(r.slug)}?utm_source=embed&utm_medium=iframe" target="_blank" rel="noopener">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : ''}<span><h1>${esc(r.title)}</h1><p>${esc(r.description || '')}</p><p>${time ? `⏱ ${time} · ` : ''}#${esc(r.code)}</p><small>Ver receita completa no ${esc(s.siteName)} →</small></span></a></body></html>`;
 }
 
+/** Páginas de resultado da newsletter (confirmar / cancelar inscrição). */
+function newsletterPage({ user, kind, email = '', token = '' }) {
+  const s = settings.all();
+  const box = (emoji, title, text, extra = '') => `<div class="wrap narrow empty-state"><h1>${emoji} ${esc(title)}</h1><p>${text}</p>${extra}<p><a class="btn btn-primary" href="/">Ver receitas</a></p></div>`;
+  const bodies = {
+    confirmed: box('🎉', 'Inscrição confirmada!', `Pronto! Você vai receber as receitas novas do <b>${esc(s.siteName)}</b> no seu e-mail.`),
+    invalid: box('😕', 'Link inválido ou expirado', 'Este link de confirmação não vale mais. Inscreva-se de novo no formulário do site para receber um novo.'),
+    ask: `<div class="wrap narrow empty-state"><h1>Cancelar inscrição?</h1><p>O e-mail <b>${esc(email)}</b> deixará de receber as receitas do ${esc(s.siteName)}.</p>
+      <form method="post" action="/newsletter/sair"><input type="hidden" name="e" value="${esc(email)}"><input type="hidden" name="t" value="${esc(token)}"><button class="btn btn-primary">Sim, cancelar inscrição</button></form>
+      <p><a href="/">Não, quero continuar recebendo</a></p></div>`,
+    left: box('👋', 'Inscrição cancelada', 'Você não vai mais receber nossos e-mails. Se mudar de ideia, é só se inscrever de novo no site.'),
+  };
+  return layout({ title: kind === 'left' || kind === 'ask' ? 'Cancelar inscrição' : 'Newsletter', user, noindex: true, body: bodies[kind] || bodies.invalid });
+}
+
 function notFound(user, message = 'Página não encontrada') {
   return layout({ title: message, user, noindex: true, body: `<div class="wrap narrow empty-state"><h1>😕 ${esc(message)}</h1><p>Tente buscar uma receita ou pelo código.</p><form class="hero-search" action="/busca">${icon('search')}<input type="search" name="q" placeholder="Buscar..." autofocus><button class="btn btn-primary">Buscar</button></form><p><a href="/">Voltar ao início</a></p></div>` });
 }
@@ -222,4 +237,4 @@ curl -X POST "${esc(base)}/api/v1/uploads" -H "Authorization: Bearer SUA_CHAVE" 
   return layout({ title: 'API', body });
 }
 
-module.exports = { legalPage, embed, home, listing, categoriesPage, favorites, shoppingList, planner, fridge, converter, about, notFound, offline, apiDocs };
+module.exports = { newsletterPage, legalPage, embed, home, listing, categoriesPage, favorites, shoppingList, planner, fridge, converter, about, notFound, offline, apiDocs };

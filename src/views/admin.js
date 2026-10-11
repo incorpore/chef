@@ -27,6 +27,7 @@ ${user ? `<aside class="admin-nav">
   ${item('/admin/comentarios', 'star', 'Comentários', 'comments')}
   ${user.role === 'admin' ? item('/admin/produtos', 'cart', 'Afiliados Amazon', 'products') : ''}
   ${user.role === 'admin' ? item('/admin/anuncios', 'flame', 'Anúncios', 'ads') : ''}
+  ${user.role === 'admin' ? item('/admin/newsletter', 'share', 'Newsletter', 'newsletter') : ''}
   ${item('/admin/api', 'qr', 'API', 'api')}
   ${user.role === 'admin' ? item('/admin/configuracoes', 'edit', 'Configurações', 'settings') : ''}
   ${user.role === 'admin' ? item('/admin/usuarios', 'users', 'Usuários', 'users') : ''}
@@ -53,9 +54,69 @@ function authPage({ mode, next = '/admin', needsToken = false, prefillToken = ''
       <label>Senha<input type="password" name="password" required minlength="8" autocomplete="${setup ? 'new-password' : 'current-password'}"></label>
       <button class="btn btn-primary btn-block">${setup ? 'Criar conta de administrador' : 'Entrar'}</button>
       <p class="form-error" hidden></p>
+      ${setup ? '' : '<p class="auth-alt"><a href="/admin/esqueci">Esqueci minha senha</a></p>'}
     </form>
   </div>`;
   return adminLayout({ title: setup ? 'Configuração' : 'Entrar', body, user: null });
+}
+
+/** "Esqueci minha senha" (sem login). */
+function forgotPage({ mailReady }) {
+  const body = `<div class="auth-box">
+    <div class="brand-big">${icon('chef')}</div>
+    <h1>Esqueci minha senha</h1>
+    ${mailReady ? `<p>Digite o e-mail da sua conta. Enviaremos um link para você criar uma nova senha.</p>
+    <form data-forgot>
+      <label>E-mail<input type="email" name="email" required autocomplete="username"></label>
+      <button class="btn btn-primary btn-block">Enviar link</button>
+      <p class="form-error" hidden></p>
+      <p class="form-ok" hidden></p>
+    </form>` : `<p>O envio de e-mail ainda não foi configurado neste site.</p>
+    <p>Peça ao administrador para redefinir sua senha, ou, se você for o administrador, use no terminal do servidor:</p>
+    <pre><code>sudo docker exec -it -u 1000:1000 chef node scripts/reset-password.js seu@email.com</code></pre>`}
+    <p class="auth-alt"><a href="/admin/login">Voltar para o login</a></p>
+  </div>`;
+  return adminLayout({ title: 'Esqueci minha senha', body, user: null });
+}
+
+/** Criar nova senha a partir do link do e-mail (redefinição ou convite). */
+function resetPage({ token, valid, invite, email }) {
+  const body = `<div class="auth-box">
+    <div class="brand-big">${icon('chef')}</div>
+    <h1>${invite ? 'Crie sua senha' : 'Nova senha'}</h1>
+    ${valid ? `<p>${invite ? 'Bem-vindo(a)! Escolha uma senha para entrar no painel' : 'Escolha uma nova senha para'} <b>${esc(email)}</b>.</p>
+    <form data-reset data-reset-key="${esc(token)}">
+      <label>Nova senha<input type="password" name="password" required minlength="8" maxlength="200" autocomplete="new-password"></label>
+      <label>Repita a senha<input type="password" name="password2" required minlength="8" maxlength="200" autocomplete="new-password"></label>
+      <small>Mínimo de 8 caracteres. Evite senhas óbvias (12345678, senha123…).</small>
+      <button class="btn btn-primary btn-block">${invite ? 'Criar senha e entrar' : 'Salvar nova senha'}</button>
+      <p class="form-error" hidden></p>
+    </form>` : `<p>Este link é inválido, já foi usado ou expirou.</p><p><a class="btn btn-primary btn-block" href="/admin/esqueci">Pedir um novo link</a></p>`}
+  </div>`;
+  return adminLayout({ title: invite ? 'Crie sua senha' : 'Nova senha', body, user: null });
+}
+
+/** Newsletter: inscritos, envio de receita para a lista e histórico. */
+function newsletterAdminPage({ user, preselect }) {
+  return simplePage({ user, title: 'Newsletter', active: 'newsletter', body: `
+    <div class="stats" data-nl-stats><p>Carregando…</p></div>
+    <section class="panel" data-nl-mail></section>
+    <section class="panel">
+      <h2>Enviar uma receita para os inscritos</h2>
+      <form class="nl-form" data-nl-form data-preselect="${esc(preselect || '')}">
+        ${field('Receita', '<select name="recipeId" required data-nl-recipes><option value="">Carregando…</option></select>')}
+        ${field('Assunto do e-mail', '<input name="subject" maxlength="150" placeholder="Receita nova: …" data-nl-subject>', 'Curto e com vontade de abrir: até ~50 caracteres funciona melhor.')}
+        ${field('Mensagem de abertura (opcional)', '<textarea name="intro" rows="4" maxlength="3000" placeholder="Oi! Essa semana testei uma receita que virou a favorita aqui de casa…"></textarea>')}
+        <div class="nl-actions">
+          <button type="button" class="btn btn-ghost" data-nl-test>${icon('check')} Enviar teste para mim</button>
+          <button class="btn btn-primary" data-nl-send>${icon('share')} Enviar para os inscritos</button>
+        </div>
+        <p class="form-error" hidden></p>
+      </form>
+    </section>
+    <section class="panel"><h2>Envios</h2><div data-nl-campaigns></div></section>
+    <section class="panel"><div class="section-head"><h2>Inscritos</h2><a class="btn btn-ghost btn-sm" href="/api/v1/subscribers?format=csv">${icon('download')} Baixar CSV</a></div>
+      <table class="table table-admin"><thead><tr><th>E-mail</th><th>Situação</th><th>Desde</th><th></th></tr></thead><tbody data-nl-subs></tbody></table></section>` });
 }
 
 function dashboard({ user }) {
@@ -82,10 +143,11 @@ function editor({ user, recipe, categories, products }) {
   const linked = new Set((r.products || []).map((p) => p.id));
   const n = r.nutrition || {};
   const body = `
-  <form class="editor" data-editor data-id="${r.id || ''}">
+  <form class="editor" data-editor data-id="${r.id || ''}" data-published="${r.status === 'published' ? 1 : 0}" data-admin="${user.role === 'admin' ? 1 : 0}">
     <header class="admin-head sticky">
       <h1>${r.id ? 'Editar receita' : 'Nova receita'} ${r.code ? codeCopy(r.code) : ''}</h1>
       <div>
+        ${r.id && r.status === 'published' && user.role === 'admin' ? `<a class="btn btn-ghost" href="/admin/newsletter?receita=${r.id}" title="Enviar esta receita para os inscritos da newsletter">📧 Enviar</a>` : ''}
         ${r.id ? `<a class="btn btn-ghost" href="/receita/${esc(r.slug)}" target="_blank">Ver</a> <button type="button" class="btn btn-ghost" data-duplicate>Duplicar</button> <button type="button" class="btn btn-danger" data-delete>Excluir</button>` : ''}
         <select name="status" aria-label="Status"><option value="draft"${r.status === 'draft' ? ' selected' : ''}>Rascunho</option><option value="published"${r.status === 'published' ? ' selected' : ''}>Publicada</option></select>
         <button class="btn btn-primary">${icon('check')} Salvar</button>
@@ -305,10 +367,18 @@ function settingsPage({ user }) {
       <label class="check"><input type="checkbox" name="adsEnabled"${s.adsEnabled ? ' checked' : ''}> Exibir anúncios</label>
       <div class="row2">${field('Google AdSense — ID do editor', `<input name="adsenseClient" value="${v('adsenseClient')}" placeholder="ca-pub-0000000000000000">`, 'Carrega o script do AdSense (inclui Anúncios Automáticos se ativados na sua conta AdSense).')}${field('ads.txt', `<textarea name="adsTxt" rows="2" placeholder="Gerado automaticamente a partir do AdSense">${v('adsTxt')}</textarea>`)}</div>
     </section>
+    <section class="panel" id="email"><h2>E-mail (SMTP)</h2>
+      <div class="mail-status" data-mail-status><p>Verificando…</p></div>
+      <p><small>Servidor, usuário e senha do SMTP ficam nas <b>variáveis do app</b> (no ZimaOS: ⋮ do app → Configurações; ou no <code>docker-compose.yml</code>): <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>, <code>SMTP_PASS</code>, <code>MAIL_FROM</code>. Assim a senha nunca fica gravada no banco nem aparece na tela.</small></p>
+      ${field('Endereço do site (usado nos links dos e-mails)', `<input name="siteUrl" value="${v('siteUrl')}" placeholder="http://192.168.0.50:8484 ou https://receitas.meusite.com.br">`, 'Preenchido automaticamente no seu login. Se você usar domínio próprio, coloque-o aqui. Se a variável BASE_URL estiver definida, ela tem prioridade.')}
+      <label class="check"><input type="checkbox" name="notifyComments"${s.notifyComments ? ' checked' : ''}> Avisar por e-mail quando chegar comentário novo (para o autor da receita e os administradores)</label>
+      <label class="check"><input type="checkbox" name="newsletterDoubleOptIn"${s.newsletterDoubleOptIn ? ' checked' : ''}> Newsletter com confirmação por e-mail (recomendado pela LGPD e evita listas falsas)</label>
+      <label class="check"><input type="checkbox" name="newsletterWelcome"${s.newsletterWelcome ? ' checked' : ''}> Enviar e-mail de boas-vindas ao confirmar a inscrição</label>
+    </section>
     <section class="panel"><h2>Comunidade</h2>
       <label class="check"><input type="checkbox" name="commentsModeration"${s.commentsModeration ? ' checked' : ''}> Moderar comentários antes de publicar</label>
       <label class="check"><input type="checkbox" name="newsletterEnabled"${s.newsletterEnabled ? ' checked' : ''}> Mostrar formulário de newsletter</label>
-      <p><a href="/api/v1/subscribers?format=csv">Baixar inscritos (CSV)</a></p>
+      <p><a href="/admin/newsletter">Gerenciar newsletter e inscritos →</a></p>
     </section>
     <section class="panel"><h2>Avançado</h2>${field('HTML extra no &lt;head&gt;', `<textarea name="headHtml" rows="4" placeholder="Outras ferramentas de medição">${v('headHtml')}</textarea>`, 'Atenção: código inserido aqui roda em todas as páginas. Use apenas códigos de fontes confiáveis.')}</section>
     <button class="btn btn-primary btn-lg">Salvar configurações</button>
@@ -326,7 +396,9 @@ function apiPage({ user }) {
 
 function usersPage({ user }) {
   return simplePage({ user, title: 'Usuários', active: 'users', body: `
-    <section class="panel"><form class="inline-form" data-user-form><input name="name" placeholder="Nome" required><input name="email" type="email" placeholder="E-mail" required><input name="password" type="password" placeholder="Senha (mín. 8)" minlength="8" required><select name="role"><option value="author">Autor</option><option value="admin">Administrador</option></select><button class="btn btn-primary">Adicionar</button></form></section>
+    <section class="panel"><form class="inline-form" data-user-form><input name="name" placeholder="Nome" required maxlength="80"><input name="email" type="email" placeholder="E-mail" required><input name="password" type="password" placeholder="Senha (mín. 8)" minlength="8" data-user-pass required><select name="role"><option value="author">Autor</option><option value="admin">Administrador</option></select>
+      <label class="check" data-invite-wrap hidden><input type="checkbox" name="invite" data-invite> Enviar convite por e-mail (a pessoa cria a própria senha)</label>
+      <button class="btn btn-primary">Adicionar</button></form></section>
     <table class="table table-admin"><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th></th></tr></thead><tbody data-user-rows></tbody></table>` });
 }
 
@@ -341,4 +413,4 @@ function forbidden({ user }) {
   return simplePage({ user, title: 'Sem permissão', active: '', body: '<section class="panel"><p>Você só pode editar as suas próprias receitas.</p><p><a class="btn" href="/admin/receitas">Voltar</a></p></section>' });
 }
 
-module.exports = { auditPage, forbidden, adminLayout, authPage, dashboard, recipeList, editor, importPage, categoriesPage, commentsPage, productsPage, adsPage, settingsPage, apiPage, usersPage };
+module.exports = { forgotPage, resetPage, newsletterAdminPage, auditPage, forbidden, adminLayout, authPage, dashboard, recipeList, editor, importPage, categoriesPage, commentsPage, productsPage, adsPage, settingsPage, apiPage, usersPage };

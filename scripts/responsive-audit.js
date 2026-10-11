@@ -103,7 +103,7 @@ const detect = () => {
     const ctx = await b.newContext({ viewport: { width: w, height: 800 }, isMobile: w < 900, hasTouch: w < 900, deviceScaleFactor: SHOTS ? 2 : 1 });
     await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/, (r) => r.abort()); // sem internet: só o próprio site
     const p = await ctx.newPage();
-    const pages = ['/', '/receitas', '/busca?q=torta', '/c/LONGA1', '/categorias', '/geladeira?q=SuperCalifragilisticoExpialidociousIngredienteSemEspacos', '/conversor', '/sobre', '/privacidade', '/api/docs', '/favoritos', '/planejador'];
+    const pages = ['/admin/esqueci', '/admin/redefinir?t=invalido', '/newsletter/sair?e=a%40b.com&t=x', '/', '/receitas', '/busca?q=torta', '/c/LONGA1', '/categorias', '/geladeira?q=SuperCalifragilisticoExpialidociousIngredienteSemEspacos', '/conversor', '/sobre', '/privacidade', '/api/docs', '/favoritos', '/planejador'];
     for (const u of pages) {
       await p.goto(B + u, { waitUntil: 'load' });
       await p.waitForTimeout(250);
@@ -147,7 +147,7 @@ const detect = () => {
     await p.evaluate(() => localStorage.clear());
     // admin
     await ctx.addCookies(cookies);
-    for (const u of ['/admin', '/admin/receitas', '/admin/receitas/2', '/admin/importar', '/admin/configuracoes', '/admin/produtos', '/admin/anuncios', '/admin/api', '/admin/comentarios', '/admin/auditoria']) {
+    for (const u of ['/admin', '/admin/receitas', '/admin/receitas/2', '/admin/importar', '/admin/configuracoes', '/admin/produtos', '/admin/anuncios', '/admin/api', '/admin/comentarios', '/admin/auditoria', '/admin/newsletter', '/admin/usuarios']) {
       await p.goto(B + u); await p.waitForTimeout(300);
       add(`${w}px ${u}`, await p.evaluate(detect));
     }

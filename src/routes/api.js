@@ -15,6 +15,8 @@ const sec = require('../security');
 const { AD_SLOTS } = require('../monetization');
 const openapi = require('../openapi');
 const pageCache = require('../cache');
+const mail = require('../mail');
+const notify = require('../notify');
 
 const router = express.Router();
 const { rateLimit } = sec;
@@ -59,6 +61,20 @@ router.use((req, res, next) => {
 router.get('/', (req, res) => res.json({ name: 'Chef API', version: 1, docs: `${baseUrl(req)}/api/docs`, openapi: `${baseUrl(req)}/api/v1/openapi.json` }));
 router.get('/openapi.json', (req, res) => res.json(openapi(baseUrl(req))));
 
+/**
+ * Guarda o endereço do site usado pelo administrador logado (para os links dos e-mails), só se
+ * BASE_URL e a configuração "siteUrl" estiverem vazios. Vem do navegador de quem acabou de provar a senha,
+ * nunca de um visitante anônimo — assim ninguém consegue "envenenar" os links com outro domínio.
+ */
+function learnSiteUrl(req, user) {
+  if (config.baseUrl || settings.all().siteUrl || user.role !== 'admin') return;
+  const origin = req.headers.origin;
+  try {
+    const u = new URL(origin);
+    if (u.host === req.headers.host && /^https?:$/.test(u.protocol)) settings.update({ siteUrl: u.origin });
+  } catch { /* sem Origin (ex.: API): ignora */ }
+}
+
 // ---------------- Autenticação ----------------
 router.post('/auth/setup', rateLimit('setup', 10, 15 * 60e3), (req, res) => {
   if (auth.userCount() > 0) return res.status(409).json({ error: 'O sistema já foi configurado' });
@@ -70,6 +86,7 @@ router.post('/auth/setup', rateLimit('setup', 10, 15 * 60e3), (req, res) => {
   const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(id);
   req.user = user;
   auth.audit(req, 'setup', user.email);
+  learnSiteUrl(req, user);
   auth.setSessionCookie(res, user);
   res.status(201).json({ user: auth.publicUser(user) });
 });
@@ -90,6 +107,38 @@ router.post('/auth/login', rateLimit('login', 10, 15 * 60e3), (req, res) => {
   sec.loginSucceeded(email);
   req.user = user;
   auth.audit(req, 'login.ok');
+  learnSiteUrl(req, user);
+  auth.setSessionCookie(res, user);
+  res.json({ user: auth.publicUser(user) });
+});
+
+/** "Esqueci minha senha": resposta sempre igual (não revela quais e-mails têm conta). */
+router.post('/auth/forgot', rateLimit('forgot', 5, 15 * 60e3), (req, res) => {
+  const email = sec.cleanText(req.body?.email, 254).trim().toLowerCase();
+  const generic = { ok: true, message: 'Se este e-mail tiver uma conta, enviamos um link para criar uma nova senha. Confira também a caixa de spam.' };
+  if (!auth.EMAIL_RE.test(email)) return res.status(400).json({ error: 'E-mail inválido' });
+  if (!mail.isConfigured() || !mail.siteUrl()) return res.status(503).json({ error: 'O envio de e-mail não está configurado. Peça ao administrador para redefinir sua senha.' });
+  const user = db.get().prepare('SELECT * FROM users WHERE email = ?').get(email);
+  // No máximo 3 pedidos por conta a cada hora (evita lotar a caixa de alguém)
+  if (user && !sec.hit(`forgot-user:${user.id}`, 3, 60 * 60e3).over) {
+    auth.audit(req, 'password.forgot', email);
+    notify.background('redefinição de senha', () => notify.sendPasswordReset(user));
+  }
+  res.json(generic);
+});
+
+/** Cria a nova senha a partir do link (de "esqueci" ou do convite). */
+router.post('/auth/reset', rateLimit('reset', 10, 15 * 60e3), (req, res) => {
+  const { token, password } = req.body || {};
+  const err = auth.validatePassword(password);
+  if (err) return res.status(400).json({ error: err });
+  const row = notify.consumeResetToken(String(token || ''));
+  if (!row) return res.status(400).json({ error: 'Link inválido ou expirado. Peça um novo em “Esqueci minha senha”.' });
+  db.get().prepare('UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?').run(auth.hashPassword(password), row.user_id);
+  const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(row.user_id);
+  req.user = user;
+  sec.loginSucceeded(user.email); // desbloqueia a conta, se estava bloqueada por tentativas
+  auth.audit(req, row.purpose === 'invite' ? 'invite.accepted' : 'password.reset', user.email);
   auth.setSessionCookie(res, user);
   res.json({ user: auth.publicUser(user) });
 });
@@ -130,11 +179,30 @@ router.put('/auth/me', auth.requireUser, (req, res) => {
 
 // ---------------- Usuários (admin) ----------------
 router.get('/users', auth.requireAdmin, (req, res) => res.json({ items: db.get().prepare('SELECT * FROM users ORDER BY id').all().map(auth.publicUser) }));
-router.post('/users', auth.requireAdmin, (req, res) => {
-  const id = auth.createUser({ ...req.body, role: req.body.role === 'admin' ? 'admin' : 'author' });
-  auth.audit(req, 'user.create', `${id}`);
-  res.status(201).json({ user: auth.publicUser(db.get().prepare('SELECT * FROM users WHERE id = ?').get(id)) });
-});
+router.post('/users', auth.requireAdmin, wrap(async (req, res) => {
+  const body = { ...req.body };
+  // Convite: a pessoa cria a própria senha pelo link (o admin não precisa saber nem enviar senha)
+  const invite = body.invite === true || body.invite === 'on' || body.invite === 'true';
+  if (invite) {
+    if (!mail.isConfigured() || !mail.siteUrl()) return res.status(400).json({ error: 'Para convidar por e-mail, configure o SMTP e o endereço do site' });
+    body.password = `Inv-${require('node:crypto').randomBytes(24).toString('base64url')}`;
+  }
+  const id = auth.createUser({ ...body, role: body.role === 'admin' ? 'admin' : 'author' });
+  const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(id);
+  auth.audit(req, invite ? 'user.invite' : 'user.create', user.email);
+  let warning;
+  if (invite) {
+    try { await notify.sendInvite(user, req.user.name); } catch (e) { warning = `Usuário criado, mas o convite não foi enviado: ${e.message}`; }
+  }
+  res.status(201).json({ user: auth.publicUser(user), invited: invite && !warning, warning });
+}));
+router.post('/users/:id/invite', auth.requireAdmin, wrap(async (req, res) => {
+  const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(idParam(req.params.id));
+  if (!user) return notFound(res, 'Usuário não encontrado');
+  await notify.sendInvite(user, req.user.name);
+  auth.audit(req, 'user.reinvite', user.email);
+  res.json({ ok: true });
+}));
 router.delete('/users/:id', auth.requireAdmin, (req, res) => {
   const id = idParam(req.params.id);
   if (id === req.user.id) return res.status(400).json({ error: 'Você não pode remover a si mesmo' });
@@ -286,6 +354,7 @@ router.post('/recipes/:ref/comments', rateLimit('comment', 5, 60e3), (req, res) 
   if (today >= 30) return res.status(429).json({ error: 'Limite diário de comentários atingido' });
   const status = auth.canEditRecipe(req.user, r) || !settings.all().commentsModeration ? 'approved' : 'pending';
   const info = db.get().prepare('INSERT INTO comments (recipe_id, name, body, rating, status, ip_hash) VALUES (?, ?, ?, ?, ?, ?)').run(r.id, n, b, rt, status, ipHash);
+  if (!auth.canEditRecipe(req.user, r)) notify.notifyComment(r, { name: n, body: b, rating: rt, status });
   res.status(201).json({ id: Number(info.lastInsertRowid), pending: status === 'pending' });
 });
 
@@ -524,17 +593,66 @@ router.put('/settings', auth.requireAdmin, (req, res) => {
 router.post('/subscribe', rateLimit('subscribe', 5, 60e3), (req, res) => {
   const email = sec.cleanText(req.body?.email, 254).trim().toLowerCase();
   if (!auth.EMAIL_RE.test(email)) return res.status(400).json({ error: 'E-mail inválido' });
-  db.get().prepare('INSERT OR IGNORE INTO subscribers (email) VALUES (?)').run(email);
-  res.status(201).json({ ok: true }); // mesma resposta se já existir (não revela quem está inscrito)
+  const r = notify.subscribe(email);
+  // Mesma resposta para todos (não revela quem já está inscrito)
+  const pending = r.status === 'pending' || (settings.all().newsletterDoubleOptIn && mail.isConfigured() && !!mail.siteUrl());
+  res.status(201).json({ ok: true, pending, message: pending ? 'Quase lá! Enviamos um link de confirmação para o seu e-mail.' : 'Inscrição confirmada!' });
 });
 router.get('/subscribers', auth.requireAdmin, (req, res) => {
-  const items = db.get().prepare('SELECT email, created_at FROM subscribers ORDER BY id DESC').all();
+  const items = db.get().prepare('SELECT id, email, status, created_at, confirmed_at, unsubscribed_at FROM subscribers ORDER BY id DESC').all();
   if (req.query.format === 'csv') {
     res.type('text/csv').setHeader('Content-Disposition', 'attachment; filename="inscritos.csv"');
-    return res.send(['email,created_at', ...items.map((i) => `${sec.csvCell(i.email)},${sec.csvCell(i.created_at)}`)].join('\n'));
+    return res.send(['email,status,created_at,confirmed_at', ...items.map((i) => [i.email, i.status, i.created_at, i.confirmed_at || ''].map(sec.csvCell).join(','))].join('\n'));
   }
   res.json({ items });
 });
+router.delete('/subscribers/:id', auth.requireAdmin, (req, res) => {
+  db.get().prepare('DELETE FROM subscribers WHERE id = ?').run(idParam(req.params.id));
+  res.json({ ok: true });
+});
+
+// ---------------- E-mail (SMTP) ----------------
+router.get('/mail/status', auth.requireAdmin, (req, res) => res.json(mail.status()));
+router.post('/mail/test', auth.requireAdmin, rateLimit('mail-test', 10, 10 * 60e3), wrap(async (req, res) => {
+  const v = await mail.verify();
+  if (!v.ok) return res.status(400).json({ error: v.error });
+  const s = settings.all();
+  await mail.send({
+    to: req.user.email,
+    subject: `✅ Teste de e-mail — ${s.siteName}`,
+    text: `Funcionou! O ${s.siteName} consegue enviar e-mails.\n\nEndereço usado nos links: ${mail.siteUrl() || '(não definido — configure em Configurações → E-mail)'}`,
+    html: mail.layout({ title: 'Teste de e-mail', body: `<h1 style="font-size:22px;margin:0 0 12px">Funcionou! ✅</h1><p>O <b>${u.esc(s.siteName)}</b> consegue enviar e-mails.</p><p style="color:#5d554d;font-size:14px">Endereço usado nos links: <b>${u.esc(mail.siteUrl() || 'não definido')}</b></p>` }),
+  });
+  auth.audit(req, 'mail.test');
+  res.json({ ok: true, to: req.user.email });
+}));
+
+// ---------------- Envio da newsletter ----------------
+router.get('/newsletter', auth.requireAdmin, (req, res) => {
+  const d = db.get();
+  const count = (st) => d.prepare('SELECT COUNT(*) AS n FROM subscribers WHERE status = ?').get(st).n;
+  res.json({
+    mail: mail.status(),
+    subscribers: { confirmed: count('confirmed'), pending: count('pending'), unsubscribed: count('unsubscribed') },
+    campaigns: d.prepare('SELECT c.*, r.title AS recipe_title, r.slug AS recipe_slug FROM newsletter_campaigns c LEFT JOIN recipes r ON r.id = c.recipe_id ORDER BY c.id DESC LIMIT 50').all(),
+    recipes: d.prepare("SELECT r.id, r.title, r.code, r.published_at, (SELECT COUNT(*) FROM newsletter_campaigns c WHERE c.recipe_id = r.id AND c.status IN ('sending','done','paused')) AS sent_before FROM recipes r WHERE r.status = 'published' ORDER BY COALESCE(r.published_at, r.created_at) DESC LIMIT 100").all(),
+  });
+});
+router.post('/newsletter/campaigns', auth.requireAdmin, rateLimit('campaign', 20, 60 * 60e3), wrap(async (req, res) => {
+  const { recipeId, subject, intro, test, force } = req.body || {};
+  const rid = idParam(recipeId);
+  if (test) {
+    await notify.sendCampaignTest({ recipeId: rid, subject, intro, to: req.user.email });
+    return res.json({ ok: true, test: true, to: req.user.email });
+  }
+  const dup = db.get().prepare("SELECT id FROM newsletter_campaigns WHERE recipe_id = ? AND status IN ('sending','done','paused')").get(rid);
+  if (dup && !force) return res.status(409).json({ error: 'Esta receita já foi enviada para a lista. Envie de novo só se tiver certeza.', duplicate: true });
+  const c = notify.createCampaign({ recipeId: rid, subject, intro, userId: req.user.id });
+  auth.audit(req, 'newsletter.send', `${c.id}:${c.total}`);
+  res.status(201).json(c);
+}));
+router.post('/newsletter/campaigns/:id/cancel', auth.requireAdmin, (req, res) => res.json({ ok: notify.cancelCampaign(idParam(req.params.id)) }));
+router.post('/newsletter/campaigns/:id/resume', auth.requireAdmin, (req, res) => res.json({ ok: notify.resumeCampaign(idParam(req.params.id)) }));
 
 // ---------------- Auditoria e estatísticas ----------------
 router.get('/audit', auth.requireAdmin, (req, res) => {
@@ -554,7 +672,7 @@ router.get('/stats', auth.requireUser, (req, res) => {
     views: one(`SELECT COALESCE(SUM(views),0) FROM recipes${w}`, ...a),
     cooked: one(`SELECT COALESCE(SUM(cooked),0) FROM recipes${w}`, ...a),
     pendingComments: one(`SELECT COUNT(*) FROM comments c JOIN recipes r ON r.id = c.recipe_id WHERE c.status='pending'${own ? ' AND r.author_id = ?' : ''}`, ...a),
-    subscribers: own ? null : one('SELECT COUNT(*) FROM subscribers'),
+    subscribers: own ? null : one("SELECT COUNT(*) FROM subscribers WHERE status = 'confirmed'"),
     productClicks: own ? null : one('SELECT COALESCE(SUM(clicks),0) FROM products'),
     adImpressions: own ? null : one('SELECT COALESCE(SUM(impressions),0) FROM ads'),
     top: d.prepare(`SELECT id, code, slug, title, views, cooked FROM recipes${w} ORDER BY views DESC LIMIT 5`).all(...a),

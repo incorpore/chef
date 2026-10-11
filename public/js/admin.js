@@ -251,9 +251,21 @@
       e.preventDefault();
       const id = editor.dataset.id;
       try {
+        const wasPublished = editor.dataset.published === '1';
         const r = await api(id ? `/recipes/${id}` : '/recipes', { method: id ? 'PUT' : 'POST', body: collect() });
         dirty = false;
         toast('✅ Receita salva');
+        // Acabou de publicar: oferece enviar para os inscritos da newsletter
+        if (r.status === 'published' && !wasPublished && editor.dataset.admin === '1') {
+          editor.dataset.published = '1';
+          try {
+            const nl = await api('/newsletter');
+            if (nl.mail.configured && nl.subscribers.confirmed > 0 && confirm(`Receita publicada! 🎉\n\nQuer enviar “${r.title}” para os ${nl.subscribers.confirmed} inscritos da newsletter?`)) {
+              location.href = `/admin/newsletter?receita=${r.id}`;
+              return;
+            }
+          } catch { /* sem permissão ou sem e-mail: segue normal */ }
+        }
         if (!id) location.href = `/admin/receitas/${r.id}`;
         else if ($('.admin-head h1 .code-copy')) $('.admin-head h1 .code-copy').outerHTML = codeCopy(r.code);
       } catch (err) { toast(`⚠️ ${err.message}`, 5000); }
@@ -327,10 +339,11 @@
       const body = toBody(f);
       const id = f.id?.value;
       try {
-        await api(id ? `${path}/${id}` : path, { method: id ? 'PUT' : 'POST', body });
+        const saved = await api(id ? `${path}/${id}` : path, { method: id ? 'PUT' : 'POST', body });
         f.reset();
         if (f.id) f.id.value = '';
-        toast('✅ Salvo');
+        f.dispatchEvent(new Event('change'));
+        toast(saved?.warning ? `⚠️ ${saved.warning}` : saved?.invited ? '📧 Convite enviado por e-mail' : '✅ Salvo', saved?.warning ? 7000 : 2600);
         load();
       } catch (err) { toast(`⚠️ ${err.message}`); }
     });
@@ -365,8 +378,28 @@
 
   crud({
     form: '[data-user-form]', list: '[data-user-rows]', path: '/users',
-    row: (u) => `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.role === 'admin' ? 'Administrador' : 'Autor'}</td><td class="row-actions"><button class="link" data-del="${u.id}">remover</button></td></tr>`,
+    toBody: (f) => { const b = Object.fromEntries(new FormData(f)); b.invite = !!f.invite?.checked; if (b.invite) delete b.password; return b; },
+    row: (u) => `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.role === 'admin' ? 'Administrador' : 'Autor'}</td><td class="row-actions">${mailReady ? `<button class="link" data-reinvite="${u.id}">enviar convite</button> ` : ''}<button class="link" data-del="${u.id}">remover</button></td></tr>`,
   });
+
+  // ---------------- Usuários: convite por e-mail ----------------
+  let mailReady = false;
+  const userForm = $('[data-user-form]');
+  if (userForm) {
+    api('/mail/status').then((st) => {
+      mailReady = st.configured && !!st.siteUrl;
+      $('[data-invite-wrap]').hidden = !mailReady;
+    }).catch(() => {});
+    userForm.addEventListener('change', () => {
+      const inv = userForm.invite?.checked;
+      const pass = $('[data-user-pass]', userForm);
+      pass.required = !inv;
+      pass.hidden = !!inv;
+    });
+    on('[data-reinvite]', 'click', async (e, b) => {
+      try { await api(`/users/${b.dataset.reinvite}/invite`, { method: 'POST' }); toast('📧 Convite enviado'); } catch (err) { toast(`⚠️ ${err.message}`, 6000); }
+    });
+  }
 
   // Chaves de API (mostra a chave uma única vez)
   const keyForm = $('[data-key-form]');
@@ -423,4 +456,117 @@
     if (!body.password) { delete body.password; delete body.currentPassword; }
     try { await api('/auth/me', { method: 'PUT', body }); toast('✅ Conta atualizada'); acc.password.value = ''; acc.currentPassword.value = ''; } catch (err) { toast(err.message); }
   });
+
+  // ---------------- Esqueci minha senha / nova senha ----------------
+  const forgot = $('[data-forgot]');
+  forgot?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('.form-error', forgot);
+    const ok = $('.form-ok', forgot);
+    err.hidden = true;
+    try {
+      const r = await api('/auth/forgot', { method: 'POST', body: { email: forgot.email.value } });
+      ok.textContent = `📧 ${r.message}`;
+      ok.hidden = false;
+      $('button', forgot).disabled = true;
+    } catch (ex) { err.textContent = ex.message; err.hidden = false; }
+  });
+  const reset = $('[data-reset]');
+  reset?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('.form-error', reset);
+    err.hidden = true;
+    if (reset.password.value !== reset.password2.value) { err.textContent = 'As senhas não conferem'; err.hidden = false; return; }
+    try {
+      await api('/auth/reset', { method: 'POST', body: { token: reset.dataset.resetKey, password: reset.password.value } });
+      toast('✅ Senha salva! Entrando…');
+      setTimeout(() => { location.href = '/admin'; }, 700);
+    } catch (ex) { err.textContent = ex.message; err.hidden = false; }
+  });
+
+  // ---------------- Configurações: status do e-mail e envio de teste ----------------
+  const mailBox = $('[data-mail-status]');
+  if (mailBox) {
+    const paint = (st) => {
+      mailBox.innerHTML = st.configured
+        ? `<p class="mail-ok">✅ E-mail configurado: <b>${esc(st.host)}</b>:${st.port} ${st.secure ? '(SSL)' : '(STARTTLS)'} · remetente <b>${esc(st.from)}</b></p>
+           ${st.siteUrl ? `<p><small>Links dos e-mails apontam para <b>${esc(st.siteUrl)}</b></small></p>` : '<p class="warn">⚠️ Defina o endereço do site abaixo (ou entre no painel pelo endereço que seus leitores usam) para os links dos e-mails funcionarem.</p>'}
+           <p><button type="button" class="btn btn-sm" data-mail-test>📧 Enviar e-mail de teste para mim</button></p>`
+        : `<p class="warn">✉️ E-mail ainda não configurado. Sem ele o site funciona normalmente, mas não envia: “esqueci minha senha”, avisos de comentário, confirmação/boas-vindas da newsletter e envio de receitas para os inscritos.</p>
+           <p><small>Veja como configurar (Gmail, Brevo, domínio próprio) no guia <code>zimaos/LEIA-ME.md</code> → “E-mail (SMTP)”.</small></p>`;
+    };
+    api('/mail/status').then(paint).catch(() => { mailBox.textContent = ''; });
+    on('[data-mail-test]', 'click', async (e, b) => {
+      b.disabled = true;
+      b.textContent = 'Enviando…';
+      try { const r = await api('/mail/test', { method: 'POST' }); toast(`✅ E-mail de teste enviado para ${r.to}. Confira a caixa de entrada (e o spam).`, 7000); } catch (err) { toast(`⚠️ ${err.message}`, 9000); }
+      b.disabled = false;
+      b.textContent = '📧 Enviar e-mail de teste para mim';
+    });
+  }
+
+  // ---------------- Newsletter ----------------
+  const nlForm = $('[data-nl-form]');
+  if (nlForm) {
+    const STATUS = { sending: '⏳ Enviando', done: '✅ Concluído', paused: '⏸ Pausado', cancelled: '✖ Cancelado', failed: '⚠️ Falhou' };
+    const SUB = { confirmed: '✅ Confirmado', pending: '⏳ Aguardando confirmação', unsubscribed: '✖ Cancelou' };
+    let data;
+    let poll;
+    const load = async () => {
+      data = await api('/newsletter');
+      const { subscribers: sb, mail: m } = data;
+      $('[data-nl-stats]').innerHTML = `<a class="stat"><b>${sb.confirmed}</b><span>inscritos confirmados</span></a><a class="stat"><b>${sb.pending}</b><span>aguardando confirmação</span></a><a class="stat"><b>${sb.unsubscribed}</b><span>cancelaram</span></a>`;
+      $('[data-nl-mail]').innerHTML = m.configured
+        ? `<p class="mail-ok">✅ Envio por <b>${esc(m.host)}</b> como <b>${esc(m.from)}</b> · velocidade: ${m.ratePerMin} e-mails/min ${m.siteUrl ? '' : '<br><span class="warn">⚠️ Defina o endereço do site em Configurações → E-mail.</span>'}</p>`
+        : '<p class="warn">✉️ Configure o e-mail (SMTP) para enviar newsletters. Enquanto isso, você pode baixar os inscritos em CSV.</p>';
+      const sel = $('[data-nl-recipes]');
+      if (!sel.dataset.filled) {
+        sel.innerHTML = '<option value="">Escolha uma receita publicada…</option>' + data.recipes.map((r) => `<option value="${r.id}">${esc(r.title)}${r.sent_before ? ' (já enviada)' : ''}</option>`).join('');
+        sel.dataset.filled = '1';
+        if (nlForm.dataset.preselect) { sel.value = nlForm.dataset.preselect; sel.dispatchEvent(new Event('change')); }
+      }
+      $('[data-nl-campaigns]').innerHTML = data.campaigns.length ? `<table class="table table-admin"><thead><tr><th>Quando</th><th>Receita / assunto</th><th>Progresso</th><th>Situação</th><th></th></tr></thead><tbody>${data.campaigns.map((c) => {
+        const pct = c.total ? Math.round(((c.sent + c.failed) / c.total) * 100) : 0;
+        return `<tr><td>${esc(new Date(`${c.created_at.replace(' ', 'T')}Z`).toLocaleString('pt-BR'))}</td><td><strong>${esc(c.recipe_title || '—')}</strong><br><small>${esc(c.subject)}</small></td>
+          <td><div class="nl-bar"><span style="width:${pct}%"></span></div><small>${c.sent} enviados${c.failed ? ` · ${c.failed} falharam` : ''} de ${c.total}</small>${c.last_error ? `<br><small class="warn">${esc(c.last_error)}</small>` : ''}</td>
+          <td>${STATUS[c.status] || esc(c.status)}</td>
+          <td class="row-actions">${c.status === 'sending' || c.status === 'paused' ? `<button class="link" data-nl-cancel="${c.id}">cancelar</button>` : ''}${c.status === 'paused' ? ` <button class="link" data-nl-resume="${c.id}">retomar</button>` : ''}</td></tr>`;
+      }).join('')}</tbody></table>` : '<p class="empty">Nenhum envio ainda.</p>';
+      clearTimeout(poll);
+      if (data.campaigns.some((c) => c.status === 'sending')) poll = setTimeout(load, 3000);
+      const subs = await api('/subscribers');
+      $('[data-nl-subs]').innerHTML = subs.items.slice(0, 500).map((x) => `<tr><td>${esc(x.email)}</td><td>${SUB[x.status] || esc(x.status)}</td><td>${esc(fmtDate(x.created_at))}</td><td class="row-actions"><button class="link" data-nl-del="${x.id}">remover</button></td></tr>`).join('') || '<tr><td colspan="4" class="empty">Ninguém inscrito ainda.</td></tr>';
+    };
+    $('[data-nl-recipes]').addEventListener('change', (e) => {
+      const r = data?.recipes.find((x) => String(x.id) === e.target.value);
+      if (r && !nlForm.subject.dataset.touched) nlForm.subject.value = `Receita nova: ${r.title}`.slice(0, 150);
+    });
+    nlForm.subject.addEventListener('input', () => { nlForm.subject.dataset.touched = '1'; });
+    const body = (extra = {}) => ({ recipeId: nlForm.recipeId.value, subject: nlForm.subject.value, intro: nlForm.intro.value, ...extra });
+    const err = $('.form-error', nlForm);
+    on('[data-nl-test]', 'click', async () => {
+      err.hidden = true;
+      if (!nlForm.recipeId.value) { err.textContent = 'Escolha uma receita'; err.hidden = false; return; }
+      try { const r = await api('/newsletter/campaigns', { method: 'POST', body: body({ test: true }) }); toast(`📧 Teste enviado para ${r.to}`, 5000); } catch (ex) { err.textContent = ex.message; err.hidden = false; }
+    });
+    nlForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.hidden = true;
+      const n = data?.subscribers.confirmed || 0;
+      if (!confirm(`Enviar para ${n} inscrito(s) confirmado(s)? Não dá para desfazer depois que os e-mails saírem.`)) return;
+      try {
+        await api('/newsletter/campaigns', { method: 'POST', body: body() });
+        toast('🚀 Envio iniciado! Acompanhe o progresso abaixo.', 5000);
+        load();
+      } catch (ex) {
+        if (ex.data?.duplicate && confirm(`${ex.message}\n\nEnviar mesmo assim?`)) {
+          try { await api('/newsletter/campaigns', { method: 'POST', body: body({ force: true }) }); toast('🚀 Envio iniciado!'); load(); } catch (ex2) { err.textContent = ex2.message; err.hidden = false; }
+        } else if (!ex.data?.duplicate) { err.textContent = ex.message; err.hidden = false; }
+      }
+    });
+    on('[data-nl-cancel]', 'click', async (e, b) => { if (confirm('Cancelar este envio? Quem já recebeu, recebeu.')) { await api(`/newsletter/campaigns/${b.dataset.nlCancel}/cancel`, { method: 'POST' }); load(); } });
+    on('[data-nl-resume]', 'click', async (e, b) => { await api(`/newsletter/campaigns/${b.dataset.nlResume}/resume`, { method: 'POST' }); load(); });
+    on('[data-nl-del]', 'click', async (e, b) => { if (confirm('Remover este inscrito da lista?')) { await api(`/subscribers/${b.dataset.nlDel}`, { method: 'DELETE' }); load(); } });
+    load();
+  }
 })();

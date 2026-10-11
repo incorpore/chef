@@ -28,6 +28,18 @@ services:
       # Use 1 se acessar por Cloudflare Tunnel, Nginx Proxy Manager, Tailscale Funnel etc.
       TRUST_PROXY: "0"
       MAX_UPLOAD_MB: "200"
+      # E-mail (opcional): "esqueci minha senha", avisos de comentário e newsletter.
+      # Deixe SMTP_HOST vazio para desligar. Gmail: smtp.gmail.com / 587 / senha de app.
+      SMTP_HOST: ""
+      SMTP_PORT: "587"
+      SMTP_USER: ""
+      SMTP_PASS: ""
+      # Remetente, ex.: "Receitas da Ana <seuemail@gmail.com>" (vazio = usa SMTP_USER)
+      MAIL_FROM: ""
+      # Quem recebe os avisos (vazio = e-mail dos administradores)
+      MAIL_ADMIN: ""
+      # Velocidade da newsletter (e-mails por minuto)
+      MAIL_RATE_PER_MIN: "30"
     volumes:
       - type: bind
         source: /DATA/AppData/chef/data
@@ -74,6 +86,34 @@ services:
           description:
             en_us: Max upload size per file (MB)
             pt_br: Tamanho máximo por arquivo enviado (MB)
+        - container: SMTP_HOST
+          description:
+            en_us: SMTP server (empty = e-mail disabled), e.g. smtp.gmail.com
+            pt_br: Servidor SMTP (vazio = e-mail desligado), ex.: smtp.gmail.com
+        - container: SMTP_PORT
+          description:
+            en_us: SMTP port (587 STARTTLS or 465 SSL)
+            pt_br: Porta do SMTP (587 ou 465)
+        - container: SMTP_USER
+          description:
+            en_us: SMTP user (usually your e-mail)
+            pt_br: Usuário do SMTP (normalmente o seu e-mail)
+        - container: SMTP_PASS
+          description:
+            en_us: SMTP password (Gmail requires an app password)
+            pt_br: Senha do SMTP (no Gmail, use uma senha de app)
+        - container: MAIL_FROM
+          description:
+            en_us: Sender, e.g. "My Recipes <me@gmail.com>"
+            pt_br: Remetente, ex.: "Receitas da Ana <eu@gmail.com>"
+        - container: MAIL_ADMIN
+          description:
+            en_us: Who receives notifications (empty = admins)
+            pt_br: Quem recebe os avisos (vazio = administradores)
+        - container: MAIL_RATE_PER_MIN
+          description:
+            en_us: Newsletter speed (e-mails per minute)
+            pt_br: Velocidade da newsletter (e-mails por minuto)
       ports:
         - container: "3000"
           description:

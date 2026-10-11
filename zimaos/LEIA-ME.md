@@ -183,6 +183,47 @@ Comandos úteis:
 
 ---
 
+## Passo 8 (opcional) — E‑mail (SMTP)
+
+Com e‑mail configurado, o Chef ganha:
+
+- **"Esqueci minha senha"** na tela de login (o link chega por e‑mail e vale 1 hora);
+- **Convite de usuário**: a pessoa recebe um link para criar a própria senha;
+- **Aviso de comentário novo** para você e para o autor da receita;
+- **Newsletter**: confirmação de inscrição (duplo opt‑in), boas‑vindas e envio de receitas pelo
+  painel (**Painel → Newsletter**). Ao publicar uma receita, o Chef pergunta se você quer enviá‑la.
+
+Sem e‑mail, tudo continua funcionando; essas funções só ficam desligadas.
+
+**Como ligar:** no ZimaOS, abra as configurações do app Chef, preencha as variáveis abaixo e salve.
+
+| Variável | Gmail | Brevo (300 e‑mails/dia grátis) |
+|---|---|---|
+| `SMTP_HOST` | `smtp.gmail.com` | `smtp-relay.brevo.com` |
+| `SMTP_PORT` | `587` | `587` |
+| `SMTP_USER` | seu e‑mail do Gmail | o login SMTP mostrado no Brevo |
+| `SMTP_PASS` | uma **senha de app** (veja abaixo) | a chave SMTP do Brevo |
+| `MAIL_FROM` | `Receitas da Ana <seuemail@gmail.com>` | um remetente verificado no Brevo |
+
+- **Senha de app do Gmail:** ative a *Verificação em duas etapas* na sua conta Google e depois abra
+  https://myaccount.google.com/apppasswords. Crie uma senha (ex.: "Chef") e cole os 16 caracteres
+  em `SMTP_PASS`. A senha normal do Gmail **não** funciona. O Gmail permite cerca de 500 e‑mails por dia.
+- **E‑mail do seu domínio** (Hostinger, Locaweb, Zoho…): use o servidor SMTP do provedor, porta
+  `587` (ou `465`) e o e‑mail e a senha da caixa.
+- `MAIL_ADMIN` (opcional): quem recebe os avisos. Vazio = os administradores.
+- `MAIL_RATE_PER_MIN`: velocidade da newsletter. O padrão (30 por minuto) evita bloqueios.
+
+**Testar:** em **Painel → Configurações → E‑mail (SMTP)**, clique em **Enviar e‑mail de teste**.
+Se der erro, a mensagem explica o motivo (senha recusada, porta errada etc.).
+
+> **Endereço do site nos e‑mails:** os links dos e‑mails usam o `BASE_URL`. Se ele estiver vazio, o Chef usa o
+> endereço em que você entrou no painel como administrador, que também aparece em *Configurações →
+> Endereço do site*. Quem acessa de fora de casa precisa de um endereço público (passo 6).
+
+> **Segurança:** a senha do SMTP fica só nas variáveis do app. Ela não é gravada no banco e não aparece no painel.
+
+---
+
 ## Backup (importante!)
 
 Escolha uma das opções:
@@ -203,8 +244,11 @@ Escolha uma das opções:
 | *port is already allocated* | Outro app já usa a porta 8484 | Nas configurações do app, troque a porta do host para `8485` (ou outra) |
 | "O SETUP_TOKEN ainda é o de exemplo" | Você não trocou o código | Edite o app, troque o `SETUP_TOKEN` e salve |
 | "Token de instalação inválido" | O código digitado é diferente do configurado | Confira maiúsculas, minúsculas e espaços |
-| Esqueci a senha | — | No terminal: `sudo docker exec -it -u 1000:1000 chef node scripts/reset-password.js seu@email.com` e digite a nova senha |
+| Esqueci a senha | — | Com e‑mail configurado (passo 8), use **"Esqueci minha senha"** no login. Sem e‑mail, no terminal: `sudo docker exec -it -u 1000:1000 chef node scripts/reset-password.js seu@email.com` e digite a nova senha |
 | Fotos não aparecem depois de restaurar um backup | Dono dos arquivos errado | Reinicie o app: ele corrige as permissões sozinho ao iniciar |
+| E‑mail de teste: *"Usuário ou senha do SMTP recusados"* | No Gmail, a senha normal não é aceita | Crie uma **senha de app** (passo 8) |
+| E‑mail de teste: *"não respondeu"* | Porta bloqueada pela operadora | Tente `SMTP_PORT` `465` ou outro provedor (Brevo) |
+| E‑mails caem no spam | Remetente diferente da conta | Use em `MAIL_FROM` o mesmo e‑mail do `SMTP_USER` ou um remetente verificado |
 | O ícone do app não aparece no painel | O repositório do GitHub é privado | É só estético; o app funciona normalmente |
 
 ---

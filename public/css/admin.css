@@ -140,3 +140,13 @@ body.admin { padding: 0; display: flex; min-height: 100vh; }
   .editor .admin-head .btn-primary { position: fixed; z-index: 40; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); padding: .85em 1.3em; font-size: 1rem; box-shadow: var(--shadow-lg); }
   .editor { padding-bottom: 72px; }
 }
+
+/* E-mail e newsletter */
+.auth-alt { text-align: center; margin: 4px 0 0; font-size: .92rem; }
+.auth-box pre { white-space: pre-wrap; word-break: break-all; font-size: .8rem; }
+.form-ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); padding: 10px 12px; border-radius: 10px; }
+.mail-ok { color: var(--ink); }
+.mail-status p { margin: 0 0 8px; }
+.nl-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.nl-bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin-bottom: 4px; min-width: 120px; }
+.nl-bar span { display: block; height: 100%; background: var(--brand); transition: width .4s; }

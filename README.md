@@ -19,7 +19,7 @@ Site/sistema para publicar e compartilhar suas receitas, com **busca por palavra
 
 ### Busca
 - Busca de texto completo (SQLite FTS5) que **ignora acentos** ("acucar" encontra "açúcar"), com autocomplete.
-- **Código por receita** (ex.: `#BOLO01`, gerado automaticamente ou personalizado): digite o código na busca, abra `/c/BOLO01`, ou use o **QR code** da receita.
+- **Código por receita** (ex.: `#BOLO01`, gerado automaticamente ou personalizado), com **botão de copiar** ao lado em todo lugar onde aparece: digite o código na busca, abra `/c/BOLO01`, ou use o **QR code** da receita.
 - Filtros por categoria, tempo, dificuldade, tag e dieta, com ordenação.
 - **"O que tem na geladeira?"**: você informa os ingredientes que tem e o sistema mostra as receitas possíveis.
 
@@ -62,6 +62,12 @@ Basta colar os IDs; os scripts são inseridos automaticamente:
 - `sitemap.xml` com imagens, categorias e tags; RSS com `atom:link`; `robots.txt`; autor e datas visíveis (E‑E‑A‑T); link "Ir direto para a receita".
 - **Desempenho**: compressão gzip/brotli, ETag e microcache de páginas (home 8× mais rápida no teste de carga).
 
+### E‑mail (opcional, SMTP)
+- **"Esqueci minha senha"** com link de uso único (1 h) e **convite de usuário** por e‑mail.
+- **Aviso de comentário novo** para o autor da receita e os administradores.
+- **Newsletter**: duplo opt‑in, e‑mail de boas‑vindas, envio de receitas pelo painel com prévia de teste, barra de progresso, envio controlado (`MAIL_RATE_PER_MIN`), retomada e descadastro em 1 clique (RFC 8058).
+- Botão **"Enviar e‑mail de teste"** no painel, com mensagens de erro em português. Veja o passo 8 de [zimaos/LEIA-ME.md](zimaos/LEIA-ME.md).
+
 ### PWA
 O PWA tem manifest, ícones *maskable*, atalhos e service worker com offline: as receitas visitadas e favoritadas ficam disponíveis sem internet. A interface tem barra de abas no estilo app nativo, tema claro/escuro e convite de instalação.
 
@@ -83,7 +89,7 @@ Acesse `/admin` para criar a conta de administrador. Em produção, o primeiro a
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | Servidor com recarga automática |
-| `npm test` | 61 testes: funcionalidades, **segurança (ataques)** e **SEO** |
+| `npm test` | 72 testes: funcionalidades, **segurança (ataques)** e **SEO** |
 | `npm run stress` | Teste de carga e de limites da API (2.000 receitas, 32 conexões) |
 | `npm run audit:secrets` | Procura senhas/chaves vazadas nos arquivos **e no histórico do Git** |
 | `sh scripts/smoke-test.sh IMAGEM` | Testa a imagem Docker como se fosse o ZimaOS (instalação, login, upload, reinício) |
@@ -119,6 +125,13 @@ Para gerar a imagem a partir do código: `docker build -t chef .`. Para testar a
 | `SETUP_TOKEN` | gerado | Token exigido em `/admin/setup` em produção |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | — | Cria o administrador na primeira inicialização |
 | `PAGE_CACHE_SECONDS` | `15` | Microcache de páginas para visitantes (0 desliga) |
+| `SMTP_HOST` | — | Servidor SMTP (vazio = e‑mail desligado) |
+| `SMTP_PORT` | `587` | `587` (STARTTLS obrigatório) ou `465` (SSL) |
+| `SMTP_USER` / `SMTP_PASS` | — | Login do SMTP (no Gmail, use uma senha de app) |
+| `SMTP_SECURE` | auto | `true` força SSL (automático na porta 465) |
+| `MAIL_FROM` / `MAIL_REPLY_TO` | `SMTP_USER` | Remetente e endereço de resposta |
+| `MAIL_ADMIN` | admins | Quem recebe os avisos (separe vários por vírgula) |
+| `MAIL_RATE_PER_MIN` | `30` | Velocidade de envio da newsletter |
 
 > Em produção, use HTTPS (necessário para PWA, microfone e notificações), por exemplo com Caddy ou Nginx na frente.
 
