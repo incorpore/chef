@@ -324,12 +324,54 @@
   }
   $$('[data-suggest]').forEach(setupSuggest);
 
+  // ---------------- Copiar (funciona também em HTTP, ex.: http://IP-do-ZimaOS) ----------------
+  /** navigator.clipboard só existe em HTTPS/localhost; em HTTP usa o método antigo (textarea + execCommand). */
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch { /* cai no método alternativo */ }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+    return ok;
+  }
+
+  // Botão de copiar o código da receita (em cartões, página, busca, painel…)
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-copy-code]');
+    if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const code = `#${b.dataset.copyCode}`;
+    const ok = await copyText(code);
+    if (ok) {
+      b.classList.add('copied');
+      b.setAttribute('aria-label', `Código ${code} copiado`);
+      setTimeout(() => { b.classList.remove('copied'); b.setAttribute('aria-label', `Copiar código ${code}`); }, 1600);
+      toast(`📋 Código ${code} copiado`);
+      track('copy_code', { item_id: b.dataset.copyCode });
+      if (navigator.vibrate) navigator.vibrate(10);
+    } else {
+      prompt('Copie o código:', code);
+    }
+  });
+
   // ---------------- Compartilhar ----------------
   async function share({ title, text, url }) {
     if (navigator.share) {
       try { await navigator.share({ title, text, url }); track('share', { method: 'native' }); return; } catch (e) { if (e.name === 'AbortError') return; }
     }
-    try { await navigator.clipboard.writeText(url || text); toast('🔗 Link copiado!'); } catch { prompt('Copie o link:', url || text); }
+    if (await copyText(url || text)) toast('🔗 Link copiado!'); else prompt('Copie o link:', url || text);
   }
 
   // ---------------- Vídeo do YouTube "leve" ----------------
@@ -413,7 +455,7 @@
     const a = e.target.closest('a[href^="/go/"]');
     if (a) track('affiliate_click', { product_id: a.getAttribute('href').split('/')[2], link_text: a.textContent.trim().slice(0, 80) });
     const n = e.target.closest('[data-share-net]');
-    if (n) track('share', { method: n.dataset.shareNet, content_type: 'recipe', item_id: document.querySelector('[data-copy]')?.dataset.copy || '' });
+    if (n) track('share', { method: n.dataset.shareNet, content_type: 'recipe', item_id: document.querySelector('[data-copy-code]')?.dataset.copyCode || '' });
   });
 
   // ---------------- PWA: service worker e instalação ----------------
@@ -480,5 +522,5 @@
   renderTimers();
   layoutFloats();
 
-  window.Chef = { $, $$, esc, store, toast, api, favs, paintFavs, shopping, planner, dateKey, fmtQty, unitLabel, timers, fmtTime, share, beep, density, norm, track, layoutFloats };
+  window.Chef = { $, $$, esc, store, toast, api, favs, paintFavs, shopping, planner, dateKey, fmtQty, unitLabel, timers, fmtTime, share, beep, density, norm, track, layoutFloats, copyText };
 })();

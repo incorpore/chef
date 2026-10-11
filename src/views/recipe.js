@@ -139,7 +139,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
       ${r.status !== 'published' ? '<span class="chip chip-warn">Rascunho</span>' : ''}
       <h1>${esc(r.title)}</h1>
       <p class="byline">Por <a href="/sobre" rel="author">${esc(r.author_name || settings.all().authorName || settings.all().siteName)}</a> · <time datetime="${esc(r.published_at || r.created_at)}">${fmtDate(r.published_at || r.created_at)}</time>${r.updated_at && (r.updated_at || '').slice(0, 10) !== (r.published_at || r.created_at || '').slice(0, 10) ? ` · atualizada em <time datetime="${esc(r.updated_at)}">${fmtDate(r.updated_at)}</time>` : ''}</p>
-      <button class="code-badge" data-copy="${esc(r.code)}" title="Copiar código">${icon('qr')} Código <b>#${esc(r.code)}</b></button>
+      <div class="code-row">${c.codeCopy(r.code, { label: true, cls: 'code-copy-lg' })}<button type="button" class="code-qr" data-qr aria-label="Mostrar QR code da receita" title="QR code">${icon('qr')}</button></div>
       ${r.description ? `<p class="lead">${esc(r.description)}</p>` : ''}
       <div class="meta-pills">
         ${r.total_minutes ? `<span class="pill">${icon('clock')}<b>${u.formatMinutes(r.total_minutes)}</b><small>tempo total</small></span>` : ''}
@@ -250,7 +250,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
   <template data-cook-done-ad>${renderAd('cook_mode')}</template>
 </div>
 <div class="timer-dock" aria-live="polite"></div>
-<dialog class="qr-dialog"><div class="qr-box"><img alt="QR code da receita" width="240" height="240"><p>Aponte a câmera para abrir a receita<br><b>#${esc(r.code)}</b></p><button class="btn" data-close-dialog>Fechar</button></div></dialog>
+<dialog class="qr-dialog"><div class="qr-box"><img alt="QR code da receita" width="240" height="240"><p>Aponte a câmera para abrir a receita</p>${c.codeCopy(r.code, { cls: 'code-copy-lg' })}<button class="btn" data-close-dialog>Fechar</button></div></dialog>
 <script type="application/json" id="recipe-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`;
 
   const crumbs = [['Início', '/'], ...(r.category ? [[r.category.name, `/categoria/${r.category.slug}`]] : []), [r.title, `/receita/${r.slug}`]];

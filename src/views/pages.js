@@ -71,7 +71,7 @@ function listing({ title, intro = '', result, q = {}, categories, basePath = '/b
   const body = `<div class="wrap">
     <header class="page-head"><h1>${esc(title)}</h1>${intro}</header>
     ${filters(q, categories)}
-    ${codeHit ? `<a class="code-hit" href="/receita/${esc(codeHit.slug)}">${icon('qr')} Código <b>#${esc(codeHit.code)}</b> encontrado: <strong>${esc(codeHit.title)}</strong> →</a>` : ''}
+    ${codeHit ? `<div class="code-hit">${c.codeCopy(codeHit.code, { label: true })}<a href="/receita/${esc(codeHit.slug)}">encontrado: <strong>${esc(codeHit.title)}</strong> →</a></div>` : ''}
     <p class="result-count">${result.total} ${result.total === 1 ? 'receita' : 'receitas'}${q.q ? ` para “${esc(q.q)}”` : ''}</p>
     ${c.grid(result.items, { adHtml: renderAd('home_inline') })}
     ${c.pagination(result.page, result.pages, qs)}

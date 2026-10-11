@@ -3,6 +3,7 @@ const u = require('../util');
 const { icon, ASSET_VERSION } = require('./layout');
 const settings = require('../settings');
 const { AD_SLOTS } = require('../monetization');
+const { codeCopy } = require('./components');
 
 const esc = u.esc;
 
@@ -83,7 +84,7 @@ function editor({ user, recipe, categories, products }) {
   const body = `
   <form class="editor" data-editor data-id="${r.id || ''}">
     <header class="admin-head sticky">
-      <h1>${r.id ? 'Editar receita' : 'Nova receita'} ${r.code ? `<span class="code-chip static">#${esc(r.code)}</span>` : ''}</h1>
+      <h1>${r.id ? 'Editar receita' : 'Nova receita'} ${r.code ? codeCopy(r.code) : ''}</h1>
       <div>
         ${r.id ? `<a class="btn btn-ghost" href="/receita/${esc(r.slug)}" target="_blank">Ver</a> <button type="button" class="btn btn-ghost" data-duplicate>Duplicar</button> <button type="button" class="btn btn-danger" data-delete>Excluir</button>` : ''}
         <select name="status" aria-label="Status"><option value="draft"${r.status === 'draft' ? ' selected' : ''}>Rascunho</option><option value="published"${r.status === 'published' ? ' selected' : ''}>Publicada</option></select>

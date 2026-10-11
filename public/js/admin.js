@@ -3,6 +3,9 @@
   'use strict';
   const { $, $$, esc, toast, api } = window.Chef;
   const on = (sel, ev, fn) => document.addEventListener(ev, (e) => { const t = e.target.closest(sel); if (t) fn(e, t); });
+  // Código da receita com botão de copiar (mesmo visual das páginas públicas)
+  const COPY_ICO = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><svg class="ico ico-ok" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>';
+  const codeCopy = (code) => `<span class="code-copy"><span class="code-copy-text">#${esc(code)}</span><button type="button" class="code-copy-btn" data-copy-code="${esc(code)}" aria-label="Copiar código #${esc(code)}" title="Copiar código">${COPY_ICO}</button></span>`;
   const fmtDate = (s) => (s ? new Date(s.includes('T') ? s : `${s.replace(' ', 'T')}Z`).toLocaleDateString('pt-BR') : '—');
 
   // ---------------- Login / configuração inicial ----------------
@@ -60,7 +63,7 @@
     api('/stats').then((s) => {
       const box = (n, l, href) => `<a class="stat" ${href ? `href="${href}"` : ''}><b>${Number(n).toLocaleString('pt-BR')}</b><span>${l}</span></a>`;
       stats.innerHTML = box(s.published, 'publicadas', '/admin/receitas') + box(s.drafts, 'rascunhos', '/admin/receitas') + box(s.views, 'visualizações') + box(s.cooked, 'vezes cozinhadas') + box(s.pendingComments, 'comentários pendentes', '/admin/comentarios') + box(s.subscribers, 'inscritos') + box(s.productClicks, 'cliques em afiliados', '/admin/produtos') + box(s.adImpressions, 'impressões de anúncios');
-      $('[data-top]').innerHTML = s.top.map((r) => `<li><a href="/admin/receitas/${r.id}">${esc(r.title)}</a> <small>${r.views} views · #${esc(r.code)}</small></li>`).join('') || '<li>—</li>';
+      $('[data-top]').innerHTML = s.top.map((r) => `<li><a href="/admin/receitas/${r.id}">${esc(r.title)}</a> <small>${r.views} views</small> ${codeCopy(r.code)}</li>`).join('') || '<li>—</li>';
       $('[data-top-products]').innerHTML = s.topProducts.map((p) => `<li>${esc(p.title)} <small>${p.clicks} cliques</small></li>`).join('') || '<li>—</li>';
     });
   }
@@ -73,7 +76,7 @@
     const load = async () => {
       const q = new URLSearchParams({ q: f.q.value, status: f.status.value, page, perPage: 25, sort: f.q.value ? '' : 'updated' });
       const res = await api(`/recipes?${q}`);
-      rows.innerHTML = res.items.map((r) => `<tr><td>${r.cover ? `<img class="thumb" src="${esc(r.cover)}" alt="">` : ''}</td><td><a href="/admin/receitas/${r.id}"><strong>${esc(r.title)}</strong></a><br><small>${esc(r.category?.name || '')}</small></td><td><code>#${esc(r.code)}</code></td><td><span class="status status-${r.status}">${r.status === 'published' ? 'Publicada' : 'Rascunho'}</span></td><td>${r.views}</td><td class="row-actions"><a href="/receita/${esc(r.slug)}" target="_blank">ver</a> <a href="/admin/receitas/${r.id}">editar</a></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma receita</td></tr>';
+      rows.innerHTML = res.items.map((r) => `<tr><td>${r.cover ? `<img class="thumb" src="${esc(r.cover)}" alt="">` : ''}</td><td><a href="/admin/receitas/${r.id}"><strong>${esc(r.title)}</strong></a><br><small>${esc(r.category?.name || '')}</small></td><td>${codeCopy(r.code)}</td><td><span class="status status-${r.status}">${r.status === 'published' ? 'Publicada' : 'Rascunho'}</span></td><td>${r.views}</td><td class="row-actions"><a href="/receita/${esc(r.slug)}" target="_blank">ver</a> <a href="/admin/receitas/${r.id}">editar</a></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma receita</td></tr>';
       $('[data-pager]').innerHTML = res.pages > 1 ? `${page > 1 ? '<button class="btn btn-sm" data-page="-1">← Anterior</button>' : ''} <span>Página ${page} de ${res.pages}</span> ${page < res.pages ? '<button class="btn btn-sm" data-page="1">Próxima →</button>' : ''}` : '';
     };
     let t;
@@ -252,7 +255,7 @@
         dirty = false;
         toast('✅ Receita salva');
         if (!id) location.href = `/admin/receitas/${r.id}`;
-        else $('.admin-head h1 .code-chip') && ($('.admin-head h1 .code-chip').textContent = `#${r.code}`);
+        else if ($('.admin-head h1 .code-copy')) $('.admin-head h1 .code-copy').outerHTML = codeCopy(r.code);
       } catch (err) { toast(`⚠️ ${err.message}`, 5000); }
     });
     document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); editor.requestSubmit(); } });
@@ -379,7 +382,7 @@
       box.innerHTML = `<p>🔑 Copie sua chave agora — ela não será exibida novamente:</p><pre><code>${esc(k.key)}</code></pre><button class="btn btn-sm" data-copy-key="${esc(k.key)}">Copiar</button>`;
       loadKeys();
     });
-    on('[data-copy-key]', 'click', async (e, b) => { await navigator.clipboard.writeText(b.dataset.copyKey); toast('Copiada'); });
+    on('[data-copy-key]', 'click', async (e, b) => { if (await window.Chef.copyText(b.dataset.copyKey)) toast('🔑 Chave copiada'); else prompt('Copie a chave:', b.dataset.copyKey); });
     on('[data-revoke]', 'click', async (e, b) => { if (confirm('Revogar esta chave?')) { await api(`/keys/${b.dataset.revoke}`, { method: 'DELETE' }); loadKeys(); } });
     loadKeys();
   }

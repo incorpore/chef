@@ -16,6 +16,12 @@ function thumb(src, alt, { w = 600, h = 450, eager = false } = {}) {
   return `<img src="${esc(src)}" alt="${esc(alt)}" width="${w}" height="${h}" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">`;
 }
 
+/** Código da receita com botão de copiar ao lado (ícone vira ✓ ao copiar). */
+function codeCopy(code, { label = false, cls = '' } = {}) {
+  const c = esc(code);
+  return `<span class="code-copy ${cls}">${label ? '<span class="code-copy-label">Código</span>' : ''}<span class="code-copy-text">#${c}</span><button type="button" class="code-copy-btn" data-copy-code="${c}" aria-label="Copiar código #${c}" title="Copiar código">${icon('copy')}${icon('check', 'ico-ok')}</button></span>`;
+}
+
 function recipeCard(r, { eager = false } = {}) {
   const time = u.formatMinutes(r.total_minutes);
   return `<article class="card" data-recipe-id="${r.id}">
@@ -31,7 +37,7 @@ function recipeCard(r, { eager = false } = {}) {
       </div>
     </div>
   </a>
-  <span class="code-chip" title="Código da receita">#${esc(r.code)}</span>
+  <button type="button" class="code-chip" data-copy-code="${esc(r.code)}" aria-label="Copiar código #${esc(r.code)}" title="Copiar código">#${esc(r.code)}${icon('copy')}${icon('check', 'ico-ok')}</button>
   <button class="fav-btn" data-fav="${r.id}" data-slug="${esc(r.slug)}" data-title="${esc(r.title)}" data-cover="${esc(r.cover)}" aria-label="Favoritar ${esc(r.title)}">${icon('heart')}</button>
 </article>`;
 }
@@ -91,4 +97,4 @@ function linkIngredients(steps, ingredients) {
   });
 }
 
-module.exports = { recipeCard, grid, pagination, stars, thumb, videoEmbed, linkIngredients, DIFFICULTY };
+module.exports = { codeCopy, recipeCard, grid, pagination, stars, thumb, videoEmbed, linkIngredients, DIFFICULTY };
