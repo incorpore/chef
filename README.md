@@ -1,5 +1,7 @@
 # 🍳 Chef — blog de receitas moderno (PWA)
 
+[![Imagem Docker](https://github.com/incorpore/chef/actions/workflows/docker.yml/badge.svg)](https://github.com/incorpore/chef/actions/workflows/docker.yml) · Imagem: [`ghcr.io/incorpore/chef:latest`](https://github.com/users/incorpore/packages/container/package/chef)
+
 Site/sistema para publicar e compartilhar suas receitas, com **busca por palavra‑chave ou código**, **fotos e vídeos**, **API REST**, **importação por URL**, **anúncios**, **afiliados da Amazon** e um **Modo Cozinha** para acompanhar a receita passo a passo — instalável no celular como um app nativo.
 
 ## Destaques
