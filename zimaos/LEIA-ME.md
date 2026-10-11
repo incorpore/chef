@@ -48,10 +48,22 @@ O GitHub cria a imagem sozinho na primeira vez que o código é enviado. Mas, po
 5. Para conferir se deu certo, abra o link do passo 2 numa **janela anônima** do navegador. Se a página
    abrir sem pedir login, a imagem está pública.
 
-> **Prefere manter privada?** Tudo bem. Crie um *token* no GitHub em
-> *Settings → Developer settings → Personal access tokens (classic)*, marcando só
-> **`read:packages`**. Depois, no terminal do ZimaOS (passo 7), rode uma vez:
-> `sudo docker login ghcr.io -u SEU_USUARIO_GITHUB` e cole o token como senha.
+> **Prefere manter a imagem privada?** Dá para fazer, mas pelo terminal do ZimaOS (veja o passo 7):
+>
+> 1. No GitHub, abra *Settings → Developer settings → Personal access tokens → Tokens (classic) →
+>    Generate new token (classic)*. Marque **só** `read:packages`, gere o token e copie (começa com `ghp_`).
+> 2. No terminal do ZimaOS, faça login (cole o token quando pedir a senha) e baixe a imagem:
+>    ```sh
+>    sudo docker login ghcr.io -u incorpore
+>    sudo docker pull ghcr.io/incorpore/chef:latest
+>    ```
+> 3. Volte ao painel e instale normalmente (passo 2). Como a imagem já está no ZimaOS, ele não
+>    precisa baixá-la de novo. Se o painel insistir em baixar e falhar, instale pelo terminal:
+>    ```sh
+>    sudo mkdir -p /DATA/AppData/chef
+>    sudo nano /DATA/AppData/chef/docker-compose.yml   # cole o conteúdo do arquivo e troque o SETUP_TOKEN
+>    sudo docker compose -f /DATA/AppData/chef/docker-compose.yml up -d
+>    ```
 
 ---
 
@@ -186,7 +198,7 @@ Escolha uma das opções:
 
 | O que aparece | Causa | Solução |
 |---|---|---|
-| Erro ao instalar: *pull access denied* / *unauthorized* / *denied* | A imagem ainda é **privada** (o padrão do GitHub quando o repositório é privado) | Faça o **passo 1**: Package settings → Change visibility → Public |
+| *"Falha ao baixar a imagem após tentar 5 métodos de espelho diferentes"*, *pull access denied*, *unauthorized* ou *denied* | A imagem ainda é **privada** (o padrão do GitHub quando o repositório é privado) | Faça o **passo 1**: Package settings → Change visibility → Public |
 | "Não encontro a imagem no GitHub" | Ela fica em **Packages**, não em *Releases* nem nos arquivos do repositório | https://github.com/users/incorpore/packages/container/package/chef |
 | *port is already allocated* | Outro app já usa a porta 8484 | Nas configurações do app, troque a porta do host para `8485` (ou outra) |
 | "O SETUP_TOKEN ainda é o de exemplo" | Você não trocou o código | Edite o app, troque o `SETUP_TOKEN` e salve |
