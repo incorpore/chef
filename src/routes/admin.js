@@ -45,6 +45,14 @@ router.use(auth.requireUser);
 const products = () => db.get().prepare('SELECT * FROM products ORDER BY title').all();
 
 router.get('/', (req, res) => res.send(v.dashboard({ user: req.user })));
+router.get('/perfil', (req, res) => {
+  const d = db.get();
+  const st = d.prepare("SELECT SUM(status = 'published') AS published, SUM(status <> 'published') AS drafts, COALESCE(SUM(views), 0) AS views FROM recipes WHERE author_id = ?").get(req.user.id);
+  const activity = d.prepare("SELECT action, created_at FROM audit_log WHERE user_id = ? AND action IN ('login.ok','logout.all','password.change','password.reset','invite.accepted','email.change','setup') ORDER BY id DESC LIMIT 40").all(req.user.id)
+    .filter((a, i, all) => i === 0 || a.action !== all[i - 1].action) // vários logins seguidos viram um só
+    .slice(0, 8);
+  res.send(v.profilePage({ user: req.user, stats: { published: st.published || 0, drafts: st.drafts || 0, views: st.views || 0 }, activity }));
+});
 router.get('/receitas', (req, res) => res.send(v.recipeList({ user: req.user })));
 router.get('/receitas/nova', (req, res) => res.send(v.editor({ user: req.user, recipe: null, categories: recipes.categories(), products: products() })));
 router.get('/receitas/:id', (req, res, next) => {

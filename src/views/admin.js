@@ -1,6 +1,6 @@
 'use strict';
 const u = require('../util');
-const { icon, ASSET_VERSION } = require('./layout');
+const { icon, avatar, ASSET_VERSION } = require('./layout');
 const settings = require('../settings');
 const { AD_SLOTS } = require('../monetization');
 const { codeCopy } = require('./components');
@@ -32,7 +32,9 @@ ${user ? `<aside class="admin-nav">
   ${user.role === 'admin' ? item('/admin/configuracoes', 'edit', 'Configurações', 'settings') : ''}
   ${user.role === 'admin' ? item('/admin/usuarios', 'users', 'Usuários', 'users') : ''}
   ${user.role === 'admin' ? item('/admin/auditoria', 'list', 'Auditoria', 'audit') : ''}
-  <button class="logout" data-logout>${icon('x')}<span>Sair</span></button>
+  <a href="/admin/perfil" class="nav-profile ${active === 'profile' ? 'active' : ''}">${avatar(user, 'avatar-xs')}<span>Meu perfil</span></a>
+  <a href="/" class="nav-site">${icon('home')}<span>Ver o site</span></a>
+  <button class="logout" data-logout>${icon('logout')}<span>Sair</span></button>
 </aside>` : ''}
 <main class="admin-main">${body}</main>
 <div class="toast" role="status" aria-live="polite"></div>
@@ -283,6 +285,89 @@ function importPage({ user, prefill = '' }) {
     </section>` });
 }
 
+const ACTIONS = {
+  'login.ok': '✅ Entrou', 'login.fail': '⚠️ Senha errada', 'login.locked': '🔒 Conta bloqueada por tentativas', 'logout.all': '🚪 Saiu de todos os aparelhos',
+  'password.change': '🔑 Trocou a senha', 'password.reset': '🔑 Redefiniu a senha pelo e-mail', 'password.forgot': '📧 Pediu link de nova senha',
+  'invite.accepted': '🎉 Aceitou o convite', 'email.change': '📧 Trocou o e-mail', 'profile.update': '✏️ Atualizou o perfil', setup: '🚀 Criou a conta de administrador',
+};
+const fmtWhen = (d) => { try { return new Date(`${String(d).replace(' ', 'T')}Z`).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: process.env.TZ || 'America/Sao_Paulo' }); } catch { return d; } };
+
+function profilePage({ user, stats, activity }) {
+  const since = user.created_at ? new Date(`${String(user.created_at).replace(' ', 'T')}Z`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '';
+  const pw = (name, label, auto, extra = '') => field(label, `<div class="pw-field"><input type="password" name="${name}" autocomplete="${auto}" ${extra}><button type="button" class="pw-toggle" data-pw-toggle aria-label="Mostrar senha" title="Mostrar senha">👁</button></div>`);
+  return adminLayout({ title: 'Meu perfil', user, active: 'profile', body: `
+  <div class="profile">
+    <section class="panel profile-head">
+      <div class="avatar-edit">
+        <div class="avatar-frame" data-avatar-preview>${avatar(user, 'avatar-xl')}</div>
+        <div class="avatar-actions">
+          <button type="button" class="btn btn-sm" data-avatar-pick>${icon('camera')} ${user.avatar ? 'Trocar foto' : 'Adicionar foto'}</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-avatar-remove ${user.avatar ? '' : 'hidden'}>Remover</button>
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-avatar-file hidden>
+        </div>
+      </div>
+      <div class="profile-id">
+        <h1 data-profile-name>${esc(user.name)}</h1>
+        <p class="profile-mail"><span data-profile-email>${esc(user.email)}</span> <span class="role role-${user.role}">${user.role === 'admin' ? 'Administrador(a)' : 'Autor(a)'}</span></p>
+        <ul class="profile-stats">
+          <li><strong>${stats.published}</strong><span>publicadas</span></li>
+          <li><strong>${stats.drafts}</strong><span>rascunhos</span></li>
+          <li><strong>${stats.views}</strong><span>visualizações</span></li>
+        </ul>
+        ${since ? `<p class="muted">Na cozinha desde ${esc(since)}</p>` : ''}
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Informações</h2>
+      <form data-profile class="profile-form" novalidate>
+        <div class="row2">
+          ${field('Nome', `<input name="name" value="${esc(user.name)}" required maxlength="80" autocomplete="name">`)}
+          ${field('E-mail de acesso', `<input name="email" type="email" value="${esc(user.email)}" required maxlength="254" autocomplete="email" data-email-orig="${esc(user.email)}">`)}
+        </div>
+        <div data-email-confirm hidden>${pw('currentPassword', 'Senha atual (para confirmar a troca de e-mail)', 'current-password')}</div>
+        ${field('Sobre você', `<textarea name="bio" rows="4" maxlength="2000" data-count="2000" placeholder="Conte um pouco da sua história na cozinha.">${esc(user.bio || '')}</textarea>`, user.role === 'admin' ? 'Aparece na página Sobre do site.' : 'Aparece junto às suas receitas.')}
+        <details class="avatar-url"><summary>Usar uma foto da internet (link)</summary>${field('Link da foto (https://…)', `<input name="avatar" value="${esc(user.avatar || '')}" placeholder="https://…" inputmode="url">`)}</details>
+        <p class="form-error" hidden></p>
+        <div class="form-actions"><button class="btn btn-primary">Salvar alterações</button></div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Senha</h2>
+      <form data-password class="profile-form" novalidate>
+        ${pw('currentPassword', 'Senha atual', 'current-password', 'required')}
+        <div class="row2">
+          ${pw('password', 'Nova senha', 'new-password', 'required minlength="8"')}
+          ${pw('confirm', 'Repita a nova senha', 'new-password', 'required minlength="8"')}
+        </div>
+        <div class="pw-meter" data-pw-meter hidden><span></span><small></small></div>
+        <p class="hint">Pelo menos 8 caracteres. Ao trocar, os outros aparelhos saem da conta; este continua conectado.</p>
+        <p class="form-error" hidden></p>
+        <div class="form-actions"><button class="btn btn-primary">Alterar senha</button></div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Aparência</h2>
+      <div class="theme-pick" role="radiogroup" aria-label="Tema">
+        <label><input type="radio" name="theme" value="system" data-theme-pick> 🖥️ Igual ao aparelho</label>
+        <label><input type="radio" name="theme" value="light" data-theme-pick> ☀️ Claro</label>
+        <label><input type="radio" name="theme" value="dark" data-theme-pick> 🌙 Escuro</label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Segurança</h2>
+      ${activity.length ? `<p class="muted">Atividade recente da sua conta:</p><ul class="activity">${activity.map((a) => `<li><span>${esc(ACTIONS[a.action] || a.action)}</span><time>${esc(fmtWhen(a.created_at))}</time></li>`).join('')}</ul>` : ''}
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-logout-all>Sair de todos os aparelhos</button>
+        <button type="button" class="btn btn-ghost" data-logout>${icon('logout')} Sair deste aparelho</button>
+      </div>
+    </section>
+  </div>` });
+}
+
 function simplePage({ user, title, active, body }) {
   return adminLayout({ title, user, active, body: `<header class="admin-head"><h1>${title}</h1></header>${body}` });
 }
@@ -383,7 +468,7 @@ function settingsPage({ user }) {
     <section class="panel"><h2>Avançado</h2>${field('HTML extra no &lt;head&gt;', `<textarea name="headHtml" rows="4" placeholder="Outras ferramentas de medição">${v('headHtml')}</textarea>`, 'Atenção: código inserido aqui roda em todas as páginas. Use apenas códigos de fontes confiáveis.')}</section>
     <button class="btn btn-primary btn-lg">Salvar configurações</button>
   </form>
-  <section class="panel"><h2>Minha conta</h2><form data-account class="row3">${field('Nome', `<input name="name" value="${esc(user.name)}">`)}${field('Senha atual', '<input type="password" name="currentPassword" autocomplete="current-password">')}${field('Nova senha', '<input type="password" name="password" minlength="8" autocomplete="new-password">')}${field('Bio', `<textarea name="bio" rows="2">${esc(user.bio || '')}</textarea>`)}${field('Foto (URL)', `<input name="avatar" value="${esc(user.avatar || '')}">`)}<div><button class="btn">Atualizar conta</button></div></form></section>` });
+  <section class="panel"><h2>Minha conta</h2><p>Nome, foto, e-mail e senha agora ficam em <a href="/admin/perfil">Meu perfil</a>.</p></section>` });
 }
 
 function apiPage({ user }) {
@@ -413,4 +498,4 @@ function forbidden({ user }) {
   return simplePage({ user, title: 'Sem permissão', active: '', body: '<section class="panel"><p>Você só pode editar as suas próprias receitas.</p><p><a class="btn" href="/admin/receitas">Voltar</a></p></section>' });
 }
 
-module.exports = { forgotPage, resetPage, newsletterAdminPage, auditPage, forbidden, adminLayout, authPage, dashboard, recipeList, editor, importPage, categoriesPage, commentsPage, productsPage, adsPage, settingsPage, apiPage, usersPage };
+module.exports = { profilePage, forgotPage, resetPage, newsletterAdminPage, auditPage, forbidden, adminLayout, authPage, dashboard, recipeList, editor, importPage, categoriesPage, commentsPage, productsPage, adsPage, settingsPage, apiPage, usersPage };

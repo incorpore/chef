@@ -147,9 +147,18 @@ const detect = () => {
     await p.evaluate(() => localStorage.clear());
     // admin
     await ctx.addCookies(cookies);
-    for (const u of ['/admin', '/admin/receitas', '/admin/receitas/2', '/admin/importar', '/admin/configuracoes', '/admin/produtos', '/admin/anuncios', '/admin/api', '/admin/comentarios', '/admin/auditoria', '/admin/newsletter', '/admin/usuarios']) {
+    for (const u of ['/admin', '/admin/receitas', '/admin/receitas/2', '/admin/importar', '/admin/configuracoes', '/admin/produtos', '/admin/anuncios', '/admin/api', '/admin/comentarios', '/admin/auditoria', '/admin/newsletter', '/admin/usuarios', '/admin/perfil']) {
       await p.goto(B + u); await p.waitForTimeout(300);
       add(`${w}px ${u}`, await p.evaluate(detect));
+    }
+    // Perfil com campos de confirmação abertos e site público com o menu da conta aberto
+    await p.fill('[data-profile] input[name=email]', 'outro-email-bem-comprido-para-testar@exemplo-de-dominio.com.br');
+    await p.fill('[data-password] input[name=password]', 'abc');
+    add(`${w}px /admin/perfil (troca de e-mail)`, await p.evaluate(detect));
+    for (const u of ['/', '/receita/bolo-de-cenoura']) {
+      await p.goto(B + u); await p.waitForTimeout(200);
+      await p.click('[data-account-menu] summary'); await p.waitForTimeout(150);
+      add(`${w}px ${u} (logado, menu da conta aberto)`, await p.evaluate(detect));
     }
     await ctx.close();
   }

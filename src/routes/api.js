@@ -158,22 +158,51 @@ router.post('/auth/logout-all', auth.requireUser, (req, res) => {
 
 router.get('/auth/me', (req, res) => res.json({ user: auth.publicUser(req.user), needsSetup: auth.userCount() === 0, needsSetupToken: !!auth.setupToken() }));
 
+/** Foto de perfil: só arquivos enviados ao próprio site ou links https (nada de javascript:, data: etc.). */
+const AVATAR_RE = /^(\/uploads\/[\w.-]+|https:\/\/[^\s"'<>]+)$/i;
+
 router.put('/auth/me', auth.requireUser, (req, res) => {
-  const { name, bio, avatar, password, currentPassword } = req.body || {};
+  const { name, bio, avatar, email, password, currentPassword } = req.body || {};
   const d = db.get();
-  if (avatar && !u.isSafeUrl(avatar)) return res.status(400).json({ error: 'URL da foto inválida' });
+  const me = req.user;
+  const changes = {};
+  if (name !== undefined) {
+    changes.name = sec.cleanText(name, 80).trim();
+    if (!changes.name) return res.status(400).json({ error: 'Informe seu nome' });
+  }
+  if (bio !== undefined) changes.bio = sec.cleanText(bio, 2000);
+  if (avatar !== undefined) {
+    changes.avatar = String(avatar ?? '').trim();
+    if (changes.avatar && (changes.avatar.length > 500 || !AVATAR_RE.test(changes.avatar))) return res.status(400).json({ error: 'Foto inválida: envie uma imagem ou use um link https' });
+  }
+  const newEmail = email !== undefined ? sec.cleanText(email, 254).trim().toLowerCase() : '';
+  const emailChanged = newEmail && newEmail !== String(me.email).toLowerCase();
+  // Trocar e-mail ou senha exige a senha atual (protege contra alguém usando um aparelho já logado)
+  if (emailChanged || password) {
+    if (req.viaApiKey) return forbid(res, 'Troque e-mail e senha pelo painel');
+    if (!auth.verifyPassword(String(currentPassword ?? ''), me.password_hash)) return res.status(400).json({ error: 'Senha atual incorreta', field: 'currentPassword' });
+  }
+  if (emailChanged) {
+    if (!auth.EMAIL_RE.test(newEmail)) return res.status(400).json({ error: 'E-mail inválido', field: 'email' });
+    if (d.prepare('SELECT 1 FROM users WHERE email = ? AND id <> ?').get(newEmail, me.id)) return res.status(409).json({ error: 'Este e-mail já é usado por outra conta', field: 'email' });
+    changes.email = newEmail;
+  }
   if (password) {
-    if (req.viaApiKey) return forbid(res, 'Troque a senha pelo painel');
-    if (!auth.verifyPassword(currentPassword, req.user.password_hash)) return res.status(400).json({ error: 'Senha atual incorreta' });
-    const err = auth.validatePassword(password);
-    if (err) return res.status(400).json({ error: err });
-    d.prepare('UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?').run(auth.hashPassword(password), req.user.id);
+    const err = auth.validatePassword(String(password));
+    if (err) return res.status(400).json({ error: err, field: 'password' });
+  }
+  const cols = Object.keys(changes);
+  if (cols.length) d.prepare(`UPDATE users SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`).run(...cols.map((c) => changes[c]), me.id);
+  if (password) {
+    d.prepare('UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?').run(auth.hashPassword(String(password)), me.id);
     auth.audit(req, 'password.change');
   }
-  d.prepare('UPDATE users SET name = COALESCE(?, name), bio = COALESCE(?, bio), avatar = COALESCE(?, avatar) WHERE id = ?')
-    .run(name ? sec.cleanText(name, 80) : null, bio !== undefined ? sec.cleanText(bio, 2000) : null, avatar !== undefined ? String(avatar) : null, req.user.id);
-  const user = d.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (emailChanged) auth.audit(req, 'email.change', `${me.email} → ${newEmail}`);
+  if (cols.some((c) => c !== 'email')) auth.audit(req, 'profile.update', cols.filter((c) => c !== 'email').join(','));
+  const user = d.prepare('SELECT * FROM users WHERE id = ?').get(me.id);
   if (password) auth.setSessionCookie(res, user); // mantém este aparelho logado, derruba os outros
+  if (emailChanged) notify.notifyAccountChange(me.email, user, 'email');
+  if (password) notify.notifyAccountChange(user.email, user, 'password');
   res.json({ user: auth.publicUser(user) });
 });
 

@@ -37,11 +37,61 @@ const ICONS = {
   star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
   layers: '<path d="m12 2 10 5-10 5L2 7zm-10 10 10 5 10-5M2 17l10 5 10-5"/>',
   download: '<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v3h16v-3"/>',
+  user: '<path d="M20 21v-1a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5v1M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/>',
+  logout: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5m5 5H3"/>',
+  camera: '<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Zm8 9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/>',
   fridge: '<path d="M6 2h12a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm-1 8h14M9 5v2m0 6v3"/>',
 };
 
 function icon(name, cls = '') {
   return `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+
+/** Foto do usuário ou, se não houver, as iniciais do nome num círculo colorido. */
+function avatar(user, cls = '') {
+  const name = String(user?.name || '?').trim();
+  if (user?.avatar) return `<img class="avatar ${cls}" src="${esc(user.avatar)}" alt="" width="40" height="40" loading="lazy" decoding="async">`;
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+  return `<span class="avatar avatar-initials ${cls}" aria-hidden="true">${esc(initials)}</span>`;
+}
+
+const SOCIAL_LABELS = { instagram: 'Instagram', youtube: 'YouTube', tiktok: 'TikTok', pinterest: 'Pinterest', facebook: 'Facebook', x: 'X (Twitter)' };
+
+/** Menu da conta no topo (só aparece para quem está logado). */
+function accountMenu(user) {
+  return `<details class="account" data-account-menu>
+    <summary aria-label="Minha conta: ${esc(user.name)}" title="Minha conta">${avatar(user, 'avatar-sm')}</summary>
+    <div class="account-menu" role="menu">
+      <div class="account-who">${avatar(user)}<div><strong>${esc(user.name)}</strong><small>${esc(user.email)}</small></div></div>
+      <a href="/admin/perfil" role="menuitem">${icon('user')} Meu perfil</a>
+      <a href="/admin" role="menuitem">${icon('grid')} Painel</a>
+      <a href="/admin/receitas/nova" role="menuitem">${icon('plus')} Nova receita</a>
+      <button type="button" role="menuitem" data-logout>${icon('logout')} Sair</button>
+    </div>
+  </details>`;
+}
+
+function footer(s, user) {
+  const social = Object.entries(s.social || {}).filter(([, v]) => v);
+  const col = (title, links) => `<nav class="footer-col" aria-label="${title}"><p class="footer-h">${title}</p>${links}</nav>`;
+  return `<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="/">${s.logo ? `<img src="${esc(s.logo)}" alt="" width="32" height="32">` : `<span class="brand-mark">${icon('chef')}</span>`}<span>${esc(s.siteName)}</span></a>
+        <p>${esc(s.tagline)}</p>
+        ${social.length ? `<p class="social">${social.map(([k, v]) => `<a href="${esc(v)}" rel="me noopener" target="_blank">${esc(SOCIAL_LABELS[k] || k)}</a>`).join('')}</p>` : ''}
+      </div>
+      ${col('Receitas', '<a href="/receitas">Todas as receitas</a><a href="/categorias">Categorias</a><a href="/geladeira">O que tem na geladeira?</a><a href="/surpresa" rel="nofollow">Me surpreenda</a>')}
+      ${col('Ferramentas', '<a href="/favoritos">Favoritos</a><a href="/lista">Lista de compras</a><a href="/planejador">Cardápio da semana</a><a href="/conversor">Conversor de medidas</a>')}
+      ${col('Sobre', `<a href="/sobre">Quem somos</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos de uso</a>${s.consentBanner ? '<button type="button" class="link" data-consent-open>Cookies</button>' : ''}<a href="/feed.xml">RSS</a><a href="/api/docs">API</a>`)}
+      ${user
+    ? col('Minha conta', '<a href="/admin/perfil">Meu perfil</a><a href="/admin">Painel</a><a href="/admin/receitas/nova">Nova receita</a><button type="button" class="link" data-logout>Sair</button>')
+    : col('Conta', '<a href="/admin" rel="nofollow">Entrar</a>')}
+    </div>
+    <div class="footer-bottom"><span>© ${new Date().getFullYear()} ${esc(s.siteName)}</span><a href="#main" class="to-top">Voltar ao topo ↑</a></div>
+  </div>
+</footer>`;
 }
 
 function layout({ title, seoTitle, description, body, head = '', canonical = '', image = '', imageAlt = '', type = 'website', article = null, prev = '', next = '', bodyClass = '', jsonLd = null, scripts = [], noindex = false, user = null, nav = '' }) {
@@ -91,9 +141,9 @@ ${gtmNoscript()}
       ${navItem('/favoritos', 'heart', 'Favoritos', 'favs')}
       ${navItem('/lista', 'cart', 'Compras', 'list')}
       ${navItem('/planejador', 'calendar', 'Cardápio', 'plan')}
-      ${user ? `<a href="/admin" class="admin-link">${icon('edit')}<span>Painel</span></a>` : ''}
       <button class="icon-btn" data-theme-toggle aria-label="Alternar tema">${icon('moon')}</button>
     </nav>
+    ${user ? accountMenu(user) : ''}
   </div>
 </header>
 ${renderAd('header')}
@@ -101,18 +151,7 @@ ${renderAd('header')}
 ${body}
 </main>
 ${renderAd('footer')}
-<footer class="footer">
-  <div class="wrap footer-in">
-    <div>
-      <strong>${esc(s.siteName)}</strong>
-      <p>${esc(s.tagline)}</p>
-      <p class="social">${Object.entries(s.social || {}).filter(([, v]) => v).map(([k, v]) => `<a href="${esc(v)}" rel="me noopener" target="_blank">${esc(k === 'x' ? 'X' : k)}</a>`).join(' · ')}</p>
-    </div>
-    <div class="footer-links">
-      <a href="/sobre">Sobre</a><a href="/categorias">Categorias</a><a href="/conversor">Conversor de medidas</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos de uso</a>${s.consentBanner ? '<button class="link" data-consent-open>Cookies</button>' : ''}<a href="/feed.xml">RSS</a><a href="/api/docs">API</a><a href="/admin" rel="nofollow">Entrar</a>
-    </div>
-  </div>
-</footer>
+${footer(s, user)}
 <nav class="tabbar" aria-label="Navegação principal">
   ${navItem('/', 'home', 'Início', 'home')}
   ${navItem('/busca', 'search', 'Buscar', 'search')}
@@ -133,4 +172,4 @@ ${scripts.map((src) => `<script src="${src}?v=${ASSET_VERSION}" defer></script>`
 </html>`;
 }
 
-module.exports = { layout, icon, ASSET_VERSION };
+module.exports = { layout, icon, avatar, ASSET_VERSION };

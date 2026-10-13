@@ -1,9 +1,9 @@
 /* Chef — Service Worker: offline, cache de receitas e notificações de timer */
-const VERSION = 'chef-v2';
+const VERSION = 'chef-v3';
 const STATIC = `${VERSION}-static`;
 const PAGES = `${VERSION}-pages`;
 const IMAGES = `${VERSION}-images`;
-const PRECACHE = ['/', '/offline', '/favoritos', '/lista', '/planejador', '/conversor', '/css/app.css', '/js/app.js', '/js/recipe.js', '/js/tools.js', '/icons/icon.svg', '/icons/icon-192.png', '/manifest.webmanifest'];
+const PRECACHE = ['/', '/offline', '/favoritos', '/lista', '/planejador', '/conversor', '/css/app.css', '/js/app.js', '/js/recipe.js', '/js/tools.js', '/icons/icon.svg', '/icons/icon-192.png', '/icons/placeholder.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(STATIC).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));

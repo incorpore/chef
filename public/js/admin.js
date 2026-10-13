@@ -19,7 +19,6 @@
     } catch (ex) { err.textContent = ex.message; err.hidden = false; }
   });
   const clearOffline = () => navigator.serviceWorker?.controller?.postMessage({ type: 'logout' });
-  on('[data-logout]', 'click', async () => { await api('/auth/logout', { method: 'POST' }); clearOffline(); location.href = '/'; });
   on('[data-logout-all]', 'click', async () => {
     if (!confirm('Encerrar a sessão em todos os aparelhos (inclusive este)?')) return;
     await api('/auth/logout-all', { method: 'POST' });
@@ -63,7 +62,7 @@
     api('/stats').then((s) => {
       const box = (n, l, href) => `<a class="stat" ${href ? `href="${href}"` : ''}><b>${Number(n).toLocaleString('pt-BR')}</b><span>${l}</span></a>`;
       stats.innerHTML = box(s.published, 'publicadas', '/admin/receitas') + box(s.drafts, 'rascunhos', '/admin/receitas') + box(s.views, 'visualizações') + box(s.cooked, 'vezes cozinhadas') + box(s.pendingComments, 'comentários pendentes', '/admin/comentarios') + box(s.subscribers, 'inscritos') + box(s.productClicks, 'cliques em afiliados', '/admin/produtos') + box(s.adImpressions, 'impressões de anúncios');
-      $('[data-top]').innerHTML = s.top.map((r) => `<li><a href="/admin/receitas/${r.id}">${esc(r.title)}</a> <small>${r.views} views</small> ${codeCopy(r.code)}</li>`).join('') || '<li>—</li>';
+      $('[data-top]').innerHTML = s.top.map((r) => `<li><a href="/admin/receitas/${r.id}">${esc(r.title)}</a><div class="top-meta">${codeCopy(r.code)}<small>${r.views} ${r.views === 1 ? 'visualização' : 'visualizações'}</small></div></li>`).join('') || '<li>—</li>';
       $('[data-top-products]').innerHTML = s.topProducts.map((p) => `<li>${esc(p.title)} <small>${p.clicks} cliques</small></li>`).join('') || '<li>—</li>';
     });
   }
@@ -449,13 +448,144 @@
       try { await api('/settings', { method: 'PUT', body }); toast('✅ Configurações salvas'); } catch (err) { toast(err.message); }
     });
   }
-  const acc = $('[data-account]');
-  acc?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const body = Object.fromEntries(new FormData(acc));
-    if (!body.password) { delete body.password; delete body.currentPassword; }
-    try { await api('/auth/me', { method: 'PUT', body }); toast('✅ Conta atualizada'); acc.password.value = ''; acc.currentPassword.value = ''; } catch (err) { toast(err.message); }
-  });
+  // ---------------- Meu perfil ----------------
+  const prof = $('[data-profile]');
+  if (prof) {
+    const showErr = (form, msg, field) => {
+      const el = $('.form-error', form);
+      el.textContent = msg || ''; el.hidden = !msg;
+      if (field && form.elements[field]) form.elements[field].focus();
+    };
+    const paintUser = (u) => {
+      $$('[data-profile-name]').forEach((el) => { el.textContent = u.name; });
+      $$('[data-profile-email]').forEach((el) => { el.textContent = u.email; });
+    };
+    const initials = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+    const paintAvatar = (u) => {
+      const html = u.avatar ? `<img class="avatar avatar-xl" src="${esc(u.avatar)}" alt="">` : `<span class="avatar avatar-initials avatar-xl">${esc(initials(u.name))}</span>`;
+      $('[data-avatar-preview]').innerHTML = html;
+      const small = u.avatar ? `<img class="avatar avatar-xs" src="${esc(u.avatar)}" alt="">` : `<span class="avatar avatar-initials avatar-xs">${esc(initials(u.name))}</span>`;
+      const nav = $('.nav-profile .avatar'); if (nav) nav.outerHTML = small;
+      $('[data-avatar-remove]').hidden = !u.avatar;
+      $('[data-avatar-pick]').lastChild.textContent = u.avatar ? ' Trocar foto' : ' Adicionar foto';
+      prof.elements.avatar.value = u.avatar || '';
+    };
+
+    // E-mail: ao mudar, pede a senha atual
+    const emailIn = prof.elements.email;
+    const syncEmail = () => { $('[data-email-confirm]', prof).hidden = emailIn.value.trim().toLowerCase() === emailIn.dataset.emailOrig.toLowerCase(); };
+    emailIn.addEventListener('input', syncEmail);
+
+    const bio = prof.elements.bio;
+
+    prof.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showErr(prof, '');
+      const body = { name: prof.elements.name.value.trim(), email: emailIn.value.trim(), bio: bio.value, avatar: prof.elements.avatar.value.trim() };
+      if (!body.name) return showErr(prof, 'Informe seu nome', 'name');
+      if (!emailIn.checkValidity()) return showErr(prof, 'E-mail inválido', 'email');
+      const changingEmail = !$('[data-email-confirm]', prof).hidden;
+      if (changingEmail) {
+        body.currentPassword = prof.elements.currentPassword.value;
+        if (!body.currentPassword) return showErr(prof, 'Digite sua senha atual para trocar o e-mail', 'currentPassword');
+      }
+      const btn = $('button.btn-primary', prof); btn.disabled = true;
+      try {
+        const { user } = await api('/auth/me', { method: 'PUT', body });
+        paintUser(user); paintAvatar(user);
+        emailIn.dataset.emailOrig = user.email; prof.elements.currentPassword.value = ''; syncEmail();
+        toast(changingEmail ? '✅ Perfil salvo. Use o novo e-mail no próximo login.' : '✅ Perfil salvo');
+      } catch (err) { showErr(prof, err.message, err.data?.field); } finally { btn.disabled = false; }
+    });
+
+    // Foto: escolhe, recorta em quadrado (centro), reduz para 512 px e envia
+    const fileIn = $('[data-avatar-file]');
+    on('[data-avatar-pick]', 'click', () => fileIn.click());
+    const squareJpeg = (file) => new Promise((resolve) => {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return resolve(file); // GIF animado vai como está
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        const size = Math.min(512, side);
+        const c = Object.assign(document.createElement('canvas'), { width: size, height: size });
+        c.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+        URL.revokeObjectURL(url);
+        c.toBlob((b) => resolve(b ? new File([b], 'avatar.jpg', { type: 'image/jpeg' }) : file), 'image/jpeg', 0.88);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+    fileIn.addEventListener('change', async () => {
+      const file = fileIn.files[0]; fileIn.value = '';
+      if (!file) return;
+      if (file.size > 15 * 1024 * 1024) return toast('A foto é muito grande (máx. 15 MB)');
+      const pick = $('[data-avatar-pick]'); pick.disabled = true;
+      $('[data-avatar-preview]').classList.add('loading');
+      try {
+        const fd = new FormData();
+        fd.append('files', await squareJpeg(file));
+        const up = await api('/uploads', { method: 'POST', body: fd });
+        const { user } = await api('/auth/me', { method: 'PUT', body: { avatar: up.files[0].url } });
+        paintAvatar(user); toast('📸 Foto atualizada');
+      } catch (err) { toast(err.message); } finally { pick.disabled = false; $('[data-avatar-preview]').classList.remove('loading'); }
+    });
+    on('[data-avatar-remove]', 'click', async () => {
+      if (!confirm('Remover sua foto de perfil?')) return;
+      try { const { user } = await api('/auth/me', { method: 'PUT', body: { avatar: '' } }); paintAvatar(user); toast('Foto removida'); } catch (err) { toast(err.message); }
+    });
+
+    // Senha
+    const pwf = $('[data-password]');
+    const meter = $('[data-pw-meter]', pwf);
+    const strength = (p) => {
+      let n = 0;
+      if (p.length >= 8) n++; if (p.length >= 12) n++;
+      if (/[a-z]/.test(p) && /[A-Z]/.test(p)) n++; if (/\d/.test(p)) n++; if (/[^\w\s]/.test(p)) n++;
+      return Math.min(4, Math.max(p.length ? 1 : 0, n - (p.length < 8 ? 2 : 0)));
+    };
+    pwf.elements.password.addEventListener('input', () => {
+      const p = pwf.elements.password.value;
+      meter.hidden = !p;
+      const n = strength(p);
+      meter.dataset.level = n;
+      meter.querySelector('small').textContent = ['', 'Fraca', 'Razoável', 'Boa', 'Forte'][n];
+    });
+    pwf.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showErr(pwf, '');
+      const { currentPassword, password, confirm: conf } = pwf.elements;
+      if (!currentPassword.value) return showErr(pwf, 'Digite sua senha atual', 'currentPassword');
+      if (password.value.length < 8) return showErr(pwf, 'A nova senha precisa ter pelo menos 8 caracteres', 'password');
+      if (password.value !== conf.value) return showErr(pwf, 'As duas senhas novas não são iguais', 'confirm');
+      const btn = $('button.btn-primary', pwf); btn.disabled = true;
+      try {
+        await api('/auth/me', { method: 'PUT', body: { currentPassword: currentPassword.value, password: password.value } });
+        pwf.reset(); meter.hidden = true;
+        toast('🔑 Senha alterada. Os outros aparelhos saíram da conta.');
+      } catch (err) { showErr(pwf, err.message, err.data?.field); } finally { btn.disabled = false; }
+    });
+
+    // Mostrar/ocultar senha
+    on('[data-pw-toggle]', 'click', (e, b) => {
+      e.preventDefault();
+      const input = b.previousElementSibling;
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      b.setAttribute('aria-label', show ? 'Ocultar senha' : 'Mostrar senha');
+      b.classList.toggle('on', show);
+    });
+
+    // Tema
+    let cur = 'system';
+    try { cur = localStorage.getItem('chef:theme') || 'system'; } catch { /* ignore */ }
+    $$('[data-theme-pick]').forEach((r) => { r.checked = r.value === cur; });
+    on('[data-theme-pick]', 'change', (e, r) => {
+      try {
+        if (r.value === 'system') { localStorage.removeItem('chef:theme'); delete document.documentElement.dataset.theme; } else { localStorage.setItem('chef:theme', r.value); document.documentElement.dataset.theme = r.value; }
+      } catch { /* ignore */ }
+    });
+  }
 
   // ---------------- Esqueci minha senha / nova senha ----------------
   const forgot = $('[data-forgot]');

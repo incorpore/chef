@@ -1,6 +1,6 @@
 'use strict';
 const u = require('../util');
-const { layout, icon } = require('./layout');
+const { layout, icon, avatar } = require('./layout');
 const c = require('./components');
 const { renderAd, renderProducts, productsForIngredients, productLink } = require('../monetization');
 const settings = require('../settings');
@@ -138,7 +138,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
       <nav class="crumbs"><a href="/">Início</a> › ${r.category ? `<a href="/categoria/${esc(r.category.slug)}">${esc(r.category.name)}</a> › ` : ''}<span>${esc(r.title)}</span></nav>
       ${r.status !== 'published' ? '<span class="chip chip-warn">Rascunho</span>' : ''}
       <h1>${esc(r.title)}</h1>
-      <p class="byline">Por <a href="/sobre" rel="author">${esc(r.author_name || settings.all().authorName || settings.all().siteName)}</a> · <time datetime="${esc(r.published_at || r.created_at)}">${fmtDate(r.published_at || r.created_at)}</time>${r.updated_at && (r.updated_at || '').slice(0, 10) !== (r.published_at || r.created_at || '').slice(0, 10) ? ` · atualizada em <time datetime="${esc(r.updated_at)}">${fmtDate(r.updated_at)}</time>` : ''}</p>
+      <p class="byline">${r.author ? avatar(r.author, 'avatar-byline') : ''}<span>Por <a href="/sobre" rel="author">${esc(r.author_name || settings.all().authorName || settings.all().siteName)}</a> · <time datetime="${esc(r.published_at || r.created_at)}">${fmtDate(r.published_at || r.created_at)}</time>${r.updated_at && (r.updated_at || '').slice(0, 10) !== (r.published_at || r.created_at || '').slice(0, 10) ? ` · atualizada em <time datetime="${esc(r.updated_at)}">${fmtDate(r.updated_at)}</time>` : ''}</span></p>
       <div class="code-row">${c.codeCopy(r.code, { label: true, cls: 'code-copy-lg' })}<button type="button" class="code-qr" data-qr aria-label="Mostrar QR code da receita" title="QR code">${icon('qr')}</button></div>
       ${r.description ? `<p class="lead">${esc(r.description)}</p>` : ''}
       <div class="meta-pills">
@@ -152,12 +152,12 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
       <div class="actions">
         <button class="btn btn-primary btn-lg" data-cook-start>${icon('chef')} Modo cozinha</button>
         <button class="icon-btn lg fav-btn" data-fav="${r.id}" data-slug="${esc(r.slug)}" data-title="${esc(r.title)}" data-cover="${esc(r.cover)}" aria-label="Favoritar">${icon('heart')}</button>
-        <button class="icon-btn lg" data-share aria-label="Compartilhar">${icon('share')}</button>
-        <button class="icon-btn lg" data-add-list aria-label="Adicionar à lista de compras">${icon('cart')}</button>
-        <button class="icon-btn lg" data-add-plan aria-label="Adicionar ao cardápio">${icon('calendar')}</button>
-        <button class="icon-btn lg" data-qr aria-label="QR code">${icon('qr')}</button>
-        <button class="icon-btn lg" data-print aria-label="Imprimir">${icon('print')}</button>
-        ${user ? `<a class="icon-btn lg" href="/admin/receitas/${r.id}" aria-label="Editar">${icon('edit')}</a>` : ''}
+        <button class="icon-btn lg" data-share aria-label="Compartilhar" title="Compartilhar">${icon('share')}</button>
+        <button class="icon-btn lg" data-add-list aria-label="Adicionar à lista de compras" title="Adicionar à lista de compras">${icon('cart')}</button>
+        <button class="icon-btn lg" data-add-plan aria-label="Adicionar ao cardápio" title="Adicionar ao cardápio">${icon('calendar')}</button>
+        <button class="icon-btn lg" data-qr aria-label="QR code" title="QR code">${icon('qr')}</button>
+        <button class="icon-btn lg" data-print aria-label="Imprimir" title="Imprimir">${icon('print')}</button>
+        ${user ? `<a class="icon-btn lg" href="/admin/receitas/${r.id}" aria-label="Editar" title="Editar">${icon('edit')}</a>` : ''}
       </div>
       ${shareBar(r, base)}
       <div class="resume-banner" hidden>${icon('layers')} Você parou no passo <b data-resume-step></b>. <button class="btn btn-sm" data-cook-resume>Continuar</button> <button class="link" data-progress-reset>Recomeçar</button></div>
@@ -204,6 +204,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
       ${r.nutrition ? nutritionTable(r) : ''}
       ${renderProducts(products)}
       ${renderAd('recipe_bottom')}
+      ${r.author?.bio ? `<aside class="author-card">${avatar(r.author, 'avatar-lg2')}<div><p class="author-k">Quem fez esta receita</p><p class="author-n">${esc(r.author.name)}</p>${u.miniMarkdown(String(r.author.bio).slice(0, 600))}</div></aside>` : ''}
       ${r.source_url ? `<p class="source">Fonte/inspiração: <a href="${esc(r.source_url)}" rel="nofollow noopener" target="_blank">${esc(r.source_name || r.source_url)}</a></p>` : ''}
 
       <section class="comments" id="comentarios">

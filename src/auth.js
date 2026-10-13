@@ -76,7 +76,7 @@ function clearSessionCookie(res) {
 
 function publicUser(u) {
   if (!u) return null;
-  return { id: u.id, email: u.email, name: u.name, role: u.role, bio: u.bio, avatar: u.avatar };
+  return { id: u.id, email: u.email, name: u.name, role: u.role, bio: u.bio, avatar: u.avatar, created_at: u.created_at };
 }
 
 function hashApiKey(key) {

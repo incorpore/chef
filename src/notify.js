@@ -86,6 +86,33 @@ async function sendInvite(user, invitedBy) {
   });
 }
 
+/**
+ * Aviso de segurança: e-mail ou senha da conta foram alterados.
+ * Na troca de e-mail, o aviso vai para o endereço ANTIGO (se não foi você, dá para reagir).
+ * Nunca falha a requisição: se o e-mail não estiver configurado, simplesmente não envia.
+ */
+function notifyAccountChange(to, user, what) {
+  if (!mail.isConfigured() || !to) return;
+  const s = settings.all();
+  const label = what === 'email' ? 'o e-mail de acesso' : 'a senha';
+  const extra = what === 'email' ? `\nNovo e-mail: ${user.email}` : '';
+  const url = mail.siteUrl();
+  mail.send({
+    to,
+    subject: `Sua conta no ${s.siteName} foi alterada`,
+    text: `Olá, ${user.name}!\n\n${label[0].toUpperCase()}${label.slice(1)} da sua conta foi alterado agora.${extra}\n\nSe não foi você, use "Esqueci minha senha"${url ? ` em ${url}/admin/esqueci` : ''} e fale com o administrador.`,
+    html: mail.layout({
+      title: 'Conta alterada',
+      preheader: `Alteramos ${label} da sua conta`,
+      body: `<h1 style="font-size:22px;margin:0 0 12px">Sua conta foi alterada 🔐</h1>
+        <p>Olá, ${esc(user.name)}! ${esc(label[0].toUpperCase() + label.slice(1))} da sua conta no <b>${esc(s.siteName)}</b> foi alterado agora.</p>
+        ${what === 'email' ? `<p>Novo e-mail: <b>${esc(user.email)}</b></p>` : ''}
+        <p style="color:#5d554d;font-size:14px">Se não foi você, redefina a senha imediatamente e avise o administrador do site.</p>
+        ${url ? mail.button(`${url}/admin/esqueci`, 'Redefinir minha senha') : ''}`,
+    }),
+  }).catch((e) => console.error('[mail] aviso de conta alterada não enviado:', e.message));
+}
+
 // ---------------------------------------------------------------------------
 // Aviso de comentário novo (autor da receita + administradores)
 // ---------------------------------------------------------------------------
@@ -337,6 +364,7 @@ function isIdle() {
 }
 
 module.exports = {
+  notifyAccountChange,
   sendPasswordReset, sendInvite, createResetToken, findResetToken, consumeResetToken,
   notifyComment, subscribe, confirmSubscription, unsubscribe, unsubscribeToken, unsubscribeUrl, sendWelcome,
   createCampaign, sendCampaignTest, cancelCampaign, resumeCampaign, confirmedCount, kick, isIdle, background,

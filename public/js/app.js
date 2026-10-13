@@ -52,6 +52,36 @@
     try { localStorage.setItem('chef:theme', next); } catch { /* ignore */ }
   });
 
+  // ---------------- Conta: menu do avatar e "Sair" ----------------
+  document.addEventListener('click', (e) => {
+    for (const d of document.querySelectorAll('[data-account-menu][open]')) if (!d.contains(e.target)) d.open = false;
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const d = document.querySelector('[data-account-menu][open]');
+    if (d) { d.open = false; d.querySelector('summary')?.focus(); }
+  });
+  document.addEventListener('click', async (e) => {
+    if (!e.target.closest('[data-logout]')) return;
+    try { await api('/auth/logout', { method: 'POST' }); } catch { /* sai mesmo assim */ }
+    navigator.serviceWorker?.controller?.postMessage({ type: 'logout' });
+    location.href = '/';
+  });
+
+  // ---------------- Imagem quebrada (link externo que saiu do ar) ----------------
+  // Em vez do texto alternativo por cima do cartão, mostra um fundo neutro com o chapéu de chef.
+  const PH = '/icons/placeholder.svg';
+  const brokenImg = (img) => {
+    if (!(img instanceof HTMLImageElement) || img.dataset.broken || !img.getAttribute('src') || img.getAttribute('src') === PH) return;
+    img.dataset.broken = '1';
+    img.removeAttribute('srcset');
+    img.classList.add('img-broken');
+    if (img.classList.contains('avatar')) { img.replaceWith(Object.assign(document.createElement('span'), { className: `${img.className} avatar-initials`, textContent: '?' })); return; }
+    img.src = PH;
+  };
+  document.addEventListener('error', (e) => brokenImg(e.target), true);
+  for (const img of document.images) if (img.complete && img.naturalWidth === 0 && img.loading !== 'lazy' && img.getAttribute('src')) brokenImg(img);
+
   // ---------------- Favoritos ----------------
   const favs = {
     all: () => store.get('favs', []),
