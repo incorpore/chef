@@ -23,7 +23,7 @@ function jsonLd(r, base) {
     '@type': 'Recipe',
     name: r.title,
     description: r.seo_description || r.description || autoDescription(r),
-    image: [r.cover, ...r.images.map((i) => i.url)].filter(Boolean).map(abs),
+    image: [r.cover, ...r.images.map((i) => i.url), r.cover || r.images.length ? '' : r.cover_auto].filter(Boolean).map(abs),
     author: { '@type': 'Person', name: r.author_name || s.authorName || s.siteName, url: `${base}/sobre` },
     publisher: { '@id': `${base}/#organization` },
     inLanguage: 'pt-BR',
@@ -111,6 +111,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
   const links = c.linkIngredients(r.steps, r.ingredients);
   const productByKw = productsForIngredients(r.ingredients, products.map((p) => p.id));
   const gallery = [r.cover ? { url: r.cover, caption: r.title } : null, ...r.images].filter(Boolean);
+  if (!gallery.length && r.cover_auto) gallery.push({ url: r.cover_auto, caption: r.title });
   let group = '';
   const ingHtml = r.ingredients.map((i, idx) => {
     let pre = '';
@@ -122,7 +123,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
   }).join('');
 
   const data = {
-    id: r.id, code: r.code, slug: r.slug, title: r.title, cover: r.cover, servings: r.servings, servings_unit: r.servings_unit,
+    id: r.id, code: r.code, slug: r.slug, title: r.title, cover: r.cover || r.cover_auto, servings: r.servings, servings_unit: r.servings_unit,
     ingredients: r.ingredients, steps: r.steps.map((st, i) => ({ ...st, ings: links[i] })), total: r.total_minutes, url: `${base}/receita/${r.slug}`,
   };
 
@@ -151,7 +152,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
       ${r.diets.length || r.tags.length ? `<div class="tags">${r.diets.map((d) => `<a class="chip chip-diet" href="/busca?diet=${encodeURIComponent(d)}">${esc(d)}</a>`).join('')}${r.tags.map((t) => `<a class="chip" href="/tag/${encodeURIComponent(t)}">#${esc(t)}</a>`).join('')}</div>` : ''}
       <div class="actions">
         <button class="btn btn-primary btn-lg" data-cook-start>${icon('chef')} Modo cozinha</button>
-        <button class="icon-btn lg fav-btn" data-fav="${r.id}" data-slug="${esc(r.slug)}" data-title="${esc(r.title)}" data-cover="${esc(r.cover)}" aria-label="Favoritar">${icon('heart')}</button>
+        <button class="icon-btn lg fav-btn" data-fav="${r.id}" data-slug="${esc(r.slug)}" data-title="${esc(r.title)}" data-cover="${esc(r.cover || r.cover_auto)}" aria-label="Favoritar">${icon('heart')}</button>
         <button class="icon-btn lg" data-share aria-label="Compartilhar" title="Compartilhar">${icon('share')}</button>
         <button class="icon-btn lg" data-add-list aria-label="Adicionar à lista de compras" title="Adicionar à lista de compras">${icon('cart')}</button>
         <button class="icon-btn lg" data-add-plan aria-label="Adicionar ao cardápio" title="Adicionar ao cardápio">${icon('calendar')}</button>

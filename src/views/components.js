@@ -26,7 +26,7 @@ function recipeCard(r, { eager = false } = {}) {
   const time = u.formatMinutes(r.total_minutes);
   return `<article class="card" data-recipe-id="${r.id}">
   <a href="/receita/${esc(r.slug)}" class="card-link">
-    <div class="card-media">${thumb(r.cover, r.title, { eager })}${r.video ? `<span class="chip chip-video">${icon('play')} Vídeo</span>` : ''}</div>
+    <div class="card-media">${thumb(r.cover || r.cover_auto, r.title, { eager })}${r.video ? `<span class="chip chip-video">${icon('play')} Vídeo</span>` : ''}</div>
     <div class="card-body">
       <span class="card-cat">${r.category ? esc(`${r.category.icon || ''} ${r.category.name}`.trim()) : '&nbsp;'}</span>
       <h3>${esc(r.title)}</h3>
@@ -38,7 +38,7 @@ function recipeCard(r, { eager = false } = {}) {
     </div>
   </a>
   <button type="button" class="code-chip" data-copy-code="${esc(r.code)}" aria-label="Copiar código #${esc(r.code)}" title="Copiar código">#${esc(r.code)}${icon('copy')}${icon('check', 'ico-ok')}</button>
-  <button class="fav-btn" data-fav="${r.id}" data-slug="${esc(r.slug)}" data-title="${esc(r.title)}" data-cover="${esc(r.cover)}" aria-label="Favoritar ${esc(r.title)}">${icon('heart')}</button>
+  <button class="fav-btn" data-fav="${r.id}" data-slug="${esc(r.slug)}" data-title="${esc(r.title)}" data-cover="${esc(r.cover || r.cover_auto)}" aria-label="Favoritar ${esc(r.title)}">${icon('heart')}</button>
 </article>`;
 }
 

@@ -168,3 +168,23 @@ test('receita mostra foto e bio de quem escreveu', async () => {
   assert.match(page.text, /class="author-card"/);
   assert.match(page.text, /<strong>domingo<\/strong>/);
 });
+
+test('receita sem foto ganha capa ilustrada (SVG seguro); com foto, usa a foto', async () => {
+  const r = (await ana.req('POST', '/api/v1/recipes', { body: { title: 'Bolo <script>alert(1)</script> de fubá', ingredients: '2 xícaras de fubá\n3 ovos', steps: 'Misture.\nAsse por 40 minutos.', status: 'published' } })).data;
+  assert.match(r.image, /^\/capa\/[A-Z0-9]+\.svg\?v=[0-9a-f]{8}$/);
+  assert.equal(r.cover, '', 'a capa automática não é gravada como foto');
+  const card = await visitor.req('GET', '/receitas');
+  assert.ok(card.text.includes(r.image.replace(/&/g, '&amp;')), 'cartão usa a capa ilustrada');
+  const svg = await fetch(base + r.image.split('?')[0]);
+  assert.equal(svg.status, 200);
+  assert.match(svg.headers.get('content-type'), /image\/svg\+xml/);
+  const body = await svg.text();
+  assert.match(body, /🍰/);
+  assert.doesNotMatch(body, /<script/i, 'título escapado');
+  const page = await visitor.req('GET', `/receita/${r.slug}`);
+  assert.match(page.text, /"image":\["[^"]*\/capa\//, 'JSON-LD tem imagem');
+  const draft = (await ana.req('POST', '/api/v1/recipes', { body: { title: 'Rascunho secreto', ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'draft' } })).data;
+  assert.equal((await fetch(`${base}/capa/${draft.code}.svg`)).status, 404, 'rascunho não aparece para visitantes');
+  const withPhoto = (await ana.req('POST', '/api/v1/recipes', { body: { title: 'Com foto', cover: '/uploads/x.jpg', ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'published' } })).data;
+  assert.equal(withPhoto.image, '/uploads/x.jpg');
+});

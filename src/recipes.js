@@ -13,6 +13,7 @@ function hydrate(row) {
   r.nutrition = u.safeJson(r.nutrition, null);
   r.diets = u.safeJson(r.diets, []);
   r.featured = !!r.featured;
+  r.cover_auto = r.cover ? '' : require('./cover').autoCoverUrl(r); // capa ilustrada quando não há foto
   r.total_minutes = (r.prep_minutes || 0) + (r.cook_minutes || 0) + (r.rest_minutes || 0);
   r.tags = db.get().prepare('SELECT tag FROM recipe_tags WHERE recipe_id = ? ORDER BY tag').all(r.id).map((t) => t.tag);
   if (r.category_id) r.category = db.get().prepare('SELECT * FROM categories WHERE id = ?').get(r.category_id) || null;
@@ -405,7 +406,7 @@ function suggest(q, limit = 8) {
       }
     } catch { /* consulta inválida */ }
   }
-  return out.slice(0, limit);
+  return out.slice(0, limit).map((r) => ({ ...r, image: r.cover || require('./cover').autoCoverUrl(r) }));
 }
 
 function related(recipe, limit = 4) {
@@ -456,6 +457,7 @@ function toPublic(r, baseUrl = '') {
     description: r.description,
     story: r.story,
     cover: r.cover,
+    image: r.cover || r.cover_auto || '', // foto ou, se não houver, a capa ilustrada
     images: r.images,
     video: r.video,
     ingredients: r.ingredients,

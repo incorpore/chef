@@ -91,7 +91,7 @@
     const results = $('[data-pick-results]');
     const search = async (q) => {
       const items = q ? (await api(`/recipes?q=${encodeURIComponent(q)}&perPage=12`)).items : favs.all();
-      results.innerHTML = items.map((r) => `<li><button type="button" data-pick='${esc(JSON.stringify({ id: r.id, slug: r.slug, title: r.title, cover: r.cover || '' }))}'>${r.cover ? `<img src="${esc(r.cover)}" alt="">` : ''}${esc(r.title)}</button></li>`).join('') || '<li class="empty">Busque uma receita (ou favorite algumas para aparecerem aqui)</li>';
+      results.innerHTML = items.map((r) => `<li><button type="button" data-pick='${esc(JSON.stringify({ id: r.id, slug: r.slug, title: r.title, cover: r.image || r.cover || '' }))}'>${r.image || r.cover ? `<img src="${esc(r.image || r.cover)}" alt="">` : ''}${esc(r.title)}</button></li>`).join('') || '<li class="empty">Busque uma receita (ou favorite algumas para aparecerem aqui)</li>';
     };
     document.addEventListener('click', (e) => {
       const w = e.target.closest('[data-week]');

@@ -1,5 +1,5 @@
 /* Chef — Service Worker: offline, cache de receitas e notificações de timer */
-const VERSION = 'chef-v3';
+const VERSION = 'chef-v4';
 const STATIC = `${VERSION}-static`;
 const PAGES = `${VERSION}-pages`;
 const IMAGES = `${VERSION}-images`;
@@ -63,7 +63,7 @@ self.addEventListener('fetch', (e) => {
     }
     if (req.mode === 'navigate') return e.respondWith(networkFirst(req));
     if (/^\/(css|js|icons)\//.test(url.pathname)) return e.respondWith(staleWhileRevalidate(req, STATIC));
-    if (url.pathname.startsWith('/uploads/') || url.pathname.startsWith('/qr/')) {
+    if (url.pathname.startsWith('/uploads/') || url.pathname.startsWith('/qr/') || url.pathname.startsWith('/capa/')) {
       e.respondWith(staleWhileRevalidate(req, IMAGES).then((r) => { trim(IMAGES, 300); return r; }));
     }
     return;

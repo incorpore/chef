@@ -332,7 +332,7 @@
       input._t = setTimeout(() => {
         fetch(`/api/v1/search/suggest?q=${encodeURIComponent(q)}`, { signal: ctl.signal }).then((r) => r.json()).then(({ items }) => {
           if (!items.length) return close();
-          box.innerHTML = items.map((r) => `<a href="/receita/${esc(r.slug)}">${r.cover ? `<img src="${esc(r.cover)}" alt="" loading="lazy">` : '<span class="ph-sm"></span>'}<span>${esc(r.title)}</span><small>#${esc(r.code)}</small></a>`).join('');
+          box.innerHTML = items.map((r) => `<a href="/receita/${esc(r.slug)}">${r.image || r.cover ? `<img src="${esc(r.image || r.cover)}" alt="" loading="lazy">` : '<span class="ph-sm"></span>'}<span>${esc(r.title)}</span><small>#${esc(r.code)}</small></a>`).join('');
           box.hidden = false;
           idx = -1;
         }).catch(() => {});

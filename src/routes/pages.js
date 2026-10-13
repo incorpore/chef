@@ -106,6 +106,14 @@ router.get('/qr/:code.svg', async (req, res) => {
   res.type('image/svg+xml').set('Cache-Control', 'public, max-age=86400').send(svg);
 });
 
+// Capa ilustrada (receitas sem foto)
+router.get('/capa/:code.svg', (req, res) => {
+  const r = recipes.getByCode(req.params.code);
+  if (!r || (r.status !== 'published' && !auth.canEditRecipe(req.user, r))) return res.sendStatus(404);
+  const svg = require('../cover').svg({ title: r.title, code: r.code, category: r.category });
+  res.type('image/svg+xml').set('Cache-Control', r.status === 'published' ? 'public, max-age=604800' : 'private, no-store').send(svg);
+});
+
 router.get('/surpresa', (req, res) => {
   const r = db.get().prepare("SELECT slug FROM recipes WHERE status='published' ORDER BY RANDOM() LIMIT 1").get();
   res.redirect(302, r ? `/receita/${r.slug}` : '/');

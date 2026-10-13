@@ -29,7 +29,7 @@ function home({ featured, latest, popular, quick, categories, tags, user }) {
         <a class="chip" href="/surpresa">🎲 Me surpreenda</a>
       </div>
     </div>
-    ${hero ? `<a class="hero-feature" href="/receita/${esc(hero.slug)}">${c.thumb(hero.cover, hero.title, { w: 900, h: 700, eager: true })}<span class="hero-feature-info"><small>Em destaque</small><strong>${esc(hero.title)}</strong>${hero.total_minutes ? `<em>${icon('clock')} ${u.formatMinutes(hero.total_minutes)}</em>` : ''}</span></a>` : ''}
+    ${hero ? `<a class="hero-feature" href="/receita/${esc(hero.slug)}">${c.thumb(hero.cover || hero.cover_auto, hero.title, { w: 900, h: 700, eager: true })}<span class="hero-feature-info"><small>Em destaque</small><strong>${esc(hero.title)}</strong>${hero.total_minutes ? `<em>${icon('clock')} ${u.formatMinutes(hero.total_minutes)}</em>` : ''}</span></a>` : ''}
   </div>
 </section>
 ${categories.length ? `<section class="wrap cat-strip" aria-label="Categorias">${categories.map((cat) => `<a href="/categoria/${esc(cat.slug)}" class="cat"><span class="cat-icon">${esc(cat.icon || '🍽️')}</span><span>${esc(cat.name)}</span></a>`).join('')}</section>` : ''}
@@ -177,7 +177,7 @@ function embed({ r, base }) {
   const time = u.formatMinutes(r.total_minutes);
   const s = settings.all();
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><link rel="canonical" href="${esc(base)}/receita/${esc(r.slug)}"><title>${esc(r.title)}</title><link rel="stylesheet" href="/css/app.css"><style>:root{--brand:${esc(s.themeColor)}}body{padding:0;background:transparent}.embed{display:flex;gap:14px;padding:12px;border:1px solid var(--line);border-radius:18px;background:var(--surface);text-decoration:none;font-family:var(--font)}.embed img{width:120px;height:120px;object-fit:cover;border-radius:12px}.embed h1{font-size:1.15rem;margin:0 0 4px}.embed p{margin:0 0 6px;color:var(--ink-2);font-size:.9rem}.embed small{color:var(--brand);font-weight:700}</style></head>
-  <body><a class="embed" href="${esc(base)}/receita/${esc(r.slug)}?utm_source=embed&utm_medium=iframe" target="_blank" rel="noopener">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : ''}<span><h1>${esc(r.title)}</h1><p>${esc(r.description || '')}</p><p>${time ? `⏱ ${time} · ` : ''}#${esc(r.code)}</p><small>Ver receita completa no ${esc(s.siteName)} →</small></span></a></body></html>`;
+  <body><a class="embed" href="${esc(base)}/receita/${esc(r.slug)}?utm_source=embed&utm_medium=iframe" target="_blank" rel="noopener">${r.cover || r.cover_auto ? `<img src="${esc(r.cover || r.cover_auto)}" alt="">` : ''}<span><h1>${esc(r.title)}</h1><p>${esc(r.description || '')}</p><p>${time ? `⏱ ${time} · ` : ''}#${esc(r.code)}</p><small>Ver receita completa no ${esc(s.siteName)} →</small></span></a></body></html>`;
 }
 
 /** Páginas de resultado da newsletter (confirmar / cancelar inscrição). */
