@@ -128,11 +128,29 @@ function dashboard({ user }) {
     <div class="two-col"><section class="panel"><h2>Mais vistas</h2><ol data-top></ol></section><section class="panel"><h2>Produtos mais clicados</h2><ol data-top-products></ol></section></div>` });
 }
 
-function recipeList({ user }) {
+function recipeList({ user, categories = [] }) {
+  const catOpts = categories.map((c) => `<option value="${esc(c.slug)}">${esc(`${c.icon || ''} ${c.name}`.trim())}</option>`).join('');
   return adminLayout({ title: 'Receitas', user, active: 'recipes', body: `
     <header class="admin-head"><h1>Receitas</h1><div><a class="btn btn-primary" href="/admin/receitas/nova">${icon('plus')} Nova</a> <a class="btn btn-ghost" href="/api/v1/export" download>${icon('download')} Exportar backup</a></div></header>
-    <form class="admin-filter" data-recipe-filter><input type="search" name="q" placeholder="Buscar por título, ingrediente ou código"><select name="status"><option value="any">Todas</option><option value="published">Publicadas</option><option value="draft">Rascunhos</option></select></form>
-    <table class="table table-admin"><thead><tr><th></th><th>Receita</th><th>Código</th><th>Status</th><th>Views</th><th></th></tr></thead><tbody data-recipe-rows></tbody></table>
+    <form class="admin-filter" data-recipe-filter>
+      <input type="search" name="q" placeholder="Buscar por título, ingrediente ou código">
+      <select name="status"><option value="any">Todas</option><option value="published">Publicadas</option><option value="draft">Rascunhos</option></select>
+      <select name="category"><option value="">Todas as categorias</option>${catOpts}</select>
+    </form>
+    <div class="list-head"><p class="list-count" data-list-count></p><label class="check-all-m"><input type="checkbox" data-check-page-m> Selecionar todas da página</label></div>
+    <div class="bulk-bar" data-bulk-bar hidden role="region" aria-label="Ações em massa">
+      <div class="bulk-info"><strong data-bulk-count>0</strong> <span data-bulk-label>selecionadas</span>
+        <button type="button" class="link" data-bulk-all hidden></button>
+        <button type="button" class="link" data-bulk-clear>Limpar seleção</button></div>
+      <div class="bulk-actions">
+        <button type="button" class="btn btn-sm" data-bulk="publish">✅ Publicar</button>
+        <button type="button" class="btn btn-sm" data-bulk="draft">⏸️ Desativar (rascunho)</button>
+        <select data-bulk-category aria-label="Mudar categoria"><option value="__">📂 Mudar categoria…</option><option value="">— Sem categoria —</option>${categories.map((c) => `<option value="${c.id}">${esc(`${c.icon || ''} ${c.name}`.trim())}</option>`).join('')}</select>
+        ${user.role === 'admin' ? '<button type="button" class="btn btn-sm" data-bulk="feature">⭐ Destacar</button><button type="button" class="btn btn-sm" data-bulk="unfeature">Tirar destaque</button>' : ''}
+        <button type="button" class="btn btn-sm btn-danger" data-bulk="delete">🗑️ Excluir</button>
+      </div>
+    </div>
+    <div class="table-wrap"><table class="table table-admin table-recipes"><thead><tr><th class="col-check"><input type="checkbox" data-check-page aria-label="Selecionar todas desta página"></th><th></th><th>Receita</th><th>Código</th><th>Status</th><th>Views</th><th></th></tr></thead><tbody data-recipe-rows></tbody></table></div>
     <div class="pager" data-pager></div>` });
 }
 
@@ -368,13 +386,40 @@ function profilePage({ user, stats, activity }) {
   </div>` });
 }
 
+/** Campo de imagem: link + botão para enviar arquivo + prévia + remover. */
+function imageInput(name, value, fallback = '') {
+  const empty = fallback ? 'Capa ilustrada automática' : 'Nenhuma';
+  return `<div class="image-input" data-image-input data-empty="${empty}">
+    <div class="image-input-preview" data-preview>${value ? `<img src="${value}" alt="">` : `<span class="muted">${empty}</span>`}</div>
+    <div class="image-input-ctl">
+      <input name="${name}" value="${value}" placeholder="https://... ou /uploads/..." inputmode="url">
+      <div class="image-input-btns"><button type="button" class="btn btn-sm" data-image-pick>${icon('camera')} Enviar imagem</button><button type="button" class="btn btn-ghost btn-sm" data-image-clear ${value ? '' : 'hidden'}>Remover</button></div>
+      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-image-file hidden>
+    </div>
+  </div>`;
+}
+
 function simplePage({ user, title, active, body }) {
   return adminLayout({ title, user, active, body: `<header class="admin-head"><h1>${title}</h1></header>${body}` });
 }
 
+const CATEGORY_ICONS = ['🍰', '🎂', '🍮', '🍫', '🍪', '🍩', '🍨', '🍝', '🍕', '🥩', '🍗', '🥓', '🐟', '🦐', '🥗', '🥦', '🍞', '🥐', '🥪', '🍔', '🥟', '🌮', '🍣', '🍚', '🫘', '🍲', '🥣', '☕', '🥤', '🍹', '🍷', '🥞', '🍳', '🌽', '🍟', '🎉', '🎄', '🐣', '🧒', '🌱', '🥑', '❤️', '⭐', '🔥', '⏱️', '💰', '🍽️'];
+
 function categoriesPage({ user }) {
   return simplePage({ user, title: 'Categorias', active: 'cats', body: `
-    <section class="panel"><form class="inline-form" data-cat-form><input name="icon" placeholder="🍰" maxlength="4" class="w-emoji"><input name="name" placeholder="Nome da categoria" required><input name="description" placeholder="Descrição (opcional)"><input name="position" type="number" placeholder="Ordem" class="w-num"><button class="btn btn-primary">${icon('plus')} Adicionar</button></form></section>
+    <section class="panel"><h2 data-cat-title>Nova categoria</h2>
+      <form class="cat-form" data-cat-form>
+        <input type="hidden" name="id">
+        <div class="cat-form-row">
+          <label class="field cat-icon-field"><span>Ícone</span><input name="icon" placeholder="Automático" maxlength="8" class="w-emoji" data-cat-icon></label>
+          ${field('Nome da categoria', '<input name="name" required maxlength="60">')}
+          ${field('Descrição (opcional)', '<input name="description" maxlength="500">')}
+          ${field('Ordem', '<input name="position" type="number" class="w-num">')}
+        </div>
+        <div class="emoji-pick" role="group" aria-label="Escolha um ícone">${CATEGORY_ICONS.map((e) => `<button type="button" data-emoji="${e}" aria-label="Usar ${e}">${e}</button>`).join('')}</div>
+        <p class="hint">Sem ícone, o sistema escolhe um a partir do nome (ex.: "Lanches" → 🥪).</p>
+        <div class="form-actions"><button class="btn btn-primary">${icon('check')} Salvar</button><button type="reset" class="btn btn-ghost" data-cat-cancel hidden>Cancelar edição</button></div>
+      </form></section>
     <table class="table table-admin"><thead><tr><th>Ícone</th><th>Nome</th><th>Receitas</th><th>Ordem</th><th></th></tr></thead><tbody data-cat-rows></tbody></table>` });
 }
 
@@ -424,7 +469,7 @@ function settingsPage({ user }) {
     <section class="panel"><h2>Site</h2>
       <div class="row2">${field('Nome do site', `<input name="siteName" value="${v('siteName')}">`)}${field('Slogan', `<input name="tagline" value="${v('tagline')}">`)}</div>
       ${field('Descrição (SEO)', `<textarea name="description" rows="2">${v('description')}</textarea>`)}
-      <div class="row3">${field('Cor principal', `<input type="color" name="themeColor" value="${v('themeColor')}">`)}${field('Logo (URL)', `<input name="logo" value="${v('logo')}">`)}${field('Receitas por página', `<input type="number" min="4" max="48" name="recipesPerPage" value="${v('recipesPerPage')}">`)}</div>
+      <div class="row3">${field('Cor principal', `<input type="color" name="themeColor" value="${v('themeColor')}">`)}${field('Logo', imageInput('logo', v('logo')))}${field('Receitas por página', `<input type="number" min="4" max="48" name="recipesPerPage" value="${v('recipesPerPage')}">`)}</div>
       ${field('Nome do autor', `<input name="authorName" value="${v('authorName')}">`)}
       ${field('Texto "Sobre"', `<textarea name="aboutText" rows="5">${v('aboutText')}</textarea>`)}
     </section>
@@ -443,7 +488,11 @@ function settingsPage({ user }) {
     </section>
     <section class="panel"><h2>Compartilhamento</h2>
       <div class="row2">${field('Botões de compartilhar (ordem)', `<input name="shareNetworks" value="${v('shareNetworks')}">`, 'Opções: whatsapp, pinterest, facebook, telegram, x, email')}${field('@ no X/Twitter', `<input name="twitterHandle" value="${v('twitterHandle')}" placeholder="@seusite">`)}</div>
-      ${field('Imagem padrão para compartilhamento (1200×630)', `<input name="defaultOgImage" value="${v('defaultOgImage')}" placeholder="https://... ou /uploads/...">`, 'Usada quando a página não tem foto própria.')}
+      ${field('Imagem padrão para compartilhamento (1200×630)', imageInput('defaultOgImage', v('defaultOgImage')), 'Usada quando a página não tem foto própria.')}
+    </section>
+    <section class="panel"><h2>Receitas sem foto</h2>
+      <p>Sem imagem escolhida, cada receita sem foto ganha uma <b>capa ilustrada automática</b> (cor + emoji do prato). Se preferir, envie uma imagem padrão do seu site para usar no lugar.</p>
+      ${field('Imagem padrão das receitas', imageInput('defaultRecipeImage', v('defaultRecipeImage'), '/icons/placeholder.svg'), 'Ideal: 1200×900 (formato 4:3). Deixe vazio para usar a capa ilustrada.')}
     </section>
     <section class="panel"><h2>Amazon Associados</h2>
       <div class="row2">${field('Tag de associado', `<input name="amazonTag" value="${v('amazonTag')}" placeholder="seusite-20">`)}${field('Aviso de afiliado', `<input name="amazonDisclosure" value="${v('amazonDisclosure')}">`)}</div>

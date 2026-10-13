@@ -214,6 +214,11 @@ function migrate(d) {
     const exists = d.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
     if (!exists) d.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
   }
+  // Categorias sem ícone (ex.: criadas por importação) ganham um emoji a partir do nome
+  const { categoryEmoji } = require('./cover');
+  for (const c of d.prepare("SELECT id, name FROM categories WHERE icon IS NULL OR trim(icon) = ''").all()) {
+    d.prepare('UPDATE categories SET icon = ? WHERE id = ?').run(categoryEmoji(c.name), c.id);
+  }
 }
 
 function open(file = config.dbFile) {
@@ -236,15 +241,21 @@ function close() {
   db = undefined;
 }
 
+let depth = 0;
+/** Transação; chamadas aninhadas viram SAVEPOINT (uma ação em massa inteira vira "tudo ou nada"). */
 function tx(fn) {
   const d = get();
-  d.exec('BEGIN');
+  const sp = `sp${depth}`;
+  d.exec(depth ? `SAVEPOINT ${sp}` : 'BEGIN');
+  depth++;
   try {
     const r = fn(d);
-    d.exec('COMMIT');
+    depth--;
+    d.exec(depth ? `RELEASE ${sp}` : 'COMMIT');
     return r;
   } catch (e) {
-    d.exec('ROLLBACK');
+    depth--;
+    d.exec(depth ? `ROLLBACK TO ${sp}; RELEASE ${sp}` : 'ROLLBACK');
     throw e;
   }
 }

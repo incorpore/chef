@@ -308,7 +308,7 @@ function mapCategory(data, req) {
     const d = db.get();
     let c = d.prepare('SELECT id FROM categories WHERE name = ? COLLATE NOCASE OR slug = ?').get(name, u.slugify(name));
     if (!c && name && isAdmin(req) && data.createCategory !== false) {
-      d.prepare('INSERT OR IGNORE INTO categories (name, slug) VALUES (?, ?)').run(name, u.slugify(name));
+      d.prepare('INSERT OR IGNORE INTO categories (name, slug, icon) VALUES (?, ?, ?)').run(name, u.slugify(name), require('../cover').categoryEmoji(name));
       c = d.prepare('SELECT id FROM categories WHERE slug = ?').get(u.slugify(name));
     }
     if (c) data.category_id = c.id;
@@ -344,6 +344,55 @@ router.delete('/recipes/:ref', auth.requireUser, (req, res) => {
   recipes.remove(r.id);
   auth.audit(req, 'recipe.delete', r.code);
   res.json({ ok: true });
+});
+
+/**
+ * Ações em massa: { ids: [1,2,3] | all: true + filter: {q, status, category}, action, value }
+ * action: publish | draft | delete | category (value = id ou '' para sem categoria) | feature | unfeature
+ * Cada receita passa pela mesma checagem de permissão da edição individual.
+ */
+const BULK_ACTIONS = ['publish', 'draft', 'delete', 'category', 'feature', 'unfeature'];
+router.post('/recipes/bulk', auth.requireUser, rateLimit('bulk', 30, 60e3), (req, res) => {
+  const { action, value } = req.body || {};
+  if (!BULK_ACTIONS.includes(action)) return res.status(400).json({ error: 'Ação inválida' });
+  if ((action === 'feature' || action === 'unfeature') && !isAdmin(req)) return forbid(res, 'Só administradores podem destacar receitas');
+  let categoryId = null;
+  if (action === 'category' && value !== '' && value !== null && value !== undefined) {
+    categoryId = idParam(value);
+    if (!db.get().prepare('SELECT 1 FROM categories WHERE id = ?').get(categoryId)) return res.status(400).json({ error: 'Categoria não encontrada' });
+  }
+  let ids = [];
+  if (req.body.all === true) {
+    const f = req.body.filter || {};
+    const str = (v, max = 200) => (v === undefined || v === null || v === '' ? undefined : sec.cleanText(String(v), max));
+    const vis = isAdmin(req) ? { status: ['draft', 'published'].includes(f.status) ? f.status : 'any' } : { status: ['draft', 'published'].includes(f.status) ? f.status : 'any', ownerId: req.user.id };
+    for (let page = 1; page <= 50; page++) {
+      const r = recipes.search({ q: str(f.q), category: str(f.category, 80), sort: 'updated', page, perPage: 100, authorId: isAdmin(req) ? undefined : req.user.id, ...vis });
+      ids.push(...r.items.map((x) => x.id));
+      if (page >= r.pages) break;
+    }
+  } else {
+    if (!Array.isArray(req.body.ids) || !req.body.ids.length) return res.status(400).json({ error: 'Nenhuma receita selecionada' });
+    if (req.body.ids.length > 5000) return res.status(413).json({ error: 'Máximo de 5000 receitas por vez' });
+    ids = [...new Set(req.body.ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  }
+  let done = 0;
+  let denied = 0;
+  db.tx(() => {
+    for (const id of ids) {
+      const r = recipes.getById(id);
+      if (!r) continue;
+      if (!auth.canEditRecipe(req.user, r)) { denied++; continue; }
+      if (action === 'delete') recipes.remove(id);
+      else if (action === 'publish') { if (r.status !== 'published') recipes.update(id, { status: 'published' }); }
+      else if (action === 'draft') { if (r.status !== 'draft') recipes.update(id, { status: 'draft' }); }
+      else if (action === 'category') recipes.update(id, { category_id: categoryId });
+      else recipes.update(id, { featured: action === 'feature' });
+      done++;
+    }
+  });
+  auth.audit(req, `recipe.bulk.${action}`, `${done} receitas${categoryId ? ` → categoria ${categoryId}` : ''}`);
+  res.json({ ok: true, done, denied });
 });
 
 router.post('/recipes/:ref/duplicate', auth.requireUser, (req, res) => {
@@ -538,7 +587,7 @@ router.get('/categories', (req, res) => res.json({ items: recipes.categories() }
 function categoryPayload(b) {
   const name = sec.cleanText(b.name, 60).trim();
   if (!name) throw Object.assign(new Error('Nome é obrigatório'), { status: 400 });
-  return [name, u.slugify(b.slug || name), sec.cleanText(b.icon || '', 8), sec.cleanText(b.description || '', 500), Math.max(-1000, Math.min(1000, Number(b.position) || 0))];
+  return [name, u.slugify(b.slug || name), sec.cleanText(b.icon || '', 8).trim() || require('../cover').categoryEmoji(name), sec.cleanText(b.description || '', 500), Math.max(-1000, Math.min(1000, Number(b.position) || 0))];
 }
 router.post('/categories', auth.requireAdmin, (req, res) => {
   const info = db.get().prepare('INSERT INTO categories (name, slug, icon, description, position) VALUES (?, ?, ?, ?, ?)').run(...categoryPayload(req.body || {}));

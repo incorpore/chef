@@ -12,6 +12,7 @@ const DEFAULTS = {
   social: { instagram: '', youtube: '', tiktok: '', pinterest: '', facebook: '', x: '' },
   twitterHandle: '',
   defaultOgImage: '',
+  defaultRecipeImage: '', // vazio = capa ilustrada automática (cor + emoji do prato)
   // Medição e verificação de propriedade
   ga4Id: '',
   gtmId: '',
@@ -72,6 +73,7 @@ const PATTERNS = {
   amazonTag: [/^([\w-]{2,40})?$/, 'Tag de associado inválida (ex.: meusite-20)'],
   logo: [/^((https:\/\/|\/)[^\s"'<>]{1,1000})?$/, 'URL do logo inválida'],
   defaultOgImage: [/^((https:\/\/|\/)[^\s"'<>]{1,1000})?$/, 'URL da imagem padrão inválida'],
+  defaultRecipeImage: [/^((https:\/\/|\/(?!\/))[^\s"'<>]{1,1000})?$/, 'URL da imagem padrão das receitas inválida'],
   shareNetworks: [/^[a-z,]{0,200}$/, 'Lista de redes inválida'],
   siteUrl: [/^(https?:\/\/[a-z0-9.-]+(:\d{1,5})?)?$/i, 'Endereço do site inválido (ex.: https://receitas.meusite.com.br, sem barra no final)'],
 };

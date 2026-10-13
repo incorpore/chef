@@ -67,21 +67,94 @@
     });
   }
 
-  // ---------------- Lista de receitas ----------------
+  // ---------------- Lista de receitas (com seleção em massa) ----------------
   const rows = $('[data-recipe-rows]');
   if (rows) {
     const f = $('[data-recipe-filter]');
+    const bar = $('[data-bulk-bar]');
+    const checkPage = $('[data-check-page]');
     let page = 1;
-    const load = async () => {
-      const q = new URLSearchParams({ q: f.q.value, status: f.status.value, page, perPage: 25, sort: f.q.value ? '' : 'updated' });
-      const res = await api(`/recipes?${q}`);
-      rows.innerHTML = res.items.map((r) => `<tr><td>${r.image || r.cover ? `<img class="thumb" src="${esc(r.image || r.cover)}" alt="">` : ''}</td><td><a href="/admin/receitas/${r.id}"><strong>${esc(r.title)}</strong></a><br><small>${esc(r.category?.name || '')}</small></td><td>${codeCopy(r.code)}</td><td><span class="status status-${r.status}">${r.status === 'published' ? 'Publicada' : 'Rascunho'}</span></td><td>${r.views}</td><td class="row-actions"><a href="/receita/${esc(r.slug)}" target="_blank">ver</a> <a href="/admin/receitas/${r.id}">editar</a></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma receita</td></tr>';
-      $('[data-pager]').innerHTML = res.pages > 1 ? `${page > 1 ? '<button class="btn btn-sm" data-page="-1">← Anterior</button>' : ''} <span>Página ${page} de ${res.pages}</span> ${page < res.pages ? '<button class="btn btn-sm" data-page="1">Próxima →</button>' : ''}` : '';
+    let res = { items: [], total: 0, pages: 1 };
+    const selected = new Set();
+    let allMatching = false; // "todas as N receitas do filtro" (inclusive de outras páginas)
+    const filterNow = () => ({ q: f.q.value, status: f.status.value, category: f.category.value });
+    const paintBar = () => {
+      const n = allMatching ? res.total : selected.size;
+      bar.hidden = n === 0;
+      $('[data-bulk-count]').textContent = n.toLocaleString('pt-BR');
+      $('[data-bulk-label]').textContent = n === 1 ? 'selecionada' : allMatching ? 'selecionadas (todas do filtro)' : 'selecionadas';
+      const pageIds = res.items.map((r) => r.id);
+      const allPage = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+      checkPage.checked = allMatching || allPage;
+      checkPage.indeterminate = !checkPage.checked && pageIds.some((id) => selected.has(id));
+      const m = $('[data-check-page-m]'); if (m) { m.checked = checkPage.checked; m.indeterminate = checkPage.indeterminate; }
+      const btnAll = $('[data-bulk-all]');
+      btnAll.hidden = allMatching || !allPage || res.total <= pageIds.length;
+      btnAll.textContent = `Selecionar todas as ${res.total.toLocaleString('pt-BR')} do filtro`;
+      $$('[data-check]', rows).forEach((c) => { c.checked = allMatching || selected.has(Number(c.dataset.check)); c.closest('tr').classList.toggle('row-selected', c.checked); });
     };
+    const load = async () => {
+      const q = new URLSearchParams({ ...filterNow(), page, perPage: 50, sort: f.q.value ? '' : 'updated' });
+      res = await api(`/recipes?${q}`);
+      rows.innerHTML = res.items.map((r) => `<tr><td class="col-check"><input type="checkbox" data-check="${r.id}" aria-label="Selecionar ${esc(r.title)}"></td><td>${r.image || r.cover ? `<img class="thumb" src="${esc(r.image || r.cover)}" alt="" loading="lazy">` : ''}</td><td><a href="/admin/receitas/${r.id}"><strong>${esc(r.title)}</strong></a>${r.featured ? ' <span title="Em destaque">⭐</span>' : ''}<br><small>${esc(r.category ? `${r.category.icon || ''} ${r.category.name}` : 'Sem categoria')}</small></td><td>${codeCopy(r.code)}</td><td><span class="status status-${r.status}">${r.status === 'published' ? 'Publicada' : 'Rascunho'}</span></td><td>${r.views}</td><td class="row-actions"><a href="/receita/${esc(r.slug)}" target="_blank">ver</a> <a href="/admin/receitas/${r.id}">editar</a></td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhuma receita</td></tr>';
+      $('[data-list-count]').textContent = `${res.total.toLocaleString('pt-BR')} ${res.total === 1 ? 'receita' : 'receitas'}`;
+      $('[data-pager]').innerHTML = res.pages > 1 ? `${page > 1 ? '<button class="btn btn-sm" data-page="-1">← Anterior</button>' : ''} <span>Página ${page} de ${res.pages}</span> ${page < res.pages ? '<button class="btn btn-sm" data-page="1">Próxima →</button>' : ''}` : '';
+      paintBar();
+    };
+    const clearSel = () => { selected.clear(); allMatching = false; paintBar(); };
     let t;
-    f.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { page = 1; load(); }, 200); });
+    f.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { page = 1; clearSel(); load(); }, 200); });
+    f.addEventListener('change', () => { page = 1; clearSel(); load(); });
     f.addEventListener('submit', (e) => e.preventDefault());
-    on('[data-page]', 'click', (e, b) => { page += Number(b.dataset.page); load(); });
+    on('[data-page]', 'click', (e, b) => { page += Number(b.dataset.page); load(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    rows.addEventListener('change', (e) => {
+      const c = e.target.closest('[data-check]');
+      if (!c) return;
+      if (allMatching) { allMatching = false; res.items.forEach((r) => selected.add(r.id)); } // sai do "todas do filtro" e mantém a página
+      const id = Number(c.dataset.check);
+      if (c.checked) selected.add(id); else selected.delete(id);
+      paintBar();
+    });
+    // Clique na linha (fora de links/botões) também marca — mais fácil no celular
+    rows.addEventListener('click', (e) => {
+      if (e.target.closest('a, button, input, .code-copy')) return;
+      const c = $('[data-check]', e.target.closest('tr') || document.createElement('tr'));
+      if (c) { c.checked = !c.checked; c.dispatchEvent(new Event('change', { bubbles: true })); }
+    });
+    checkPage.addEventListener('change', () => {
+      allMatching = false;
+      res.items.forEach((r) => (checkPage.checked ? selected.add(r.id) : selected.delete(r.id)));
+      paintBar();
+    });
+    $('[data-check-page-m]')?.addEventListener('change', (e) => { checkPage.checked = e.target.checked; checkPage.dispatchEvent(new Event('change')); });
+    on('[data-bulk-all]', 'click', () => { allMatching = true; paintBar(); });
+    on('[data-bulk-clear]', 'click', clearSel);
+
+    const LABELS = { publish: 'publicar', draft: 'desativar (virar rascunho)', delete: 'EXCLUIR', category: 'mudar a categoria de', feature: 'destacar', unfeature: 'tirar o destaque de' };
+    const runBulk = async (action, value) => {
+      const n = allMatching ? res.total : selected.size;
+      if (!n) return;
+      const what = `${n.toLocaleString('pt-BR')} ${n === 1 ? 'receita' : 'receitas'}`;
+      if (action === 'delete') {
+        if (!confirm(`Excluir ${what}? Isso não pode ser desfeito.`)) return;
+        if (n >= 20 && prompt(`Para confirmar, digite o número de receitas que serão excluídas (${n}):`) !== String(n)) return toast('Exclusão cancelada');
+      } else if (!confirm(`Confirmar: ${LABELS[action]} ${what}?`)) return;
+      const body = allMatching ? { all: true, filter: filterNow(), action, value } : { ids: [...selected], action, value };
+      $$('[data-bulk], [data-bulk-category]', bar).forEach((b) => { b.disabled = true; });
+      try {
+        const r = await api('/recipes/bulk', { method: 'POST', body });
+        toast(`✅ ${r.done.toLocaleString('pt-BR')} ${r.done === 1 ? 'receita atualizada' : 'receitas atualizadas'}${r.denied ? ` · ${r.denied} sem permissão` : ''}`, 4000);
+        clearSel();
+        if (action === 'delete' && page > 1) page = 1;
+        await load();
+      } catch (err) { toast(`⚠️ ${err.message}`); } finally { $$('[data-bulk], [data-bulk-category]', bar).forEach((b) => { b.disabled = false; }); }
+    };
+    on('[data-bulk]', 'click', (e, b) => runBulk(b.dataset.bulk));
+    $('[data-bulk-category]').addEventListener('change', (e) => {
+      const v = e.target.value;
+      e.target.value = '__';
+      if (v !== '__') runBulk('category', v);
+    });
     load();
   }
 
@@ -356,10 +429,25 @@
     return { load };
   }
 
+  const catForm = $('[data-cat-form]');
   crud({
     form: '[data-cat-form]', list: '[data-cat-rows]', path: '/categories',
-    row: (c) => `<tr><td style="font-size:1.5rem">${esc(c.icon)}</td><td><strong>${esc(c.name)}</strong><br><small>/categoria/${esc(c.slug)}</small></td><td>${c.count}</td><td>${c.position}</td><td class="row-actions"><button class="link" data-del="${c.id}">remover</button></td></tr>`,
+    fill: (f, c) => {
+      for (const k of ['id', 'icon', 'name', 'description', 'position']) f[k].value = c[k] ?? '';
+      $('[data-cat-title]').textContent = `Editar: ${c.name}`;
+      $('[data-cat-cancel]').hidden = false;
+      paintEmoji();
+    },
+    row: (c) => `<tr><td class="cat-icon-cell">${esc(c.icon || '🍽️')}</td><td><strong>${esc(c.name)}</strong><br><small>/categoria/${esc(c.slug)}</small></td><td>${c.count}</td><td>${c.position}</td><td class="row-actions"><button class="link" data-edit="${c.id}">editar</button> <button class="link" data-del="${c.id}">remover</button></td></tr>`,
   });
+  const paintEmoji = () => { if (!catForm) return; $$('[data-emoji]', catForm).forEach((b) => b.classList.toggle('on', b.dataset.emoji === catForm.icon.value.trim())); };
+  if (catForm) {
+    on('[data-emoji]', 'click', (e, b) => { catForm.icon.value = b.dataset.emoji; paintEmoji(); });
+    catForm.icon.addEventListener('input', paintEmoji);
+    const resetTitle = () => { $('[data-cat-title]').textContent = 'Nova categoria'; $('[data-cat-cancel]').hidden = true; setTimeout(paintEmoji); };
+    catForm.addEventListener('reset', resetTitle);
+    catForm.addEventListener('change', (e) => { if (!e.target.name) resetTitle(); }); // disparado pelo crud depois de salvar
+  }
 
   crud({
     form: '[data-product-form]', list: '[data-product-list]', path: '/products',
@@ -448,6 +536,34 @@
       try { await api('/settings', { method: 'PUT', body }); toast('✅ Configurações salvas'); } catch (err) { toast(err.message); }
     });
   }
+  // ---------------- Campo de imagem (logo, imagem padrão…): enviar arquivo, prévia e remover ----------------
+  const paintImageInput = (box) => {
+    const input = $('input[name]', box);
+    const val = input.value.trim();
+    $('[data-preview]', box).innerHTML = val ? `<img src="${esc(val)}" alt="">` : `<span class="muted">${esc(box.dataset.empty || 'Nenhuma')}</span>`;
+    $('[data-image-clear]', box).hidden = !val;
+  };
+  on('[data-image-pick]', 'click', (e, b) => $('[data-image-file]', b.closest('[data-image-input]')).click());
+  on('[data-image-clear]', 'click', (e, b) => { const box = b.closest('[data-image-input]'); $('input[name]', box).value = ''; paintImageInput(box); toast('Clique em Salvar para aplicar'); });
+  document.addEventListener('change', async (e) => {
+    const fileIn = e.target.closest?.('[data-image-file]');
+    if (fileIn) {
+      const box = fileIn.closest('[data-image-input]');
+      const file = fileIn.files[0]; fileIn.value = '';
+      if (!file) return;
+      const btn = $('[data-image-pick]', box); btn.disabled = true;
+      try {
+        const fd = new FormData();
+        fd.append('files', await shrinkImage(file));
+        const up = await api('/uploads', { method: 'POST', body: fd });
+        $('input[name]', box).value = up.files[0].url;
+        paintImageInput(box);
+        toast('📸 Imagem enviada. Clique em Salvar para aplicar.');
+      } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+    }
+  });
+  document.addEventListener('input', (e) => { const box = e.target.closest?.('[data-image-input]'); if (box) paintImageInput(box); });
+
   // ---------------- Meu perfil ----------------
   const prof = $('[data-profile]');
   if (prof) {

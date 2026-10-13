@@ -151,6 +151,11 @@ const detect = () => {
       await p.goto(B + u); await p.waitForTimeout(300);
       add(`${w}px ${u}`, await p.evaluate(detect));
     }
+    // Lista de receitas com a barra de ações em massa aberta
+    await p.goto(B + '/admin/receitas'); await p.waitForSelector('[data-check]');
+    await p.check('[data-check] >> nth=0'); await p.waitForTimeout(150);
+    add(`${w}px /admin/receitas (seleção em massa)`, await p.evaluate(detect));
+    await p.goto(B + '/admin/perfil'); await p.waitForTimeout(200);
     // Perfil com campos de confirmação abertos e site público com o menu da conta aberto
     await p.fill('[data-profile] input[name=email]', 'outro-email-bem-comprido-para-testar@exemplo-de-dominio.com.br');
     await p.fill('[data-password] input[name=password]', 'abc');

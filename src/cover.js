@@ -73,4 +73,20 @@ function svg({ title, code, category }) {
 </svg>`;
 }
 
-module.exports = { svg, autoCoverUrl, emojiFor };
+
+// Ícone de categoria a partir do nome ("Lanches e salgados" → 🥪). Usado quando a categoria não tem ícone.
+const CATEGORY_EMOJI = [
+  [/bolo|torta/, '🍰'], [/doce|sobremesa|confeitaria/, '🍮'], [/massa|macarr/, '🍝'], [/carne|churrasco/, '🥩'], [/\baves?\b|frango/, '🍗'],
+  [/peixe|fruto.? do mar|marisco/, '🐟'], [/vegan|vegetar|salada|saudave|fit|light/, '🥗'], [/\bpa(o|es)\b|padaria/, '🍞'],
+  [/lanche|salgado|petisco|sanduiche/, '🥪'], [/bebida|drink|suco|coquetel/, '🥤'], [/cafe da manha|breakfast/, '☕'], [/sopa|caldo/, '🍲'],
+  [/acompanhamento|arroz|guarni/, '🍚'], [/festa|junina|natal|pascoa|datas?\b|comemora/, '🎉'], [/air.?fryer|frit/, '🍟'],
+  [/pizza/, '🍕'], [/japon|orient|asiat/, '🍣'], [/mexican/, '🌮'], [/italian/, '🇮🇹'], [/infantil|crianc/, '🧒'], [/molho/, '🍅'],
+];
+function categoryEmoji(name) {
+  const t = ` ${norm(name)} `;
+  for (const [re, e] of CATEGORY_EMOJI) if (re.test(t)) return e;
+  const e = emojiFor(name, '');
+  return e || '🍽️';
+}
+
+module.exports = { svg, autoCoverUrl, emojiFor, categoryEmoji };

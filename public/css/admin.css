@@ -88,7 +88,9 @@ body.admin { padding: 0; display: flex; min-height: 100vh; }
 .status { font-size: .78rem; padding: .15em .6em; border-radius: 99px; font-weight: 600; }
 .status-published { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
 .status-draft { background: color-mix(in srgb, var(--warn) 20%, transparent); color: #9a6a00; }
-.admin-filter { display: flex; gap: 8px; margin-bottom: 12px; }
+.admin-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.admin-filter input[type=search] { flex: 1 1 260px; min-width: 0; }
+.admin-filter select { flex: 0 1 auto; min-width: 0; }
 .admin-filter select { width: auto; }
 .pager { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 16px 0; }
 .inline-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -203,3 +205,59 @@ body.admin { padding: 0; display: flex; min-height: 100vh; }
 .activity { list-style: none; padding: 0; margin: 0 0 12px; display: grid; }
 .activity li { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: .5rem 0; border-bottom: 1px dashed var(--line); font-size: .92rem; }
 .activity time { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* Lista de receitas: seleção em massa */
+.list-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 8px; }
+.list-count { color: var(--ink-3); font-size: .9rem; margin: 0; }
+.check-all-m { display: none; align-items: center; gap: 8px; font-size: .9rem; color: var(--ink-2); cursor: pointer; }
+.check-all-m input { width: 20px; height: 20px; accent-color: var(--brand); }
+@media (max-width: 700px) { .check-all-m { display: flex; } }
+.col-check { width: 44px; text-align: center !important; }
+.col-check input { width: 20px; height: 20px; accent-color: var(--brand); cursor: pointer; }
+.table-recipes tbody tr { cursor: pointer; }
+.table-recipes tr.row-selected td { background: color-mix(in srgb, var(--brand) 8%, var(--surface)); }
+.bulk-bar { position: sticky; top: 8px; z-index: 18; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 10px 14px; margin-bottom: 12px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--brand) 45%, var(--line)); border-radius: 14px; box-shadow: 0 10px 30px rgb(0 0 0 / .12); }
+.bulk-info { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.bulk-info strong { color: var(--brand); font-size: 1.1rem; }
+.bulk-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.bulk-actions select { padding: .4rem .6rem; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 500 .85rem var(--font); max-width: 220px; }
+.bulk-actions button:disabled, .bulk-actions select:disabled { opacity: .5; }
+.admin-filter select[name=category] { max-width: 260px; }
+@media (max-width: 860px) {
+  .bulk-bar { top: 64px; }
+  .bulk-actions { width: 100%; }
+  .bulk-actions .btn, .bulk-actions select { flex: 1 1 auto; }
+}
+
+/* Categorias: ícone e seletor de emoji */
+.cat-form-row { display: grid; gap: 0 12px; grid-template-columns: 110px minmax(0, 2fr) minmax(0, 3fr) 90px; align-items: end; }
+@media (max-width: 760px) { .cat-form-row { grid-template-columns: 100px minmax(0, 1fr); } }
+.cat-icon-field input { font-size: 1.4rem; text-align: center; }
+.emoji-pick { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; }
+.emoji-pick button { width: 40px; height: 40px; font-size: 1.3rem; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; display: grid; place-items: center; }
+.emoji-pick button:hover { background: var(--surface-2); }
+.emoji-pick button.on { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 14%, var(--surface)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 30%, transparent); }
+.cat-icon-cell { font-size: 1.6rem; width: 56px; }
+
+/* Campo de imagem (logo, imagem padrão) */
+.image-input { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; font-weight: 400; }
+.image-input-preview { width: 120px; height: 90px; border-radius: 12px; border: 1px dashed var(--line); background: var(--surface-2); display: grid; place-items: center; overflow: hidden; flex: none; text-align: center; font-size: .75rem; padding: 4px; }
+.image-input-preview img { width: 100%; height: 100%; object-fit: cover; }
+.image-input-ctl { flex: 1 1 220px; min-width: 0; display: grid; gap: 6px; }
+.image-input-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Coluna de ações: td normal (display:flex no td quebrava o fundo da linha selecionada) */
+td.row-actions { display: table-cell; white-space: nowrap; }
+td.row-actions > * + * { margin-left: 10px; }
+/* Celular: lista de receitas como cartões com a caixa de seleção no canto */
+@media (max-width: 700px) {
+  .table-recipes tr { position: relative; grid-template-columns: 64px 1fr; padding: 12px 12px 12px 48px; gap: 2px 0; }
+  .table-recipes td.col-check { position: absolute; left: 6px; top: 12px; width: auto; padding: 4px; }
+  .table-recipes td:nth-child(2) { grid-row: span 4; padding-left: 0; }
+  .table-recipes td:nth-child(4), .table-recipes td:nth-child(5), .table-recipes td:nth-child(6) { display: inline-flex; align-items: center; }
+  .table-recipes td:nth-child(6)::before { content: "👁 "; margin-right: 4px; }
+  .table-recipes td.row-actions { grid-column: 2; }
+  .table-recipes td { background: transparent !important; }
+  .table-recipes tr.row-selected { background: color-mix(in srgb, var(--brand) 8%, var(--surface)); }
+  .admin-filter select { flex: 1 1 40%; }
+}

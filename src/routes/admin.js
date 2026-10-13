@@ -53,7 +53,7 @@ router.get('/perfil', (req, res) => {
     .slice(0, 8);
   res.send(v.profilePage({ user: req.user, stats: { published: st.published || 0, drafts: st.drafts || 0, views: st.views || 0 }, activity }));
 });
-router.get('/receitas', (req, res) => res.send(v.recipeList({ user: req.user })));
+router.get('/receitas', (req, res) => res.send(v.recipeList({ user: req.user, categories: recipes.categories() })));
 router.get('/receitas/nova', (req, res) => res.send(v.editor({ user: req.user, recipe: null, categories: recipes.categories(), products: products() })));
 router.get('/receitas/:id', (req, res, next) => {
   const r = recipes.getById(Number(req.params.id) || 0);

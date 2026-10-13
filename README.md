@@ -72,6 +72,8 @@ Basta colar os IDs; os scripts são inseridos automaticamente:
 O PWA tem manifest, ícones *maskable*, atalhos e service worker com offline: as receitas visitadas e favoritadas ficam disponíveis sem internet. A interface tem barra de abas no estilo app nativo, tema claro/escuro e convite de instalação.
 
 ### Painel
+**Seleção em massa** na lista de receitas: marque várias (ou todas as do filtro) e publique, desative (rascunho), mude a categoria, destaque ou exclua de uma vez. **Categorias com ícone** (emoji escolhido num seletor ou automático pelo nome). **Receitas sem foto** usam a capa ilustrada automática ou uma imagem padrão enviada em Configurações.
+
 **Meu perfil** (menu da foto no topo do site ou do painel): troque foto (recortada em quadrado automaticamente), nome, e‑mail de acesso (pede a senha atual e avisa o e‑mail antigo), bio (aparece no cartão "Quem fez esta receita"), senha (com medidor de força) e tema; veja a atividade recente e saia de todos os aparelhos. Quem está logado não vê mais "Entrar": o menu mostra Meu perfil, Painel, Nova receita e Sair.
 
 Painel com estatísticas, editor de receitas (grupos de ingredientes com pré‑visualização, passos que podem ser reordenados, timers detectados, colar texto, Ctrl+S), duplicar, rascunho/publicado, destaque, categorias, comentários, produtos, anúncios, chaves de API, usuários (admin/autor) e configurações (nome, cor, logo, redes sociais, AdSense, tag Amazon, HTML extra no `<head>` para Analytics).
@@ -91,7 +93,7 @@ Acesse `/admin` para criar a conta de administrador. Em produção, o primeiro a
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | Servidor com recarga automática |
-| `npm test` | 79 testes: funcionalidades, **segurança (ataques)** e **SEO** |
+| `npm test` | 85 testes: funcionalidades, **segurança (ataques)** e **SEO** |
 | `npm run stress` | Teste de carga e de limites da API (2.000 receitas, 32 conexões) |
 | `npm run audit:secrets` | Procura senhas/chaves vazadas nos arquivos **e no histórico do Git** |
 | `sh scripts/smoke-test.sh IMAGEM` | Testa a imagem Docker como se fosse o ZimaOS (instalação, login, upload, reinício) |
