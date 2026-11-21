@@ -20,7 +20,13 @@ const perPage = () => settings.all().recipesPerPage || 12;
 
 router.get('/', (req, res) => cache.page(req, res, () => {
   const latest = recipes.search({ sort: 'recent', perPage: perPage() }).items;
+  // Destaque do topo: sorteado entre as 20 mais vistas (as com foto de verdade têm preferência).
+  // Muda a cada carregamento (ou a cada ciclo do cache de páginas, para visitantes).
+  const top = recipes.search({ sort: 'popular', perPage: 20 }).items;
+  const pool = top.some((r) => r.cover) ? top.filter((r) => r.cover) : top;
+  const hero = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
   return pages.home({
+    hero,
     featured: recipes.search({ featured: true, sort: 'recent', perPage: 8 }).items,
     latest,
     popular: recipes.search({ sort: 'popular', perPage: 8 }).items,

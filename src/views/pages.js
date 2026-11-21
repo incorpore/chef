@@ -9,9 +9,9 @@ const { organizationLd, websiteLd, itemListLd, breadcrumbLd } = require('./head'
 
 const esc = u.esc;
 
-function home({ featured, latest, popular, quick, categories, tags, user }) {
+function home({ hero: picked, featured, latest, popular, quick, categories, tags, user }) {
   const s = settings.all();
-  const hero = featured[0] || latest[0];
+  const hero = picked || featured[0] || latest[0];
   const body = `
 <section class="home-hero">
   <div class="wrap home-hero-in">

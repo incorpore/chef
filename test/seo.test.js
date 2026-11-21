@@ -163,3 +163,29 @@ test('desempenho: HTML comprimido (gzip/brotli) e estáticos com ETag', async ()
   const css = await fetch(`${base}/css/app.css`);
   assert.ok(css.headers.get('etag'));
 });
+
+test('destaque do topo é sorteado entre as 20 mais vistas (com foto têm preferência)', async () => {
+  const d = db.get();
+  const recipes = require('../src/recipes');
+  const mk = (title, views, cover = '') => recipes.create({ title, cover, ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'published' }, null);
+  const tops = [];
+  for (let i = 0; i < 4; i++) tops.push(mk(`Destaque popular ${i}`, 0, `/uploads/foto-destaque-${i}.jpg`));
+  tops.forEach((r, i) => d.prepare('UPDATE recipes SET views = ? WHERE id = ?').run(100000 + i, r.id));
+  const sem = mk('Muito vista sem foto', 0);
+  d.prepare('UPDATE recipes SET views = 999999 WHERE id = ?').run(sem.id);
+  require('../src/cache').bump();
+  const seen = new Set();
+  for (let i = 0; i < 25; i++) {
+    require('../src/cache').bump();
+    const html = await (await fetch(`${base}/`)).text();
+    const m = html.match(/class="hero-feature" href="\/receita\/([^"]+)"/);
+    seen.add(m && m[1]);
+  }
+  assert.ok(seen.size > 1, `o destaque varia (${[...seen].join(', ')})`);
+  assert.ok(![...seen].includes(sem.slug), 'com receitas com foto no top 20, a sem foto não é sorteada');
+  const top20 = d.prepare("SELECT slug FROM recipes WHERE status = 'published' ORDER BY views DESC LIMIT 20").all().map((r) => r.slug);
+  for (const slug of seen) {
+    assert.ok(top20.includes(slug), `${slug} está entre as 20 mais vistas`);
+    assert.ok(d.prepare('SELECT cover FROM recipes WHERE slug = ?').get(slug).cover, `${slug} tem foto`);
+  }
+});
