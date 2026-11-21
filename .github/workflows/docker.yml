@@ -36,7 +36,8 @@ jobs:
   responsividade:
     name: Responsividade (8 larguras de tela, navegador real)
     needs: testes
-    runs-on: ubuntu-latest
+    # Fixo no 24.04: o navegador de testes (Playwright 1.56) ainda não instala no ubuntu-latest (26.04)
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
