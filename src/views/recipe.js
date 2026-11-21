@@ -106,6 +106,12 @@ function stepsHtml(r, links, adEvery) {
   return out.join('');
 }
 
+/** Gostei / não gostei: dois botões redondos só com ícone e contador (o estado é sincronizado pelo recipe.js). */
+function voteBox(r, size = '') {
+  const btn = (v, label, n) => `<button type="button" class="vote-btn${v < 0 ? ' vote-down' : ''}" data-vote="${v}" aria-pressed="false" aria-label="${label}" title="${label}">${icon('like')}<span class="vote-n" data-vote-count="${v}">${n || ''}</span></button>`;
+  return `<div class="vote${size ? ` vote-${size}` : ''}" role="group" aria-label="Avalie a receita" data-vote-box>${btn(1, 'Gostei', r.likes)}${btn(-1, 'Não gostei', r.dislikes)}</div>`;
+}
+
 function recipePage({ r, base, related, products, adjacent, comments, user }) {
   const s = settings.all();
   const links = c.linkIngredients(r.steps, r.ingredients);
@@ -152,10 +158,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
       ${r.diets.length || r.tags.length ? `<div class="tags">${r.diets.map((d) => `<a class="chip chip-diet" href="/busca?diet=${encodeURIComponent(d)}">${esc(d)}</a>`).join('')}${r.tags.map((t) => `<a class="chip" href="/tag/${encodeURIComponent(t)}">#${esc(t)}</a>`).join('')}</div>` : ''}
       <div class="actions">
         <button class="btn btn-primary btn-lg" data-cook-start>${icon('chef')} Modo cozinha</button>
-        <div class="vote" role="group" aria-label="Avalie a receita" data-vote-box>
-          <button type="button" class="vote-btn" data-vote="1" aria-pressed="false" aria-label="Gostei" title="Gostei">${icon('like')}<span data-vote-count="1">${r.likes || ''}</span></button>
-          <button type="button" class="vote-btn vote-down" data-vote="-1" aria-pressed="false" aria-label="Não gostei" title="Não gostei">${icon('like')}<span data-vote-count="-1">${r.dislikes || ''}</span></button>
-        </div>
+        ${voteBox(r)}
         <button class="icon-btn lg fav-btn" data-fav="${r.id}" data-slug="${esc(r.slug)}" data-title="${esc(r.title)}" data-cover="${esc(r.cover || r.cover_auto)}" aria-label="Favoritar">${icon('heart')}</button>
         <button class="icon-btn lg" data-share aria-label="Compartilhar" title="Compartilhar">${icon('share')}</button>
         <button class="icon-btn lg" data-add-list aria-label="Adicionar à lista de compras" title="Adicionar à lista de compras">${icon('cart')}</button>
@@ -203,6 +206,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
         </div>
         <ol class="steps">${stepsHtml(r, links, true)}</ol>
         <button class="btn btn-primary btn-block" data-cook-start>${icon('chef')} Cozinhar passo a passo (timers e voz)</button>
+        <div class="vote-card"><p class="vote-q">Gostou desta receita?</p>${voteBox(r, 'xl')}</div>
       </section>
 
       ${r.tips ? `<section class="tips prose"><h2>💡 Dicas</h2>${u.miniMarkdown(r.tips)}</section>` : ''}
@@ -253,6 +257,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
     <button class="btn btn-primary btn-lg" data-cook-next>Próximo ${icon('arrowR')}</button>
   </div>
   <div class="cook-drawer" hidden><h3>Ingredientes</h3><ul></ul></div>
+  <template data-vote-tpl>${voteBox(r, 'xl')}</template>
   <template data-cook-done-ad>${renderAd('cook_mode')}</template>
 </div>
 <div class="timer-dock" aria-live="polite"></div>

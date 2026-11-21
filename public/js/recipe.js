@@ -8,9 +8,24 @@
   const PKEY = `progress:${R.id}`;
 
   // ---------------- Gostei / não gostei (um voto por aparelho; tocar de novo desfaz) ----------------
-  const voteBox = $('[data-vote-box]');
-  if (voteBox) {
-    const votes = store.get('votes', {});
+  // Há mais de um par de botões (topo, fim do preparo, fim do modo cozinha): todos mostram o mesmo estado.
+  const firstBox = $('[data-vote-box]');
+  const votes = store.get('votes', {});
+  const counts = {
+    1: Number(firstBox?.querySelector('[data-vote-count="1"]').textContent) || 0,
+    '-1': Number(firstBox?.querySelector('[data-vote-count="-1"]').textContent) || 0,
+  };
+  const paintVotes = (mine = votes[R.id] || 0) => {
+    for (const box of $$('[data-vote-box]')) {
+      for (const v of ['1', '-1']) {
+        const b = box.querySelector(`[data-vote="${v}"]`);
+        b.setAttribute('aria-pressed', String(String(mine) === v));
+        b.classList.toggle('on', String(mine) === v);
+        box.querySelector(`[data-vote-count="${v}"]`).textContent = counts[v] > 0 ? counts[v].toLocaleString('pt-BR') : '';
+      }
+    }
+  };
+  if (firstBox) {
     let voter = store.get('voterId', '');
     if (!/^[A-Za-z0-9_-]{16,64}$/.test(voter)) {
       const a = new Uint8Array(18);
@@ -18,39 +33,32 @@
       voter = btoa(String.fromCharCode(...a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       store.set('voterId', voter);
     }
-    const counts = { 1: Number($('[data-vote-count="1"]', voteBox).textContent) || 0, '-1': Number($('[data-vote-count="-1"]', voteBox).textContent) || 0 };
-    const paint = (mine) => {
-      for (const v of ['1', '-1']) {
-        const b = $(`[data-vote="${v}"]`, voteBox);
-        b.setAttribute('aria-pressed', String(String(mine) === v));
-        b.classList.toggle('on', String(mine) === v);
-        $(`[data-vote-count="${v}"]`, voteBox).textContent = counts[v] > 0 ? counts[v].toLocaleString('pt-BR') : '';
-      }
-    };
-    paint(votes[R.id] || 0);
+    paintVotes();
     let busy = false;
-    voteBox.addEventListener('click', async (e) => {
-      const b = e.target.closest('[data-vote]');
+    document.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-vote-box] [data-vote]');
       if (!b || busy) return;
       const old = votes[R.id] || 0;
       const value = Number(b.dataset.vote) === old ? 0 : Number(b.dataset.vote);
       // mostra na hora (otimista) e confirma com o servidor
       if (old) counts[old] = Math.max(0, counts[old] - 1);
       if (value) counts[value] += 1;
-      paint(value);
-      b.classList.add('pop'); setTimeout(() => b.classList.remove('pop'), 300);
+      paintVotes(value);
+      b.classList.add('pop'); setTimeout(() => b.classList.remove('pop'), 350);
       busy = true;
       try {
         const r = await api(`/recipes/${R.id}/vote`, { method: 'POST', body: { value, voter } });
         counts[1] = r.likes; counts[-1] = r.dislikes;
         if (r.value) votes[R.id] = r.value; else delete votes[R.id];
         store.set('votes', votes);
-        paint(r.value);
+        paintVotes(r.value);
+        if (value > 0) toast('🧡 Obrigado! Que bom que você gostou');
+        else if (value < 0) toast('Obrigado pela opinião! Conte nos comentários o que podemos melhorar');
         if (value) track(value > 0 ? 'recipe_like' : 'recipe_dislike', { item_id: R.code });
       } catch (err) {
         if (value) counts[value] = Math.max(0, counts[value] - 1);
         if (old) counts[old] += 1;
-        paint(old);
+        paintVotes(old);
         toast(err.status === 429 ? 'Calma! Muitos votos seguidos.' : 'Não foi possível registrar agora');
       } finally { busy = false; }
     });
@@ -322,8 +330,10 @@
       const adTpl = $('[data-cook-done-ad]');
       cards.push(`<section class="cook-card cook-done"><div class="big">🎉</div><h2>Pronto! Bom apetite!</h2><p>Você concluiu <b>${esc(R.title)}</b>.</p>
         <p><button class="btn btn-primary btn-lg" data-cook-finish>Fiz esta receita!</button></p>
+        ${$('[data-vote-tpl]') ? `<div class="vote-card vote-card-cook"><p class="vote-q">Gostou?</p>${$('[data-vote-tpl]').innerHTML}</div>` : ''}
         <p><button class="btn btn-ghost" data-cook-rate>⭐ Avaliar</button> <button class="btn btn-ghost" data-share>Compartilhar</button></p>${adTpl ? adTpl.innerHTML : ''}</section>`);
       this.track.innerHTML = cards.join('');
+      paintVotes();
       $('.cook-drawer ul').innerHTML = R.ingredients.map((ing, i) => `<li class="${state.ings.includes(i) ? 'got' : ''}"><b>${esc(withDe(ing, qtyText(ing, f)))}</b> ${esc(ing.name)}</li>`).join('');
       this.go(this.idx, false);
     },

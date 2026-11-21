@@ -588,18 +588,30 @@ button.code-chip.copied { background: color-mix(in srgb, var(--ok) 20%, #fff); }
 .qr-box .code-copy { margin: 0 auto 6px; }
 @media print { .code-copy-btn, .code-qr { display: none !important; } .code-copy { border: 0; padding: 0; } }
 
-/* Gostei / não gostei (só ícones) */
-.vote { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); overflow: hidden; height: 48px; flex: none; }
-.vote-btn { display: inline-flex; align-items: center; gap: 6px; height: 100%; padding: 0 14px; border: 0; background: none; color: var(--ink-2); cursor: pointer; font: 600 .95rem var(--font); font-variant-numeric: tabular-nums; transition: background .15s, color .15s; }
-.vote-btn + .vote-btn { border-left: 1px solid var(--line); }
-.vote-btn .ico { width: 22px; height: 22px; transition: transform .2s; }
+/* Gostei / não gostei: botões redondos como os demais da receita, com contador em destaque */
+.vote { display: inline-flex; align-items: center; gap: 10px; flex: none; }
+.vote-btn { position: relative; display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; transition: background .2s, color .2s, border-color .2s, transform .12s, box-shadow .2s; }
+.vote-btn .ico { width: 22px; height: 22px; transition: transform .25s cubic-bezier(.3, 1.6, .5, 1); }
 .vote-down .ico { transform: scale(1, -1); }
-.vote-btn span:empty { display: none; }
-.vote-btn:hover { background: var(--surface-2); color: var(--ink); }
-.vote-btn.on { color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, var(--surface)); }
-.vote-btn.on .ico { fill: color-mix(in srgb, var(--brand) 25%, transparent); }
-.vote-down.on { color: var(--ink); background: var(--surface-2); }
-.vote-down.on .ico { fill: color-mix(in srgb, var(--ink) 15%, transparent); }
-.vote-btn.pop .ico { transform: scale(1.25); }
-.vote-down.pop .ico { transform: scale(1.25, -1.25); }
-@media print { .vote { display: none !important; } }
+.vote-btn:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); box-shadow: 0 4px 14px color-mix(in srgb, var(--brand) 18%, transparent); }
+.vote-down:hover { color: var(--ink); border-color: var(--ink-3); box-shadow: 0 4px 14px rgb(0 0 0 / .08); }
+.vote-btn:active { transform: scale(.92); }
+.vote-n { position: absolute; top: -6px; right: -8px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; background: var(--brand); color: #fff; font: 700 .72rem/1 var(--font); font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--bg); }
+.vote-down .vote-n { background: var(--ink-3); }
+.vote-n:empty { display: none; }
+.vote-btn.on { background: var(--brand); border-color: transparent; color: #fff; box-shadow: 0 6px 18px color-mix(in srgb, var(--brand) 35%, transparent); }
+.vote-btn.on .ico { fill: rgb(255 255 255 / .25); }
+.vote-btn.on .vote-n { background: #fff; color: var(--brand); }
+.vote-down.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+.vote-down.on .ico { fill: color-mix(in srgb, var(--bg) 25%, transparent); }
+.vote-down.on .vote-n { background: var(--bg); color: var(--ink); }
+.vote-btn.pop .ico { transform: scale(1.3) rotate(-12deg); }
+.vote-down.pop .ico { transform: scale(1.3, -1.3) rotate(12deg); }
+/* Versão grande: fim do modo de preparo e tela final do modo cozinha */
+.vote-xl { gap: 18px; }
+.vote-xl .vote-btn { width: 64px; height: 64px; }
+.vote-xl .vote-btn .ico { width: 28px; height: 28px; }
+.vote-card { margin-top: 22px; padding-top: 18px; border-top: 1px dashed var(--line); display: grid; justify-items: center; gap: 12px; text-align: center; }
+.vote-q { margin: 0; font-family: var(--serif); font-weight: 700; font-size: 1.15rem; color: var(--ink); }
+.vote-card-cook { border-top: 0; margin: 4px 0 8px; padding-top: 0; }
+@media print { .vote, .vote-card { display: none !important; } }
