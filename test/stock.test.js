@@ -159,3 +159,34 @@ test('automático: coloca foto nas que faltam, pula as sem resultado e informa o
   assert.equal(pudim.cover_credit, 'Foto: chefpix / Pixabay', 'Pixabay vem primeiro no automático (mais rápido)');
   assert.ok(db.get().prepare("SELECT 1 FROM audit_log WHERE action = 'fotos.auto'").get());
 });
+
+test('editor: autor busca e baixa foto grátis; a receita nova salva capa e crédito', async () => {
+  const page = await author.req('GET', '/admin/receitas/nova');
+  assert.match(page.text, /data-stock-open/, 'botão aparece quando há chave configurada');
+  assert.match(page.text, /data-stock-dialog/);
+  assert.equal((await author.req('GET', '/api/v1/fotos/buscar?q=')).data.items.length, 0);
+  const found = await author.req('GET', `/api/v1/fotos/buscar?q=${encodeURIComponent('Feijoada (completa)')}`);
+  assert.equal(found.status, 200);
+  assert.equal(found.data.query, 'Feijoada');
+  assert.ok(found.data.items.length >= 2);
+  assert.equal((await author.req('POST', '/api/v1/fotos/baixar', { photo: { ...found.data.items[0], full: 'https://evil.example.com/a.jpg' } })).status, 400);
+  const d = await author.req('POST', '/api/v1/fotos/baixar', { photo: found.data.items[0] });
+  assert.equal(d.status, 201);
+  assert.match(d.data.url, /^\/uploads\/.+\.webp$/);
+  assert.equal(d.data.credit, 'Foto: Ana Lima / Pexels');
+  const r = (await author.req('POST', '/api/v1/recipes', { title: 'Feijoada completa', cover: d.data.url, cover_credit: d.data.credit, cover_credit_url: d.data.creditUrl, ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'published' })).data;
+  assert.deepEqual([r.cover, r.cover_credit], [d.data.url, 'Foto: Ana Lima / Pexels']);
+  const edit = await author.req('GET', `/admin/receitas/${r.id}`);
+  assert.match(edit.text, /data-cover-credit="Foto: Ana Lima \/ Pexels"/, 'editor conhece o crédito da capa atual');
+  assert.equal((await author.req('PATCH', `/api/v1/recipes/${r.id}`, { cover_credit_url: 'javascript:alert(1)' })).status, 400);
+});
+
+test('editor sem chave: autor vê aviso claro; admin vê atalho para configurar', async () => {
+  await admin.req('PUT', '/api/v1/fotos/chaves', { provider: 'pexels', key: '' });
+  await admin.req('PUT', '/api/v1/fotos/chaves', { provider: 'pixabay', key: '' });
+  const a = await author.req('GET', '/api/v1/fotos/buscar?q=bolo');
+  assert.equal(a.status, 400);
+  assert.match(a.data.error, /administrador/);
+  assert.doesNotMatch((await author.req('GET', '/admin/receitas/nova')).text, /data-stock-open/);
+  assert.match((await admin.req('GET', '/admin/receitas/nova')).text, /Ativar busca de fotos grátis/);
+});

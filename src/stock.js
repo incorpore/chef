@@ -120,10 +120,8 @@ async function search(term, { perPage = 4, providers } = {}) {
 }
 
 /** Baixa a foto escolhida, guarda como WebP otimizado e coloca na receita com o crédito do fotógrafo. */
-async function apply(recipeId, photo, userId = null) {
-  const recipes = require('./recipes');
-  const r = recipes.getById(Number(recipeId));
-  if (!r) throw new StockError('Receita não encontrada', 404);
+/** Baixa a foto escolhida e guarda como WebP otimizado. Devolve o endereço local e o crédito do fotógrafo. */
+async function download(photo, userId = null) {
   if (!NAMES[photo?.provider]) throw new StockError('Banco de imagens desconhecido', 400);
   let url;
   try { url = new URL(String(photo.full || '')); } catch { throw new StockError('Endereço da foto inválido', 400); }
@@ -140,13 +138,26 @@ async function apply(recipeId, photo, userId = null) {
   fs.writeFileSync(path.join(config.uploadsDir, name), buf);
   const images = require('./images');
   const opt = await images.optimizeUpload(name, mime);
-  db.get().prepare('INSERT INTO uploads (filename, mime, size, original_name, user_id) VALUES (?, ?, ?, ?, ?)').run(opt.name, opt.mime, opt.size || buf.length, `${NAMES[photo.provider]} ${photo.id}`.slice(0, 200), userId);
+  db.get().prepare('INSERT INTO uploads (filename, mime, size, original_name, user_id) VALUES (?, ?, ?, ?, ?)').run(opt.name, opt.mime, opt.size || buf.length, `${NAMES[photo.provider]} ${String(photo.id || '').slice(0, 40)}`.slice(0, 200), userId);
   images.warm(opt.name);
   const author = sec.cleanText(String(photo.author || ''), 80).trim();
-  const credit = `Foto: ${author ? `${author} / ` : ''}${NAMES[photo.provider]}`;
-  const creditUrl = /^https:\/\//.test(photo.authorUrl || '') ? String(photo.authorUrl).slice(0, 500) : /^https:\/\//.test(photo.pageUrl || '') ? String(photo.pageUrl).slice(0, 500) : '';
-  return recipes.update(r.id, { cover: `/uploads/${opt.name}`, cover_credit: credit, cover_credit_url: creditUrl });
+  return {
+    url: `/uploads/${opt.name}`,
+    credit: `Foto: ${author ? `${author} / ` : ''}${NAMES[photo.provider]}`,
+    creditUrl: /^https:\/\//.test(photo.authorUrl || '') ? String(photo.authorUrl).slice(0, 500) : /^https:\/\//.test(photo.pageUrl || '') ? String(photo.pageUrl).slice(0, 500) : '',
+  };
 }
+
+/** Baixa a foto e coloca como capa da receita, com o crédito. */
+async function apply(recipeId, photo, userId = null) {
+  const recipes = require('./recipes');
+  const r = recipes.getById(Number(recipeId));
+  if (!r) throw new StockError('Receita não encontrada', 404);
+  const d = await download(photo, userId);
+  return recipes.update(r.id, { cover: d.url, cover_credit: d.credit, cover_credit_url: d.creditUrl });
+}
+
+const configured = () => { const k = keys(); return !!(k.pexels || k.pixabay); };
 
 /** Receitas publicadas ainda sem foto (as mais vistas primeiro). */
 function missing(limit = 12, offset = 0) {
@@ -198,4 +209,4 @@ function stopAuto() {
   if (job) { job.running = false; job.stopReason = 'Parada pelo administrador'; }
 }
 
-module.exports = { status, saveKey, search, apply, missing, startAuto, stopAuto, queryFor, endpoints, IMAGE_HOSTS, MIN_INTERVAL, StockError, NAMES, _reset: () => { job = null; last.pexels = 0; last.pixabay = 0; } };
+module.exports = { status, saveKey, search, apply, download, configured, missing, startAuto, stopAuto, queryFor, endpoints, IMAGE_HOSTS, MIN_INTERVAL, StockError, NAMES, _reset: () => { job = null; last.pexels = 0; last.pixabay = 0; } };

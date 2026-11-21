@@ -737,6 +737,18 @@ router.post('/fotos/aplicar', auth.requireAdmin, rateLimit('stock-apply', 120, 6
   auth.audit(req, 'fotos.aplicar', r.code);
   res.json(recipes.toPublic(r, baseUrl(req)));
 }));
+// Editor de receitas (autores também): buscar e baixar uma foto para usar como capa
+router.get('/fotos/buscar', auth.requireUser, rateLimit('stock-search', 120, 60e3), stockWrap(async (req, res) => {
+  if (!stock.configured()) return res.status(400).json({ error: isAdmin(req) ? 'Configure a chave do Pexels ou do Pixabay em Painel → Fotos automáticas' : 'A busca de fotos ainda não foi configurada pelo administrador' });
+  const q = sec.cleanText(String(req.query.q || ''), 100).trim();
+  if (!q) return res.json({ query: '', items: [] });
+  res.json({ query: stock.queryFor(q), items: await stock.search(q, { perPage: 6 }) });
+}));
+router.post('/fotos/baixar', auth.requireUser, rateLimit('stock-apply', 60, 60e3), stockWrap(async (req, res) => {
+  const d = await stock.download(req.body?.photo || {}, req.user.id);
+  auth.audit(req, 'fotos.baixar', d.url);
+  res.status(201).json(d);
+}));
 router.post('/fotos/auto', auth.requireAdmin, stockWrap(async (req, res) => {
   const job = stock.startAuto(req.user.id);
   auth.audit(req, 'fotos.auto', `${job.total} receitas`);

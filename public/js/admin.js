@@ -236,6 +236,72 @@
       } catch (err) { toast(err.message); }
     };
     on('[data-pick-files]', 'click', async () => addMedia(await pickFiles('image/*,video/*')));
+    // ---- Foto grátis (Pexels/Pixabay): busca, baixa e entra como capa com o crédito do fotógrafo ----
+    // Crédito vale só enquanto aquela foto for a capa (a primeira da lista)
+    const credits = new Map();
+    if (editor.dataset.coverCredit && media.firstElementChild) credits.set(media.firstElementChild.dataset.url, { credit: editor.dataset.coverCredit, url: editor.dataset.coverCreditUrl || '' });
+    const creditLine = $('[data-cover-credit-line]');
+    const paintCredit = () => {
+      const c = credits.get($('.media-item', media)?.dataset.url || '');
+      if (!creditLine) return;
+      creditLine.hidden = !c;
+      $('span', creditLine).textContent = c ? c.credit : '';
+    };
+    new MutationObserver(paintCredit).observe(media, { childList: true });
+    const dlg = $('[data-stock-dialog]');
+    if (dlg) {
+      const qIn = $('[data-stock-q]', dlg);
+      const results = $('[data-stock-results]', dlg);
+      const NAMES = { pexels: 'Pexels', pixabay: 'Pixabay' };
+      const runSearch = async () => {
+        const q = qIn.value.trim();
+        if (!q) return qIn.focus();
+        results.innerHTML = '<p class="muted">Buscando…</p>';
+        try {
+          const d = await api(`/fotos/buscar?q=${encodeURIComponent(q)}`);
+          if (!d.items.length) { results.innerHTML = '<p class="muted">Nenhuma foto encontrada. Tente um termo mais curto ou em inglês.</p>'; return; }
+          results.replaceChildren(...d.items.map((ph) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'stock-opt';
+            b.title = `Usar como capa (${ph.author} / ${NAMES[ph.provider]})`;
+            const img = Object.assign(document.createElement('img'), { src: ph.thumb, alt: ph.alt || q, loading: 'lazy' });
+            const cap = document.createElement('span');
+            cap.textContent = `${ph.author} · ${NAMES[ph.provider]}`;
+            b.append(img, cap);
+            b.addEventListener('click', async () => {
+              $$('.stock-opt', results).forEach((x) => { x.disabled = true; });
+              b.classList.add('busy');
+              try {
+                const f = await api('/fotos/baixar', { method: 'POST', body: { photo: ph } });
+                credits.set(f.url, { credit: f.credit, url: f.creditUrl });
+                media.prepend(mediaItem(f.url));
+                paintCredit();
+                dlg.close();
+                toast('📷 Foto definida como capa. Clique em Salvar para gravar.');
+              } catch (err) {
+                toast(`⚠️ ${err.message}`);
+                $$('.stock-opt', results).forEach((x) => { x.disabled = false; });
+                b.classList.remove('busy');
+              }
+            });
+            return b;
+          }));
+        } catch (err) {
+          results.replaceChildren(Object.assign(document.createElement('p'), { className: 'form-error', textContent: err.message }));
+        }
+      };
+      on('[data-stock-open]', 'click', () => {
+        if (!qIn.value) qIn.value = (editor.title?.value || '').replace(/\([^)]*\)/g, '').trim();
+        dlg.showModal();
+        if (qIn.value && !results.children.length) runSearch(); else qIn.focus();
+      });
+      on('[data-stock-close]', 'click', () => dlg.close());
+      $('[data-stock-go]', dlg).addEventListener('click', runSearch);
+      qIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runSearch(); } }); // não envia o formulário da receita
+      dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // clique fora fecha
+    }
+
     const dz = $('[data-dropzone]');
     ['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('over'); }));
     ['dragleave', 'drop'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('over'); }));
@@ -328,6 +394,9 @@
       const items = $$('.media-item', media).map((li) => ({ url: li.dataset.url, caption: $('.media-caption', li).value }));
       data.cover = items[0]?.url || '';
       data.images = items.slice(1);
+      const cc = credits.get(data.cover);
+      data.cover_credit = cc ? cc.credit : '';
+      data.cover_credit_url = cc ? cc.url : '';
       data.steps = $$('.step-item', steps).map((li) => ({
         text: $('.step-text', li).value.trim(),
         group: $('.step-group', li).value.trim(),

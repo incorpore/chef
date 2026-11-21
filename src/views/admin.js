@@ -161,12 +161,12 @@ function field(label, html, hint = '') {
   return `<label class="field"><span>${label}</span>${html}${hint ? `<small>${hint}</small>` : ''}</label>`;
 }
 
-function editor({ user, recipe, categories, products }) {
+function editor({ user, recipe, categories, products, stockReady = false }) {
   const r = recipe || { title: '', images: [], ingredients: [], steps: [], tags: [], diets: [], servings: 4, servings_unit: 'porções', difficulty: 2, status: 'draft', nutrition: null, video: null };
   const linked = new Set((r.products || []).map((p) => p.id));
   const n = r.nutrition || {};
   const body = `
-  <form class="editor" data-editor data-id="${r.id || ''}" data-published="${r.status === 'published' ? 1 : 0}" data-admin="${user.role === 'admin' ? 1 : 0}">
+  <form class="editor" data-editor data-id="${r.id || ''}" data-published="${r.status === 'published' ? 1 : 0}" data-admin="${user.role === 'admin' ? 1 : 0}" data-cover-credit="${esc(r.cover_credit || '')}" data-cover-credit-url="${esc(r.cover_credit_url || '')}">
     <header class="admin-head sticky">
       <h1>${r.id ? 'Editar receita' : 'Nova receita'} ${r.code ? codeCopy(r.code) : ''}</h1>
       <div>
@@ -190,6 +190,12 @@ function editor({ user, recipe, categories, products }) {
             <input type="file" accept="image/*,video/*" multiple data-file-input hidden>
             <p>${icon('download')} Arraste fotos/vídeos aqui ou <button type="button" class="link" data-pick-files>escolha arquivos</button>. A primeira foto é a capa. Imagens são otimizadas antes do envio.</p>
           </div>
+          <div class="stock-editor-row">
+            ${stockReady
+    ? `<button type="button" class="btn btn-sm" data-stock-open>${icon('search')} Buscar foto grátis</button><small class="muted">Pexels e Pixabay · uso comercial liberado · crédito automático</small>`
+    : user.role === 'admin' ? `<a class="btn btn-ghost btn-sm" href="/admin/fotos">${icon('search')} Ativar busca de fotos grátis</a><small class="muted">Configure uma chave grátis do Pexels ou Pixabay</small>` : ''}
+          </div>
+          <p class="cover-credit-line" data-cover-credit-line ${r.cover_credit ? '' : 'hidden'}>📷 <span>${esc(r.cover_credit || '')}</span></p>
           <ul class="media-list" data-media>${[r.cover ? { url: r.cover, caption: '' } : null, ...r.images].filter(Boolean).map((m) => mediaItem(m)).join('')}</ul>
           ${field('Vídeo', `<input name="video" value="${esc(r.video?.url || '')}" placeholder="Link do YouTube, Vimeo, TikTok, Instagram ou envie um arquivo acima">`, 'Vídeos enviados acima preenchem este campo automaticamente.')}
         </section>
@@ -255,6 +261,12 @@ function editor({ user, recipe, categories, products }) {
         </section>
       </aside>
     </div>
+  <dialog class="stock-dialog" data-stock-dialog aria-labelledby="stock-dialog-title">
+    <div class="stock-dialog-head"><h2 id="stock-dialog-title">Buscar foto grátis</h2><button type="button" class="icon-btn" data-stock-close aria-label="Fechar">${icon('x')}</button></div>
+    <div class="stock-q stock-dialog-q"><input type="search" data-stock-q aria-label="O que buscar" placeholder="Ex.: bolo de cenoura"><button type="button" class="btn btn-primary btn-sm" data-stock-go>Buscar</button></div>
+    <p class="hint">Dica: termos curtos funcionam melhor ("bolo de cenoura", "feijoada"). Em inglês costuma haver mais opções ("carrot cake").</p>
+    <div class="stock-grid stock-dialog-grid" data-stock-results></div>
+  </dialog>
   </form>
 <dialog class="paste-dialog"><form method="dialog"><h3>Colar modo de preparo</h3><p>Um passo por linha (numeração é removida). “## Cobertura” cria grupos.</p><textarea rows="12" data-paste-text></textarea><div><button class="btn" value="cancel">Cancelar</button> <button class="btn btn-primary" value="ok" data-paste-ok>Substituir passos</button></div></form></dialog>`;
   return adminLayout({ title: r.id ? `Editar: ${r.title}` : 'Nova receita', user, active: r.id ? 'recipes' : 'new', body });

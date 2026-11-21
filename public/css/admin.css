@@ -381,3 +381,14 @@ td.row-actions > * + * { margin-left: 10px; }
 .stock-done > div { display: grid; gap: 2px; min-width: 0; }
 .stock-done small { color: var(--ink-3); }
 .stock-done-actions { display: flex; gap: 14px; align-items: center; font-size: .9rem; }
+
+/* Editor: foto grátis */
+.stock-editor-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 10px 0 4px; }
+.cover-credit-line { margin: 6px 0 0; font-size: .85rem; color: var(--ink-2); }
+.stock-dialog { width: min(920px, calc(100vw - 24px)); max-height: calc(100vh - 32px); padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink); box-shadow: 0 30px 80px rgb(0 0 0 / .3); }
+.stock-dialog::backdrop { background: rgb(20 15 10 / .55); }
+.stock-dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+.stock-dialog-head h2 { margin: 0; font-size: 1.3rem; }
+.stock-dialog-q { margin-bottom: 6px; }
+.stock-dialog-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); margin-top: 10px; }
+@media (max-width: 560px) { .stock-dialog { padding: 14px; } .stock-dialog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

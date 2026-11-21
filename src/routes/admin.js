@@ -54,13 +54,13 @@ router.get('/perfil', (req, res) => {
   res.send(v.profilePage({ user: req.user, stats: { published: st.published || 0, drafts: st.drafts || 0, views: st.views || 0 }, activity }));
 });
 router.get('/receitas', (req, res) => res.send(v.recipeList({ user: req.user, categories: recipes.categories() })));
-router.get('/receitas/nova', (req, res) => res.send(v.editor({ user: req.user, recipe: null, categories: recipes.categories(), products: products() })));
+router.get('/receitas/nova', (req, res) => res.send(v.editor({ user: req.user, recipe: null, categories: recipes.categories(), products: products(), stockReady: require('../stock').configured() })));
 router.get('/receitas/:id', (req, res, next) => {
   const r = recipes.getById(Number(req.params.id) || 0);
   if (!r) return next();
   if (!auth.canEditRecipe(req.user, r)) return res.status(403).send(v.forbidden({ user: req.user }));
   r.products = recipes.products(r.id);
-  res.send(v.editor({ user: req.user, recipe: r, categories: recipes.categories(), products: products() }));
+  res.send(v.editor({ user: req.user, recipe: r, categories: recipes.categories(), products: products(), stockReady: require('../stock').configured() }));
 });
 router.get('/importar', (req, res) => {
   // Também é o destino do "Compartilhar" do PWA (share_target): a URL pode vir em url ou dentro de text.

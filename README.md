@@ -52,6 +52,7 @@ Botões só com ícone (👍 👎) na receita, com a contagem ao lado. Um voto p
 **Painel → Fotos automáticas** encontra fotos para as receitas que ainda não têm imagem, em bancos gratuitos com licença para uso comercial:
 - **Com revisão:** para cada receita aparecem algumas opções e você toca na que combina. Dá para mudar o termo da busca ou pular.
 - **Automático:** coloca a primeira foto encontrada em todas, em segundo plano, respeitando os limites gratuitos (Pixabay 100/min, Pexels 200/h).
+- **No editor:** o botão **"Buscar foto grátis"** (autores também podem usar) abre a busca já com o nome da receita; a foto escolhida entra como capa, mesmo numa receita ainda não salva.
 - A foto é **baixada** para o servidor (vira WebP/AVIF) e a receita mostra o **crédito do fotógrafo**. Se você trocar a foto depois, o crédito some.
 - As chaves (grátis) ficam em `data/stock-keys.json` (600) ou nas variáveis `PEXELS_API_KEY` / `PIXABAY_API_KEY`. O servidor só baixa imagens dos servidores do Pexels e do Pixabay.
 
@@ -124,7 +125,7 @@ Acesse `/admin` para criar a conta de administrador. Em produção, o primeiro a
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | Servidor com recarga automática |
-| `npm test` | 106 testes: funcionalidades, **segurança (ataques)** e **SEO** |
+| `npm test` | 108 testes: funcionalidades, **segurança (ataques)** e **SEO** |
 | `npm run stress` | Teste de carga e de limites da API (2.000 receitas, 32 conexões) |
 | `npm run audit:secrets` | Procura senhas/chaves vazadas nos arquivos **e no histórico do Git** |
 | `sh scripts/smoke-test.sh IMAGEM` | Testa a imagem Docker como se fosse o ZimaOS (instalação, login, upload, reinício) |
