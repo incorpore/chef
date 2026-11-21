@@ -6,14 +6,17 @@
 const { execSync } = require('node:child_process');
 
 const PATTERNS = [
-  ['Chave privada', /-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/],
+  // Cabeçalho SEGUIDO do conteúdo da chave (base64), cru ou dentro de JSON ("\\n"); só o cabeçalho (ex.: um padrão
+  // de validação no código) não é uma chave
+  ['Chave privada', /-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----(\s|\\n)+[A-Za-z0-9+/=]{40,}/],
   ['AWS Access Key', /\bAKIA[0-9A-Z]{16}\b/],
   ['Google API Key', /\bAIza[0-9A-Za-z_-]{35}\b/],
   ['Stripe live key', /\b(sk|rk)_live_[0-9a-zA-Z]{20,}\b/],
   ['GitHub token', /\b(ghp|gho|ghu|ghs|ghr)_[0-9A-Za-z]{36}\b/],
   ['Slack token', /\bxox[abpr]-[0-9A-Za-z-]{20,}\b/],
   ['Chave de API do Chef', /\bchef_[A-Za-z0-9_-]{32}\b/],
-  ['Senha em variável', /\b(PASSWORD|SENHA|SECRET|TOKEN|API_KEY)\s*[:=]\s*["'][^"'\s]{8,}["']/i],
+  // Endereço https:// não é senha (endereços com senha embutida são pegos por "URL com senha")
+  ['Senha em variável', /\b(PASSWORD|SENHA|SECRET|TOKEN|API_KEY)\s*[:=]\s*["'](?!https?:\/\/)[^"'\s]{8,}["']/i],
   ['URL com senha', /\b[a-z]+:\/\/[^\s:/@]+:[^\s:/@]{6,}@[^\s]+/i],
 ];
 const SENSITIVE_FILES = /(^|\/)\.env($|\.(?!example))|\.(db|sqlite3?|pem|key|p12|pfx)$|(^|\/)data\/|id_rsa|\.secret$/;

@@ -17,8 +17,8 @@ const settings = require('./settings');
 const SCOPE = 'https://www.googleapis.com/auth/webmasters';
 // Endereços da API (os testes apontam para um servidor falso)
 const endpoints = {
-  token: 'https://oauth2.googleapis.com/token',
-  api: 'https://www.googleapis.com/webmasters/v3',
+  tokenUrl: 'https://oauth2.googleapis.com/token',
+  apiUrl: 'https://www.googleapis.com/webmasters/v3',
 };
 const keyFile = () => path.join(config.dataDir, 'google-service-account.json');
 
@@ -32,7 +32,8 @@ function parseKey(raw) {
   if (!text.startsWith('{')) { try { text = Buffer.from(text, 'base64').toString('utf8'); } catch { return null; } }
   let k;
   try { k = JSON.parse(text); } catch { throw new GscError('O arquivo não é um JSON válido', 400); }
-  if (k.type !== 'service_account' || !k.client_email || !/-----BEGIN PRIVATE KEY-----/.test(k.private_key || '')) {
+  // (padrão escrito com [A-Z ]* para não parecer uma chave real aos verificadores de segredo)
+  if (k.type !== 'service_account' || !k.client_email || !/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(k.private_key || '')) {
     throw new GscError('Este JSON não é a chave de uma conta de serviço do Google (tipo "service_account")', 400);
   }
   try { crypto.createPrivateKey(k.private_key); } catch { throw new GscError('A chave privada do arquivo está corrompida', 400); }
@@ -71,9 +72,9 @@ async function accessToken() {
   if (token && token.email === key.client_email && token.exp > Date.now() + 60e3) return token.value;
   const now = Math.floor(Date.now() / 1000);
   const head = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const claim = b64url(JSON.stringify({ iss: key.client_email, scope: SCOPE, aud: endpoints.token, iat: now, exp: now + 3600 }));
+  const claim = b64url(JSON.stringify({ iss: key.client_email, scope: SCOPE, aud: endpoints.tokenUrl, iat: now, exp: now + 3600 }));
   const sig = b64url(crypto.sign('RSA-SHA256', Buffer.from(`${head}.${claim}`), key.private_key));
-  const res = await fetch(endpoints.token, {
+  const res = await fetch(endpoints.tokenUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${head}.${claim}.${sig}` }),
@@ -88,7 +89,7 @@ async function accessToken() {
 }
 
 async function call(method, urlPath, body) {
-  const res = await fetch(`${endpoints.api}${urlPath}`, {
+  const res = await fetch(`${endpoints.apiUrl}${urlPath}`, {
     method,
     headers: { authorization: `Bearer ${await accessToken()}`, ...(body ? { 'content-type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,

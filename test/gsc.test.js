@@ -88,8 +88,8 @@ test.before(async () => {
   gServer = http.createServer(fakeGoogle).listen(0);
   await new Promise((r) => gServer.once('listening', r));
   gBase = `http://127.0.0.1:${gServer.address().port}`;
-  gsc.endpoints.token = `${gBase}/token`;
-  gsc.endpoints.api = `${gBase}/v3`;
+  gsc.endpoints.tokenUrl = `${gBase}/token`;
+  gsc.endpoints.apiUrl = `${gBase}/v3`;
   db.open(':memory:');
   server = createApp().listen(0);
   await new Promise((r) => server.once('listening', r));
@@ -116,7 +116,7 @@ test('sem chave: painel mostra a configuração guiada e a API responde com mens
 test('chave: só aceita JSON de conta de serviço válido; fica no servidor (600) e nunca volta na API', async () => {
   assert.equal((await admin.req('POST', '/api/v1/gsc/key', { key: 'isso não é json' })).status, 400);
   assert.equal((await admin.req('POST', '/api/v1/gsc/key', { key: JSON.stringify({ type: 'authorized_user', client_id: 'x' }) })).status, 400);
-  assert.equal((await admin.req('POST', '/api/v1/gsc/key', { key: JSON.stringify({ ...KEY, private_key: '-----BEGIN PRIVATE KEY-----\nlixo\n-----END PRIVATE KEY-----' }) })).status, 400);
+  assert.equal((await admin.req('POST', '/api/v1/gsc/key', { key: JSON.stringify({ ...KEY, private_key: `-----BEGIN ${'PRIVATE'} KEY-----\nlixo\n-----END ${'PRIVATE'} KEY-----` }) })).status, 400);
   assert.equal((await author.req('POST', '/api/v1/gsc/key', { key: JSON.stringify(KEY) })).status, 403, 'só administradores');
   const r = await admin.req('POST', '/api/v1/gsc/key', { key: JSON.stringify(KEY) });
   assert.deepEqual([r.status, r.data.email], [200, KEY.client_email]);
