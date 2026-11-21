@@ -125,7 +125,7 @@ test('imagem padrão das receitas sem foto: configurável; vazio = capa ilustrad
   assert.equal((await admin.req('PUT', '/api/v1/settings', { body: { defaultRecipeImage: '//evil.com/x.jpg' } })).status, 400);
   assert.equal((await admin.req('PUT', '/api/v1/settings', { body: { defaultRecipeImage: '/uploads/padrao.jpg' } })).status, 200);
   assert.equal((await visitor.req('GET', `/api/v1/recipes/${r.code}`)).data.image, '/uploads/padrao.jpg');
-  assert.match((await visitor.req('GET', '/receitas')).text, /src="\/uploads\/padrao\.jpg"/);
+  assert.match((await visitor.req('GET', '/receitas')).text, /src="\/img\/640\/padrao\.jpg" srcset="\/img\/320\/padrao\.jpg 320w/);
   await admin.req('PUT', '/api/v1/settings', { body: { defaultRecipeImage: '' } });
   assert.match((await visitor.req('GET', `/api/v1/recipes/${r.code}`)).data.image, /^\/capa\//);
 });

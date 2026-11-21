@@ -180,7 +180,7 @@ test('upload de imagem e bloqueio de tipos inválidos', async () => {
   fd.append('files', new Blob([png], { type: 'image/png' }), 'foto.png');
   let r = await req('POST', '/api/v1/uploads', { auth: 'key', body: fd });
   assert.equal(r.status, 201);
-  assert.match(r.data.files[0].url, /^\/uploads\/.+\.png$/);
+  assert.match(r.data.files[0].url, /^\/uploads\/.+\.webp$/, 'foto convertida para WebP');
   const file = await req('GET', r.data.files[0].url, { auth: 'none', raw: true });
   assert.equal(file.status, 200);
   fd = new FormData();

@@ -72,7 +72,14 @@ printf '\211PNG\r\n\032\n\000\000\000\rIHDR\000\000\000\001\000\000\000\001\010\
 UP="$(curl -fsS -b "$JAR" -H "origin: $BASE" -F "files=@$DIR/foto.png;type=image/png" "$BASE/api/v1/uploads")" || fail "upload"
 URL="$(echo "$UP" | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')"
 curl -fsS -o /dev/null "$BASE$URL" || fail "foto enviada não abre"
-ok "upload de foto funcionando ($URL)"
+case "$URL" in *.webp) ;; *) fail "foto não foi convertida para WebP (biblioteca de imagens não carregou?)";; esac
+ok "upload de foto funcionando e convertido para WebP ($URL)"
+FILE="${URL#/uploads/}"
+CT="$(curl -fsS -o /dev/null -w '%{content_type}' -H 'accept: image/avif,image/webp' "$BASE/img/160/$FILE")" || fail "versão redimensionada não abre"
+[ "$CT" = "image/avif" ] || fail "versão redimensionada deveria ser AVIF (veio: $CT)"
+CT="$(curl -fsS -o /dev/null -w '%{content_type}' -H 'accept: image/webp' "$BASE/img/160/$FILE")"
+[ "$CT" = "image/webp" ] || fail "versão redimensionada deveria ser WebP (veio: $CT)"
+ok "fotos redimensionadas em AVIF e WebP (sharp funcionando no Alpine)"
 
 docker restart "$NAME" >/dev/null
 i=0; until [ "$(docker inspect -f '{{.State.Health.Status}}' "$NAME")" = "healthy" ]; do i=$((i+1)); [ $i -gt 60 ] && fail "não voltou após reiniciar"; sleep 1; done
@@ -82,7 +89,7 @@ curl -fsS -o /dev/null "$BASE$URL" || fail "foto perdida após reiniciar"
 ok "após reiniciar: receita, foto e login continuam lá (dados persistentes)"
 
 as_root test -f "$DIR/AppData/chef/data/chef.db" || fail "banco não está na pasta montada"
-as_root ls "$DIR/AppData/chef/uploads" | grep -q png || fail "foto não está na pasta montada"
+as_root ls "$DIR/AppData/chef/uploads" | grep -q webp || fail "foto não está na pasta montada"
 [ "$(as_root stat -c %u "$DIR/AppData/chef/data")" = "1000" ] || fail "pasta de dados sem o dono correto"
 ok "banco e fotos gravados nas pastas do host (backup fácil)"
 

@@ -1,6 +1,7 @@
 'use strict';
 const u = require('../util');
 const { icon } = require('./layout');
+const images = require('../images');
 
 const esc = u.esc;
 const DIFFICULTY = { 1: 'Fácil', 2: 'Média', 3: 'Difícil' };
@@ -11,9 +12,12 @@ function stars(avg, count) {
   return `<span class="stars" title="${avg} de 5 (${count} avaliações)" aria-label="${avg} de 5">${'★'.repeat(full)}${'☆'.repeat(5 - full)}<small>${String(avg).replace('.', ',')}</small></span>`;
 }
 
-function thumb(src, alt, { w = 600, h = 450, eager = false } = {}) {
+/** Foto com srcset: o navegador escolhe o tamanho certo (WebP/AVIF) para a tela. `sizes`/`max` dizem quanto ela ocupa. */
+const CARD_SIZES = '(max-width: 560px) 50vw, (max-width: 900px) 33vw, 300px';
+function thumb(src, alt, { w = 600, h = 450, eager = false, sizes = CARD_SIZES, max = 640 } = {}) {
   if (!src) return `<div class="ph" aria-hidden="true">${icon('chef')}</div>`;
-  return `<img src="${esc(src)}" alt="${esc(alt)}" width="${w}" height="${h}" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">`;
+  const a = images.attrs(src, { sizes, max });
+  return `<img src="${esc(a.src)}"${a.srcset ? ` srcset="${esc(a.srcset)}" sizes="${esc(a.sizes)}"` : ''} alt="${esc(alt)}" width="${w}" height="${h}" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">`;
 }
 
 /** Código da receita com botão de copiar ao lado (ícone vira ✓ ao copiar). */

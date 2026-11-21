@@ -31,6 +31,13 @@
     toastTimer = setTimeout(() => el.classList.remove('show'), ms);
   }
 
+  // Foto enviada ao site → versão redimensionada (WebP/AVIF) do tamanho pedido; outras URLs ficam iguais
+  const IMG_W = [160, 320, 480, 640, 960, 1280, 1920];
+  const img = (url, w = 320) => {
+    if (typeof url !== 'string' || !/^\/uploads\/[A-Za-z0-9_-][A-Za-z0-9._-]*\.(jpe?g|png|webp|gif|avif)$/i.test(url)) return url || '';
+    return `/img/${IMG_W.find((x) => x >= w) || 1920}/${url.slice(9)}`;
+  };
+
   async function api(path, opts = {}) {
     const res = await fetch(`/api/v1${path}`, {
       credentials: 'same-origin',
@@ -332,7 +339,7 @@
       input._t = setTimeout(() => {
         fetch(`/api/v1/search/suggest?q=${encodeURIComponent(q)}`, { signal: ctl.signal }).then((r) => r.json()).then(({ items }) => {
           if (!items.length) return close();
-          box.innerHTML = items.map((r) => `<a href="/receita/${esc(r.slug)}">${r.image || r.cover ? `<img src="${esc(r.image || r.cover)}" alt="" loading="lazy">` : '<span class="ph-sm"></span>'}<span>${esc(r.title)}</span><small>#${esc(r.code)}</small></a>`).join('');
+          box.innerHTML = items.map((r) => `<a href="/receita/${esc(r.slug)}">${r.image || r.cover ? `<img src="${esc(img(r.image || r.cover, 160))}" alt="" loading="lazy">` : '<span class="ph-sm"></span>'}<span>${esc(r.title)}</span><small>#${esc(r.code)}</small></a>`).join('');
           box.hidden = false;
           idx = -1;
         }).catch(() => {});
@@ -546,7 +553,7 @@
     }
     if (items.length) {
       items.sort((a, b) => b.updatedAt - a.updatedAt);
-      $('.hscroll', cont).innerHTML = items.slice(0, 8).map((p) => `<article class="card"><a class="card-link" href="/receita/${esc(p.slug)}"><div class="card-media">${p.cover ? `<img src="${esc(p.cover)}" alt="" loading="lazy">` : '<div class="ph"></div>'}</div><div class="card-body"><span class="card-cat">Passo ${p.current + 1} de ${p.total}</span><h3>${esc(p.title)}</h3><div class="timeline-bar"><span class="tl-cook" style="flex:${p.steps.length}"></span><span style="flex:${p.total - p.steps.length};background:var(--line)"></span></div></div></a></article>`).join('');
+      $('.hscroll', cont).innerHTML = items.slice(0, 8).map((p) => `<article class="card"><a class="card-link" href="/receita/${esc(p.slug)}"><div class="card-media">${p.cover ? `<img src="${esc(img(p.cover, 480))}" alt="" loading="lazy">` : '<div class="ph"></div>'}</div><div class="card-body"><span class="card-cat">Passo ${p.current + 1} de ${p.total}</span><h3>${esc(p.title)}</h3><div class="timeline-bar"><span class="tl-cook" style="flex:${p.steps.length}"></span><span style="flex:${p.total - p.steps.length};background:var(--line)"></span></div></div></a></article>`).join('');
       cont.hidden = false;
     }
   }
@@ -555,5 +562,5 @@
   renderTimers();
   layoutFloats();
 
-  window.Chef = { $, $$, esc, store, toast, api, favs, paintFavs, shopping, planner, dateKey, fmtQty, unitLabel, timers, fmtTime, share, beep, density, norm, track, layoutFloats, copyText };
+  window.Chef = { img, $, $$, esc, store, toast, api, favs, paintFavs, shopping, planner, dateKey, fmtQty, unitLabel, timers, fmtTime, share, beep, density, norm, track, layoutFloats, copyText };
 })();

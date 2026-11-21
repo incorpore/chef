@@ -301,8 +301,9 @@ async function downloadImage(remote, userId = null) {
     if (!mime || !mime.startsWith('image/')) return remote;
     const name = `${Date.now().toString(36)}-${crypto.randomBytes(8).toString('hex')}${sec.EXT_BY_MIME[mime]}`;
     fs.writeFileSync(path.join(config.uploadsDir, name), buffer);
-    db.get().prepare('INSERT INTO uploads (filename, mime, size, original_name, user_id) VALUES (?, ?, ?, ?, ?)').run(name, mime, buffer.length, remote.slice(0, 200), userId);
-    return `/uploads/${name}`;
+    const opt = await require('./images').optimizeUpload(name, mime); // WebP leve, sem metadados
+    db.get().prepare('INSERT INTO uploads (filename, mime, size, original_name, user_id) VALUES (?, ?, ?, ?, ?)').run(opt.name, opt.mime, opt.size || buffer.length, remote.slice(0, 200), userId);
+    return `/uploads/${opt.name}`;
   } catch {
     return remote;
   }

@@ -54,6 +54,21 @@ function createApp() {
     res.sendFile(path.join(config.root, 'public', 'sw.js'));
   });
   app.use(express.static(path.join(config.root, 'public'), { maxAge: config.isProd ? '7d' : 0, index: false, dotfiles: 'deny', redirect: false }));
+  // Fotos redimensionadas sob demanda: /img/640/arquivo.jpg → AVIF (se o navegador aceitar) ou WebP; ?f=jpg força JPEG
+  app.get('/img/:w/:file', async (req, res, next) => {
+    try {
+      const images = require('./images');
+      const width = Number(req.params.w);
+      const forced = req.query.f === 'jpg';
+      const format = forced ? 'jpeg' : /image\/avif/.test(req.get('accept') || '') ? 'avif' : 'webp';
+      const file = await images.variant(req.params.file, width, format);
+      if (!file) return res.redirect(302, `/uploads/${encodeURIComponent(req.params.file)}`); // sem versão: entrega o original (ou 404 lá)
+      if (!forced) res.setHeader('Vary', 'Accept');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.type(format === 'jpeg' ? 'image/jpeg' : `image/${format}`);
+      res.sendFile(file, { dotfiles: 'allow' });
+    } catch (e) { next(e); }
+  });
   app.use('/uploads', express.static(config.uploadsDir, {
     maxAge: '30d', immutable: true, index: false, dotfiles: 'deny', redirect: false, fallthrough: false,
     setHeaders: (res, file) => {

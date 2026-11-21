@@ -71,6 +71,12 @@ Basta colar os IDs; os scripts são inseridos automaticamente:
 - **Newsletter**: duplo opt‑in, e‑mail de boas‑vindas, envio de receitas pelo painel com prévia de teste, barra de progresso, envio controlado (`MAIL_RATE_PER_MIN`), retomada e descadastro em 1 clique (RFC 8058).
 - Botão **"Enviar e‑mail de teste"** no painel, com mensagens de erro em português. Veja o passo 8 de [zimaos/LEIA-ME.md](zimaos/LEIA-ME.md).
 
+### Imagens leves (WebP/AVIF) e no tamanho certo
+- Toda foto enviada vira **WebP** (qualidade 82, visualmente igual), girada conforme a câmera, **sem metadados** (inclusive a localização GPS do celular) e com no máximo 2560 px. GIF animado é mantido.
+- As páginas pedem a foto em **vários tamanhos** (`srcset`: 320 a 1920 px). O celular baixa a pequena, o computador a grande, e o navegador recebe **AVIF** (o formato mais leve) quando aceita, senão WebP. As versões ficam em cache no disco (`uploads/.cache`) e no navegador por 1 ano.
+- Fotos enviadas antes desta versão também saem otimizadas, sem converter nada. Para gerar tudo de uma vez: `node scripts/optimize-images.js`.
+- Compartilhamento (WhatsApp/Facebook), Google, RSS e e‑mails recebem JPEG, que todos aceitam.
+
 ### PWA
 O PWA tem manifest, ícones *maskable*, atalhos e service worker com offline: as receitas visitadas e favoritadas ficam disponíveis sem internet. A interface tem barra de abas no estilo app nativo, tema claro/escuro e convite de instalação.
 
@@ -96,11 +102,12 @@ Acesse `/admin` para criar a conta de administrador. Em produção, o primeiro a
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | Servidor com recarga automática |
-| `npm test` | 86 testes: funcionalidades, **segurança (ataques)** e **SEO** |
+| `npm test` | 93 testes: funcionalidades, **segurança (ataques)** e **SEO** |
 | `npm run stress` | Teste de carga e de limites da API (2.000 receitas, 32 conexões) |
 | `npm run audit:secrets` | Procura senhas/chaves vazadas nos arquivos **e no histórico do Git** |
 | `sh scripts/smoke-test.sh IMAGEM` | Testa a imagem Docker como se fosse o ZimaOS (instalação, login, upload, reinício) |
 | `node scripts/reset-password.js EMAIL` | Redefine uma senha esquecida |
+| `node scripts/optimize-images.js` | Gera as versões leves (AVIF/WebP) de todas as fotos já enviadas |
 
 Segurança: veja **[SECURITY.md](SECURITY.md)** (checklist de 21 itens com a prova de cada um).
 

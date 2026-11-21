@@ -545,7 +545,7 @@ const upload = multer({
 });
 
 /** Confere o conteúdo real (assinatura do arquivo), renomeia com a extensão correta e registra o dono. */
-function finalizeUpload(file, userId) {
+async function finalizeUpload(file, userId) {
   const tmp = path.join(config.uploadsDir, file.filename);
   const fd = fs.openSync(tmp, 'r');
   const head = Buffer.alloc(16);
@@ -556,22 +556,27 @@ function finalizeUpload(file, userId) {
     fs.rmSync(tmp, { force: true });
     return null;
   }
-  const name = file.filename.replace(/\.tmp$/, sec.EXT_BY_MIME[mime]);
+  let name = file.filename.replace(/\.tmp$/, sec.EXT_BY_MIME[mime]);
   fs.renameSync(tmp, path.join(config.uploadsDir, name));
-  db.get().prepare('INSERT INTO uploads (filename, mime, size, original_name, user_id) VALUES (?, ?, ?, ?, ?)').run(name, mime, file.size, sec.cleanText(file.originalname, 200), userId);
-  return { url: `/uploads/${name}`, type: mime.startsWith('video/') ? 'video' : 'image', size: file.size, name: sec.cleanText(file.originalname, 200) };
+  // Fotos viram WebP leve, sem metadados (GPS) e no máximo 2560 px; vídeos ficam como estão
+  const opt = await require('../images').optimizeUpload(name, mime);
+  name = opt.name;
+  if (opt.mime.startsWith('image/')) require('../images').warm(name); // tamanhos mais usados, em segundo plano
+  const size = opt.size || file.size;
+  db.get().prepare('INSERT INTO uploads (filename, mime, size, original_name, user_id) VALUES (?, ?, ?, ?, ?)').run(name, opt.mime, size, sec.cleanText(file.originalname, 200), userId);
+  return { url: `/uploads/${name}`, type: opt.mime.startsWith('video/') ? 'video' : 'image', size, originalSize: file.size, name: sec.cleanText(file.originalname, 200) };
 }
 
-router.post('/uploads', auth.requireUser, rateLimit('upload', 60, 60e3), upload.array('files', 20), (req, res) => {
+router.post('/uploads', auth.requireUser, rateLimit('upload', 60, 60e3), upload.array('files', 20), wrap(async (req, res) => {
   const files = [];
   let rejected = 0;
   for (const f of req.files || []) {
-    const out = finalizeUpload(f, req.user.id);
+    const out = await finalizeUpload(f, req.user.id);
     if (out) files.push(out); else rejected++;
   }
   if (!files.length) return res.status(rejected ? 415 : 400).json({ error: rejected ? 'O conteúdo do arquivo não é uma imagem/vídeo válido' : 'Nenhum arquivo enviado (campo "files")' });
   res.status(201).json({ files, rejected });
-});
+}));
 
 router.post('/uploads/from-url', auth.requireUser, rateLimit('upload', 60, 60e3), wrap(async (req, res) => {
   const url = await importer.downloadImage(String(req.body?.url || '').slice(0, 2000), req.user.id);
@@ -590,6 +595,7 @@ router.delete('/uploads/:id', auth.requireUser, (req, res) => {
   const row = db.get().prepare('SELECT * FROM uploads WHERE id = ?').get(idParam(req.params.id));
   if (!row || (!isAdmin(req) && row.user_id !== req.user.id)) return notFound(res, 'Arquivo não encontrado');
   fs.rmSync(path.join(config.uploadsDir, path.basename(row.filename)), { force: true });
+  require('../images').purge(path.basename(row.filename));
   db.get().prepare('DELETE FROM uploads WHERE id = ?').run(row.id);
   res.json({ ok: true });
 });

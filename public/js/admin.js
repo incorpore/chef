@@ -96,7 +96,7 @@
     const load = async () => {
       const q = new URLSearchParams({ ...filterNow(), page, perPage: 50, sort: f.q.value ? '' : 'updated' });
       res = await api(`/recipes?${q}`);
-      rows.innerHTML = res.items.map((r) => `<tr><td class="col-check"><input type="checkbox" data-check="${r.id}" aria-label="Selecionar ${esc(r.title)}"></td><td>${r.image || r.cover ? `<img class="thumb" src="${esc(r.image || r.cover)}" alt="" loading="lazy">` : ''}</td><td><a href="/admin/receitas/${r.id}"><strong>${esc(r.title)}</strong></a>${r.featured ? ' <span title="Em destaque">⭐</span>' : ''}<br><small>${esc(r.category ? `${r.category.icon || ''} ${r.category.name}` : 'Sem categoria')}</small></td><td>${codeCopy(r.code)}</td><td><span class="status status-${r.status}">${r.status === 'published' ? 'Publicada' : 'Rascunho'}</span></td><td>${r.views}${r.likes || r.dislikes ? `<br><small title="Gostei / Não gostei">👍 ${r.likes} · 👎 ${r.dislikes}</small>` : ''}</td><td class="row-actions"><a href="/receita/${esc(r.slug)}" target="_blank">ver</a> <a href="/admin/receitas/${r.id}">editar</a></td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhuma receita</td></tr>';
+      rows.innerHTML = res.items.map((r) => `<tr><td class="col-check"><input type="checkbox" data-check="${r.id}" aria-label="Selecionar ${esc(r.title)}"></td><td>${r.image || r.cover ? `<img class="thumb" src="${esc(window.Chef.img(r.image || r.cover, 160))}" alt="" loading="lazy">` : ''}</td><td><a href="/admin/receitas/${r.id}"><strong>${esc(r.title)}</strong></a>${r.featured ? ' <span title="Em destaque">⭐</span>' : ''}<br><small>${esc(r.category ? `${r.category.icon || ''} ${r.category.name}` : 'Sem categoria')}</small></td><td>${codeCopy(r.code)}</td><td><span class="status status-${r.status}">${r.status === 'published' ? 'Publicada' : 'Rascunho'}</span></td><td>${r.views}${r.likes || r.dislikes ? `<br><small title="Gostei / Não gostei">👍 ${r.likes} · 👎 ${r.dislikes}</small>` : ''}</td><td class="row-actions"><a href="/receita/${esc(r.slug)}" target="_blank">ver</a> <a href="/admin/receitas/${r.id}">editar</a></td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhuma receita</td></tr>';
       $('[data-list-count]').textContent = `${res.total.toLocaleString('pt-BR')} ${res.total === 1 ? 'receita' : 'receitas'}`;
       $('[data-pager]').innerHTML = res.pages > 1 ? `${page > 1 ? '<button class="btn btn-sm" data-page="-1">← Anterior</button>' : ''} <span>Página ${page} de ${res.pages}</span> ${page < res.pages ? '<button class="btn btn-sm" data-page="1">Próxima →</button>' : ''}` : '';
       paintBar();
@@ -578,9 +578,9 @@
     };
     const initials = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
     const paintAvatar = (u) => {
-      const html = u.avatar ? `<img class="avatar avatar-xl" src="${esc(u.avatar)}" alt="">` : `<span class="avatar avatar-initials avatar-xl">${esc(initials(u.name))}</span>`;
+      const html = u.avatar ? `<img class="avatar avatar-xl" src="${esc(window.Chef.img(u.avatar, 320))}" alt="">` : `<span class="avatar avatar-initials avatar-xl">${esc(initials(u.name))}</span>`;
       $('[data-avatar-preview]').innerHTML = html;
-      const small = u.avatar ? `<img class="avatar avatar-xs" src="${esc(u.avatar)}" alt="">` : `<span class="avatar avatar-initials avatar-xs">${esc(initials(u.name))}</span>`;
+      const small = u.avatar ? `<img class="avatar avatar-xs" src="${esc(window.Chef.img(u.avatar, 160))}" alt="">` : `<span class="avatar avatar-initials avatar-xs">${esc(initials(u.name))}</span>`;
       const nav = $('.nav-profile .avatar'); if (nav) nav.outerHTML = small;
       $('[data-avatar-remove]').hidden = !u.avatar;
       $('[data-avatar-pick]').lastChild.textContent = u.avatar ? ' Trocar foto' : ' Adicionar foto';

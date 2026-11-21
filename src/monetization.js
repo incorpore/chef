@@ -48,7 +48,7 @@ function renderProducts(list, { title = 'Utensílios e ingredientes que eu uso',
   const s = settings.all();
   const cards = list.map((p) => `
     <a class="product-card" href="${productLink(p)}" target="_blank" rel="sponsored noopener nofollow">
-      ${p.image ? `<img src="${u.esc(p.image)}" alt="" loading="lazy" width="120" height="120">` : '<div class="product-ph">🛒</div>'}
+      ${p.image ? `<img src="${u.esc(require('./images').sized(p.image, 320))}" alt="" loading="lazy" width="120" height="120">` : '<div class="product-ph">🛒</div>'}
       <span class="product-info">
         ${p.badge ? `<span class="badge">${u.esc(p.badge)}</span>` : ''}
         <strong>${u.esc(p.title)}</strong>

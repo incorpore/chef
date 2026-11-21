@@ -367,7 +367,7 @@ test('upload: tipo falso, HTML/SVG disfarçado, arquivo grande e excesso de arqu
   assert.equal((await send(Array(21).fill([png, 'image/png', 'a.png']))).status, 400, 'mais de 20 arquivos');
   const ok = await send([[png, 'image/png', '../../../etc/evil.png.php']]);
   assert.equal(ok.status, 201);
-  assert.match(ok.data.files[0].url, /^\/uploads\/[a-z0-9]+-[a-f0-9]{16}\.png$/, 'nome aleatório, extensão pelo conteúdo real');
+  assert.match(ok.data.files[0].url, /^\/uploads\/[a-z0-9]+-[a-f0-9]{16}\.webp$/, 'nome aleatório; foto convertida para WebP');
   const file = await stranger.req('GET', ok.data.files[0].url);
   assert.equal(file.status, 200);
   assert.match(file.headers.get('content-security-policy'), /sandbox/);

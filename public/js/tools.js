@@ -3,7 +3,7 @@
   'use strict';
   const { $, $$, esc, store, toast, api, favs, paintFavs, shopping, planner, dateKey, fmtQty, unitLabel, share, density } = window.Chef;
 
-  const miniCard = (r) => `<article class="card"><a class="card-link" href="/receita/${esc(r.slug)}"><div class="card-media">${r.cover ? `<img src="${esc(r.cover)}" alt="" loading="lazy">` : '<div class="ph"></div>'}</div><div class="card-body"><h3>${esc(r.title)}</h3></div></a>
+  const miniCard = (r) => `<article class="card"><a class="card-link" href="/receita/${esc(r.slug)}"><div class="card-media">${r.cover ? `<img src="${esc(window.Chef.img(r.cover, 480))}" alt="" loading="lazy">` : '<div class="ph"></div>'}</div><div class="card-body"><h3>${esc(r.title)}</h3></div></a>
     <button class="fav-btn" data-fav="${r.id}" data-slug="${esc(r.slug)}" data-title="${esc(r.title)}" data-cover="${esc(r.cover || '')}" aria-label="Favoritar"><svg class="ico" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9.2-8.6C1.1 8 3 4.5 6.6 4.5c2 0 3.4 1.1 4.4 2.5 1-1.4 2.4-2.5 4.4-2.5C19 4.5 20.9 8 19.2 11.4 17 15.6 12 20 12 20Z"/></svg></button></article>`;
 
   // ---------------- Favoritos ----------------
@@ -84,14 +84,14 @@
       planEl.innerHTML = ds.map((d) => {
         const k = dateKey(d);
         return `<div class="day${k === today ? ' today' : ''}"><h3><span>${d.toLocaleDateString('pt-BR', { weekday: 'long' })}</span><small>${d.getDate()}/${d.getMonth() + 1}</small></h3>
-          ${MEALS.map(([m, label]) => `<div class="meal"><small>${label}</small>${(plan[k]?.[m] || []).map((r, i) => `<div class="meal-item">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : ''}<a href="/receita/${esc(r.slug)}">${esc(r.title)}</a><button data-meal-remove="${k}|${m}|${i}" aria-label="Remover">✕</button></div>`).join('')}<button class="meal-add" data-meal-add="${k}|${m}">+ adicionar</button></div>`).join('')}</div>`;
+          ${MEALS.map(([m, label]) => `<div class="meal"><small>${label}</small>${(plan[k]?.[m] || []).map((r, i) => `<div class="meal-item">${r.cover ? `<img src="${esc(window.Chef.img(r.cover, 160))}" alt="">` : ''}<a href="/receita/${esc(r.slug)}">${esc(r.title)}</a><button data-meal-remove="${k}|${m}|${i}" aria-label="Remover">✕</button></div>`).join('')}<button class="meal-add" data-meal-add="${k}|${m}">+ adicionar</button></div>`).join('')}</div>`;
       }).join('');
     };
     const dlg = $('.pick-dialog');
     const results = $('[data-pick-results]');
     const search = async (q) => {
       const items = q ? (await api(`/recipes?q=${encodeURIComponent(q)}&perPage=12`)).items : favs.all();
-      results.innerHTML = items.map((r) => `<li><button type="button" data-pick='${esc(JSON.stringify({ id: r.id, slug: r.slug, title: r.title, cover: r.image || r.cover || '' }))}'>${r.image || r.cover ? `<img src="${esc(r.image || r.cover)}" alt="">` : ''}${esc(r.title)}</button></li>`).join('') || '<li class="empty">Busque uma receita (ou favorite algumas para aparecerem aqui)</li>';
+      results.innerHTML = items.map((r) => `<li><button type="button" data-pick='${esc(JSON.stringify({ id: r.id, slug: r.slug, title: r.title, cover: r.image || r.cover || '' }))}'>${r.image || r.cover ? `<img src="${esc(window.Chef.img(r.image || r.cover, 160))}" alt="">` : ''}${esc(r.title)}</button></li>`).join('') || '<li class="empty">Busque uma receita (ou favorite algumas para aparecerem aqui)</li>';
     };
     document.addEventListener('click', (e) => {
       const w = e.target.closest('[data-week]');

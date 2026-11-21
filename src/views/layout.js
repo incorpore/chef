@@ -51,7 +51,7 @@ function icon(name, cls = '') {
 /** Foto do usuário ou, se não houver, as iniciais do nome num círculo colorido. */
 function avatar(user, cls = '') {
   const name = String(user?.name || '?').trim();
-  if (user?.avatar) return `<img class="avatar ${cls}" src="${esc(user.avatar)}" alt="" width="40" height="40" loading="lazy" decoding="async">`;
+  if (user?.avatar) return `<img class="avatar ${cls}" src="${esc(require('../images').sized(user.avatar, 160))}" alt="" width="40" height="40" loading="lazy" decoding="async">`;
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
   return `<span class="avatar avatar-initials ${cls}" aria-hidden="true">${esc(initials)}</span>`;
 }
@@ -79,7 +79,7 @@ function footer(s, user) {
   <div class="wrap">
     <div class="footer-grid">
       <div class="footer-brand">
-        <a class="brand" href="/">${s.logo ? `<img src="${esc(s.logo)}" alt="" width="32" height="32">` : `<span class="brand-mark">${icon('chef')}</span>`}<span>${esc(s.siteName)}</span></a>
+        <a class="brand" href="/">${s.logo ? `<img src="${esc(require('../images').sized(s.logo, 160))}" alt="" width="32" height="32">` : `<span class="brand-mark">${icon('chef')}</span>`}<span>${esc(s.siteName)}</span></a>
         <p>${esc(s.tagline)}</p>
         ${social.length ? `<p class="social">${social.map(([k, v]) => `<a href="${esc(v)}" rel="me noopener" target="_blank">${esc(SOCIAL_LABELS[k] || k)}</a>`).join('')}</p>` : ''}
       </div>
@@ -130,7 +130,7 @@ ${gtmNoscript()}
 <a class="skip" href="#main">Pular para o conteúdo</a>
 <header class="topbar">
   <div class="wrap topbar-in">
-    <a class="brand" href="/">${s.logo ? `<img src="${esc(s.logo)}" alt="" width="32" height="32">` : `<span class="brand-mark">${icon('chef')}</span>`}<span>${esc(s.siteName)}</span></a>
+    <a class="brand" href="/">${s.logo ? `<img src="${esc(require('../images').sized(s.logo, 160))}" alt="" width="32" height="32">` : `<span class="brand-mark">${icon('chef')}</span>`}<span>${esc(s.siteName)}</span></a>
     <form class="search" action="/busca" role="search" autocomplete="off">
       ${icon('search')}
       <input type="search" name="q" placeholder="Buscar receita, ingrediente ou #código" aria-label="Buscar" data-suggest>

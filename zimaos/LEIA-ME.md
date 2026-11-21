@@ -179,6 +179,7 @@ Comandos úteis:
 | Ver se está saudável | `sudo docker ps --filter name=chef` (deve aparecer `healthy`) |
 | Reiniciar | `sudo docker restart chef` |
 | Testar por dentro | `curl http://localhost:8484/healthz` → `{"ok":true,...}` |
+| Gerar versões leves das fotos antigas (opcional, depois de atualizar) | `sudo docker exec -u 1000:1000 chef node scripts/optimize-images.js` |
 | Redefinir senha esquecida | `sudo docker exec -it -u 1000:1000 chef node scripts/reset-password.js seu@email.com` |
 
 ---

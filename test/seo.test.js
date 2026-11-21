@@ -58,7 +58,7 @@ test('página da receita: título, descrição, canonical absoluto, robots e Ope
   assert.equal(link(r.text, 'canonical'), 'https://receitas.exemplo.com.br/receita/bolo-de-fuba');
   assert.match(meta(r.text, 'name', 'robots'), /max-image-preview:large/);
   assert.equal(meta(r.text, 'property', 'og:type'), 'article');
-  assert.equal(meta(r.text, 'property', 'og:image'), 'https://receitas.exemplo.com.br/uploads/bolo.jpg', 'og:image precisa ser absoluta');
+  assert.equal(meta(r.text, 'property', 'og:image'), 'https://receitas.exemplo.com.br/img/1280/bolo.jpg?f=jpg', 'og:image absoluta, em JPEG 1280 px (compatível com WhatsApp/Facebook)');
   assert.equal(meta(r.text, 'property', 'og:locale'), 'pt_BR');
   assert.equal(meta(r.text, 'name', 'twitter:card'), 'summary_large_image');
   assert.equal(meta(r.text, 'name', 'twitter:site'), '@anachef');

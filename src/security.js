@@ -43,7 +43,7 @@ function headers(req, res, next) {
   const embed = req.path.startsWith('/embed/');
   if (req.path.startsWith('/api/v1/')) { // só a API JSON; /api/docs é uma página normal com CSS
     res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
-  } else if (req.path.startsWith('/uploads/')) {
+  } else if (req.path.startsWith('/uploads/') || req.path.startsWith('/img/')) {
     // Arquivos enviados nunca executam nada, mesmo que alguém consiga enviar algo malicioso
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox");
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');

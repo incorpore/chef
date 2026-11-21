@@ -164,7 +164,7 @@ test('receita mostra foto e bio de quem escreveu', async () => {
   await ana.req('PUT', '/api/v1/auth/me', { body: { avatar: '/uploads/ana.jpg', bio: 'Cozinheira de **domingo**' } });
   const r = (await ana.req('POST', '/api/v1/recipes', { body: { title: 'Pudim de leite', ingredients: '1 lata de leite condensado', steps: 'Misture e asse.', status: 'published' } })).data;
   const page = await visitor.req('GET', `/receita/${r.slug}`);
-  assert.match(page.text, /class="byline"><img class="avatar avatar-byline" src="\/uploads\/ana\.jpg"/);
+  assert.match(page.text, /class="byline"><img class="avatar avatar-byline" src="\/img\/160\/ana\.jpg"/);
   assert.match(page.text, /class="author-card"/);
   assert.match(page.text, /<strong>domingo<\/strong>/);
 });

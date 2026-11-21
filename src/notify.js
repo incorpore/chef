@@ -11,7 +11,8 @@ const sha256 = (s) => crypto.createHash('sha256').update(String(s)).digest('hex'
 const newToken = () => crypto.randomBytes(32).toString('base64url');
 const isoIn = (ms) => new Date(Date.now() + ms).toISOString();
 const abs = (path) => `${mail.siteUrl()}${path}`;
-const recipeImage = (r) => (r.cover ? (r.cover.startsWith('/') ? abs(r.cover) : r.cover) : '');
+// E-mail: JPEG (vários leitores de e-mail não mostram WebP/AVIF), 640 px
+const recipeImage = (r) => { const c = r.cover ? require('./images').sized(r.cover, 640, 'jpeg') : ''; return c ? (c.startsWith('/') ? abs(c) : c) : ''; };
 
 /** Dispara um e-mail sem travar a resposta ao visitante (erros vão só para o log). */
 function background(label, fn) {

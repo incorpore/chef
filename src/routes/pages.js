@@ -193,7 +193,7 @@ router.get('/sitemap.xml', (req, res) => {
     `<url><loc>${b}/sobre</loc></url>`,
     ...cats.map((c) => `<url><loc>${b}/categoria/${u.esc(c.slug)}</loc>${c.lastmod ? `<lastmod>${c.lastmod.slice(0, 10)}</lastmod>` : ''}</url>`),
     ...tags.map((t) => `<url><loc>${b}/tag/${u.esc(encodeURIComponent(t.tag))}</loc></url>`),
-    ...rows.map((r) => `<url><loc>${b}/receita/${u.esc(r.slug)}</loc><lastmod>${r.updated_at.slice(0, 10)}</lastmod>${r.cover ? `<image:image><image:loc>${u.esc(r.cover.startsWith('/') ? b + r.cover : r.cover)}</image:loc><image:title>${u.esc(r.title)}</image:title></image:image>` : ''}</url>`),
+    ...rows.map((r) => `<url><loc>${b}/receita/${u.esc(r.slug)}</loc><lastmod>${r.updated_at.slice(0, 10)}</lastmod>${r.cover ? `<image:image><image:loc>${u.esc((c => (c.startsWith('/') ? b + c : c))(require('../images').sized(r.cover, 1280, 'jpeg')))}</image:loc><image:title>${u.esc(r.title)}</image:title></image:image>` : ''}</url>`),
   ];
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">${urls.join('')}</urlset>`);
 });
@@ -205,7 +205,7 @@ router.get('/feed.xml', (req, res) => {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
 <title>${u.esc(s.siteName)}</title><link>${b}/</link><description>${u.esc(s.description)}</description><language>pt-BR</language><atom:link href="${b}/feed.xml" rel="self" type="application/rss+xml"/>
-${items.map((r) => `<item><title>${u.esc(r.title)}</title><link>${b}/receita/${u.esc(r.slug)}</link><guid isPermaLink="false">${u.esc(r.code)}</guid><pubDate>${new Date(r.published_at || r.created_at).toUTCString()}</pubDate><description>${u.esc(r.description)}</description>${r.cover ? `<media:content url="${u.esc(r.cover.startsWith('/') ? b + r.cover : r.cover)}" medium="image"/>` : ''}</item>`).join('\n')}
+${items.map((r) => `<item><title>${u.esc(r.title)}</title><link>${b}/receita/${u.esc(r.slug)}</link><guid isPermaLink="false">${u.esc(r.code)}</guid><pubDate>${new Date(r.published_at || r.created_at).toUTCString()}</pubDate><description>${u.esc(r.description)}</description>${r.cover ? `<media:content url="${u.esc((c => (c.startsWith('/') ? b + c : c))(require('../images').sized(r.cover, 1280, 'jpeg')))}" medium="image"/>` : ''}</item>`).join('\n')}
 </channel></rss>`;
   res.type('application/rss+xml').send(xml);
 });

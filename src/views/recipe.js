@@ -1,5 +1,6 @@
 'use strict';
 const u = require('../util');
+const images = require('../images');
 const { layout, icon, avatar } = require('./layout');
 const c = require('./components');
 const { renderAd, renderProducts, productsForIngredients, productLink } = require('../monetization');
@@ -23,7 +24,7 @@ function jsonLd(r, base) {
     '@type': 'Recipe',
     name: r.title,
     description: r.seo_description || r.description || autoDescription(r),
-    image: [r.cover, ...r.images.map((i) => i.url), r.cover || r.images.length ? '' : r.cover_auto].filter(Boolean).map(abs),
+    image: [r.cover, ...r.images.map((i) => i.url)].filter(Boolean).map((x) => images.sized(x, 1280, 'jpeg')).concat(r.cover || r.images.length ? [] : [r.cover_auto]).filter(Boolean).map(abs),
     author: { '@type': 'Person', name: r.author_name || s.authorName || s.siteName, url: `${base}/sobre` },
     publisher: { '@id': `${base}/#organization` },
     inLanguage: 'pt-BR',
@@ -98,7 +99,7 @@ function stepsHtml(r, links, adEvery) {
         <p>${esc(s.text)}</p>
         ${ings.length ? `<div class="step-ings">${links[i].map((idx) => `<span class="chip" data-ing-ref="${idx}">${esc(r.ingredients[idx].name)}</span>`).join('')}</div>` : ''}
         ${s.timer ? `<button class="timer-btn" data-timer="${s.timer}" data-timer-label="Passo ${i + 1}">${icon('timer')} Timer ${u.formatMinutes(Math.round(s.timer / 60)) || `${s.timer}s`}</button>` : ''}
-        ${s.image ? `<figure class="step-img">${c.thumb(s.image, `Passo ${i + 1}`, { w: 800, h: 600 })}</figure>` : ''}
+        ${s.image ? `<figure class="step-img">${c.thumb(s.image, `Passo ${i + 1}`, { w: 800, h: 600, sizes: '(min-width: 900px) 600px, 90vw', max: 960 })}</figure>` : ''}
       </div>
     </li>`);
     if (ad && (i + 1) % 3 === 0 && i < r.steps.length - 1) out.push(`<li class="step-ad">${ad}</li>`);
@@ -138,7 +139,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
   <div class="progress-rail" aria-hidden="true"><span></span></div>
   <header class="recipe-hero">
     <div class="hero-media">
-      ${gallery.length ? `<div class="gallery" data-gallery>${gallery.map((g, i) => `<figure>${c.thumb(g.url, g.caption || r.title, { w: 1200, h: 900, eager: i === 0 })}${g.caption && i ? `<figcaption>${esc(g.caption)}</figcaption>` : ''}</figure>`).join('')}</div>${gallery.length > 1 ? `<div class="gallery-dots">${gallery.map((_, i) => `<button data-goto="${i}" aria-label="Foto ${i + 1}"></button>`).join('')}</div>` : ''}` : `<div class="ph ph-hero">${icon('chef')}</div>`}
+      ${gallery.length ? `<div class="gallery" data-gallery>${gallery.map((g, i) => `<figure>${c.thumb(g.url, g.caption || r.title, { w: 1200, h: 900, eager: i === 0, sizes: '(min-width: 900px) 50vw, 100vw', max: 1920 })}${g.caption && i ? `<figcaption>${esc(g.caption)}</figcaption>` : ''}</figure>`).join('')}</div>${gallery.length > 1 ? `<div class="gallery-dots">${gallery.map((_, i) => `<button data-goto="${i}" aria-label="Foto ${i + 1}"></button>`).join('')}</div>` : ''}` : `<div class="ph ph-hero">${icon('chef')}</div>`}
       ${r.video ? `<a href="#video" class="chip chip-video hero-video">${icon('play')} Ver vídeo</a>` : ''}
     </div>
     <div class="hero-info">
@@ -270,7 +271,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
     seoTitle: r.seo_title || seoTitle(r),
     description: r.seo_description || r.description || autoDescription(r),
     canonical: `${base}/receita/${r.slug}`,
-    image: r.cover || '',
+    image: r.cover ? images.sized(r.cover, 1280, 'jpeg') : '',
     imageAlt: r.title,
     type: 'article',
     article: { published: r.published_at || r.created_at, modified: r.updated_at, section: r.category?.name, tags: r.tags },
