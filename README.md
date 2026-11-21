@@ -48,6 +48,13 @@ Botões só com ícone (👍 👎) na receita, com a contagem ao lado. Um voto p
 - **"Incorporar"**: gera um `<iframe>` com o cartão da receita para outros blogs, com link de volta para o seu site.
 - Imagens e textos de pré‑visualização (Open Graph e Twitter Card) em todas as páginas, com imagem padrão configurável.
 
+### Fotos automáticas (Pexels e Pixabay)
+**Painel → Fotos automáticas** encontra fotos para as receitas que ainda não têm imagem, em bancos gratuitos com licença para uso comercial:
+- **Com revisão:** para cada receita aparecem algumas opções e você toca na que combina. Dá para mudar o termo da busca ou pular.
+- **Automático:** coloca a primeira foto encontrada em todas, em segundo plano, respeitando os limites gratuitos (Pixabay 100/min, Pexels 200/h).
+- A foto é **baixada** para o servidor (vira WebP/AVIF) e a receita mostra o **crédito do fotógrafo**. Se você trocar a foto depois, o crédito some.
+- As chaves (grátis) ficam em `data/stock-keys.json` (600) ou nas variáveis `PEXELS_API_KEY` / `PIXABAY_API_KEY`. O servidor só baixa imagens dos servidores do Pexels e do Pixabay.
+
 ### Google Search no painel
 **Painel → Google Search** mostra os dados do Google Search Console sem sair do Chef:
 - cliques, impressões, CTR e posição média, comparados com o período anterior;
@@ -117,7 +124,7 @@ Acesse `/admin` para criar a conta de administrador. Em produção, o primeiro a
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | Servidor com recarga automática |
-| `npm test` | 101 testes: funcionalidades, **segurança (ataques)** e **SEO** |
+| `npm test` | 106 testes: funcionalidades, **segurança (ataques)** e **SEO** |
 | `npm run stress` | Teste de carga e de limites da API (2.000 receitas, 32 conexões) |
 | `npm run audit:secrets` | Procura senhas/chaves vazadas nos arquivos **e no histórico do Git** |
 | `sh scripts/smoke-test.sh IMAGEM` | Testa a imagem Docker como se fosse o ZimaOS (instalação, login, upload, reinício) |
@@ -161,6 +168,7 @@ Para gerar a imagem a partir do código: `docker build -t chef .`. Para testar a
 | `MAIL_FROM` / `MAIL_REPLY_TO` | `SMTP_USER` | Remetente e endereço de resposta |
 | `MAIL_ADMIN` | admins | Quem recebe os avisos (separe vários por vírgula) |
 | `MAIL_RATE_PER_MIN` | `30` | Velocidade de envio da newsletter |
+| `PEXELS_API_KEY` / `PIXABAY_API_KEY` | — | (Opcional) Chaves dos bancos de imagens para as fotos automáticas (alternativa: Painel → Fotos automáticas) |
 | `GOOGLE_SERVICE_ACCOUNT` | — | (Opcional) JSON da conta de serviço do Search Console, inteiro ou em base64. Alternativa: enviar o arquivo em Painel → Google Search |
 
 > Em produção, use HTTPS (necessário para PWA, microfone e notificações), por exemplo com Caddy ou Nginx na frente.

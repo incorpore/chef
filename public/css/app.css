@@ -615,3 +615,11 @@ button.code-chip.copied { background: color-mix(in srgb, var(--ok) 20%, #fff); }
 .vote-q { margin: 0; font-family: var(--serif); font-weight: 700; font-size: 1.15rem; color: var(--ink); }
 .vote-card-cook { border-top: 0; margin: 4px 0 8px; padding-top: 0; }
 @media print { .vote, .vote-card { display: none !important; } }
+
+/* Crédito da foto (bancos de imagens) */
+.hero-media { position: relative; }
+.photo-credit { position: absolute; right: 10px; bottom: 10px; margin: 0; padding: .2rem .55rem; border-radius: 999px; background: rgb(0 0 0 / .5); color: #fff; font-size: .7rem; line-height: 1.4; backdrop-filter: blur(4px); max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; z-index: 2; }
+.photo-credit a { color: #fff; text-decoration: none; }
+.photo-credit a:hover { text-decoration: underline; }
+@media print { .photo-credit { position: static; background: none; color: #555; } }
+.hero-media .gallery-dots ~ .photo-credit { bottom: 34px; }

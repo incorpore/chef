@@ -220,6 +220,9 @@ const COLUMNS = [
   ['recipes', 'seo_description', "TEXT DEFAULT ''"],
   ['recipes', 'likes', 'INTEGER NOT NULL DEFAULT 0'],
   ['recipes', 'dislikes', 'INTEGER NOT NULL DEFAULT 0'],
+  // Crédito da foto de capa (ex.: "Foto: Ana Lima / Pexels") e link do autor/banco de imagens
+  ['recipes', 'cover_credit', "TEXT DEFAULT ''"],
+  ['recipes', 'cover_credit_url', "TEXT DEFAULT ''"],
 ];
 
 function migrate(d) {

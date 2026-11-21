@@ -31,6 +31,7 @@ ${user ? `<aside class="admin-nav">
   ${item('/admin/api', 'qr', 'API', 'api')}
   ${user.role === 'admin' ? item('/admin/configuracoes', 'edit', 'Configurações', 'settings') : ''}
   ${user.role === 'admin' ? item('/admin/usuarios', 'users', 'Usuários', 'users') : ''}
+  ${user.role === 'admin' ? item('/admin/fotos', 'camera', 'Fotos automáticas', 'photos') : ''}
   ${user.role === 'admin' ? item('/admin/google', 'search', 'Google Search', 'google') : ''}
   ${user.role === 'admin' ? item('/admin/auditoria', 'list', 'Auditoria', 'audit') : ''}
   <a href="/admin/perfil" class="nav-profile ${active === 'profile' ? 'active' : ''}">${avatar(user, 'avatar-xs')}<span>Meu perfil</span></a>
@@ -558,6 +559,44 @@ function usersPage({ user }) {
     <table class="table table-admin"><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th></th></tr></thead><tbody data-user-rows></tbody></table>` });
 }
 
+function photosPage({ user }) {
+  return adminLayout({ title: 'Fotos automáticas', user, active: 'photos', body: `
+  <header class="admin-head"><h1>Fotos automáticas</h1></header>
+  <p class="lead-admin">Encontre fotos para as receitas que ainda não têm imagem, em bancos gratuitos com licença para uso comercial (inclusive com anúncios). A foto é baixada para o seu servidor, fica leve (WebP/AVIF) e a receita mostra o crédito do fotógrafo.</p>
+
+  <section class="panel">
+    <h2>1. Chaves dos bancos de imagens <small class="muted">(grátis)</small></h2>
+    <div class="stock-keys">
+      <form class="stock-key" data-stock-key="pexels">
+        <div class="stock-key-head"><strong>Pexels</strong><span class="stock-badge" data-stock-badge="pexels"></span></div>
+        <p class="hint">Crie a chave em <a href="https://www.pexels.com/api/new/" target="_blank" rel="noopener">pexels.com/api</a> (entre com sua conta, preencha o motivo "blog de receitas"). Limite: 200 buscas por hora.</p>
+        <div class="inline-form"><input name="key" placeholder="Cole a chave do Pexels" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Salvar</button></div>
+      </form>
+      <form class="stock-key" data-stock-key="pixabay">
+        <div class="stock-key-head"><strong>Pixabay</strong><span class="stock-badge" data-stock-badge="pixabay"></span></div>
+        <p class="hint">Crie uma conta em <a href="https://pixabay.com/accounts/register/" target="_blank" rel="noopener">pixabay.com</a> e copie a chave em <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">pixabay.com/api/docs</a> (aparece no texto "key"). Limite: 100 buscas por minuto.</p>
+        <div class="inline-form"><input name="key" placeholder="Cole a chave do Pixabay" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Salvar</button></div>
+      </form>
+    </div>
+    <p class="hint">Basta uma das duas; com as duas há mais opções. As chaves ficam só no servidor e nunca aparecem de novo.</p>
+  </section>
+
+  <section class="panel stock-auto">
+    <h2>2. Automático</h2>
+    <p><b data-stock-missing>…</b> receitas publicadas estão sem foto.</p>
+    <p class="hint">Coloca a primeira foto encontrada em cada uma, em segundo plano (você pode fechar a página). Fotos automáticas às vezes não combinam com a receita: confira depois e troque no editor, ou use a revisão abaixo.</p>
+    <div class="form-actions"><button type="button" class="btn btn-primary" data-stock-auto>${icon('camera')} Colocar fotos em todas</button><button type="button" class="btn btn-ghost" data-stock-stop hidden>Parar</button></div>
+    <div class="stock-progress" data-stock-progress hidden><div class="nl-bar"><span data-stock-bar></span></div><p data-stock-progress-text></p><ul class="stock-log" data-stock-log></ul></div>
+  </section>
+
+  <section class="panel">
+    <h2>3. Com revisão (recomendado)</h2>
+    <p class="hint">Para cada receita aparecem algumas opções. Toque na foto que combina; se nenhuma servir, mude o termo da busca ou pule.</p>
+    <div class="stock-list" data-stock-list></div>
+    <div class="form-actions"><button type="button" class="btn" data-stock-more hidden>Mostrar mais receitas</button></div>
+  </section>`, scripts: ['/js/stock.js'] });
+}
+
 function googlePage({ user }) {
   return adminLayout({ title: 'Google Search', user, active: 'google', body: `
   <header class="admin-head"><h1>Google Search</h1>
@@ -624,4 +663,4 @@ function forbidden({ user }) {
   return simplePage({ user, title: 'Sem permissão', active: '', body: '<section class="panel"><p>Você só pode editar as suas próprias receitas.</p><p><a class="btn" href="/admin/receitas">Voltar</a></p></section>' });
 }
 
-module.exports = { googlePage, profilePage, forgotPage, resetPage, newsletterAdminPage, auditPage, forbidden, adminLayout, authPage, dashboard, recipeList, editor, importPage, categoriesPage, commentsPage, productsPage, adsPage, settingsPage, apiPage, usersPage };
+module.exports = { photosPage, googlePage, profilePage, forgotPage, resetPage, newsletterAdminPage, auditPage, forbidden, adminLayout, authPage, dashboard, recipeList, editor, importPage, categoriesPage, commentsPage, productsPage, adsPage, settingsPage, apiPage, usersPage };

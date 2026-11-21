@@ -708,6 +708,42 @@ router.delete('/subscribers/:id', auth.requireAdmin, (req, res) => {
 });
 
 // ---------------- E-mail (SMTP) ----------------
+// ---------------- Fotos automáticas (Pexels / Pixabay) para receitas sem imagem ----------------
+const stock = require('../stock');
+const stockWrap = (fn) => wrap(async (req, res) => {
+  try { await fn(req, res); } catch (e) {
+    if (e instanceof stock.StockError) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
+});
+router.get('/fotos/status', auth.requireAdmin, (req, res) => res.json(stock.status()));
+router.put('/fotos/chaves', auth.requireAdmin, rateLimit('stock-key', 20, 10 * 60e3), stockWrap(async (req, res) => {
+  stock.saveKey(String(req.body?.provider || ''), req.body?.key);
+  auth.audit(req, 'fotos.chave', String(req.body?.provider || ''));
+  res.json(stock.status());
+}));
+router.get('/fotos/pendentes', auth.requireAdmin, (req, res) => {
+  const offset = Math.max(0, Math.min(100000, Number(req.query.offset) || 0));
+  res.json({ items: stock.missing(12, offset), total: stock.status().missing });
+});
+router.get('/fotos/sugestoes/:id', auth.requireAdmin, rateLimit('stock-search', 120, 60e3), stockWrap(async (req, res) => {
+  const r = recipes.getById(idParam(req.params.id));
+  if (!r) return notFound(res, 'Receita não encontrada');
+  const q = sec.cleanText(String(req.query.q || ''), 100).trim() || r.title;
+  res.json({ query: stock.queryFor(q), items: await stock.search(q, { perPage: 4 }) });
+}));
+router.post('/fotos/aplicar', auth.requireAdmin, rateLimit('stock-apply', 120, 60e3), stockWrap(async (req, res) => {
+  const r = await stock.apply(idParam(req.body?.recipeId), req.body?.photo || {}, req.user.id);
+  auth.audit(req, 'fotos.aplicar', r.code);
+  res.json(recipes.toPublic(r, baseUrl(req)));
+}));
+router.post('/fotos/auto', auth.requireAdmin, stockWrap(async (req, res) => {
+  const job = stock.startAuto(req.user.id);
+  auth.audit(req, 'fotos.auto', `${job.total} receitas`);
+  res.json(stock.status());
+}));
+router.post('/fotos/auto/parar', auth.requireAdmin, (req, res) => { stock.stopAuto(); res.json(stock.status()); });
+
 // ---------------- Google Search Console (relatório no painel) ----------------
 const gsc = require('../gsc');
 const gscWrap = (fn) => wrap(async (req, res) => {

@@ -58,7 +58,7 @@ function clampInt(v, min, max, def) {
 // Limites de tamanho (validação no servidor — nunca confie só no formulário)
 const LIMITS = {
   title: 200, description: 500, story: 50000, tips: 10000, cuisine: 60, servings_unit: 40, source_url: 2000, source_name: 200,
-  seo_title: 120, seo_description: 320, url: 2000, caption: 300, ingredients: 300, ingredient: 500, steps: 200, step: 5000, images: 40, tags: 30, tag: 40, diets: 15, products: 50,
+  seo_title: 120, seo_description: 320, cover_credit: 200, url: 2000, caption: 300, ingredients: 300, ingredient: 500, steps: 200, step: 5000, images: 40, tags: 30, tag: 40, diets: 15, products: 50,
 };
 
 function bad(msg) {
@@ -83,7 +83,8 @@ function normalizeInput(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw bad('Corpo da requisição inválido');
   const out = {};
   const has = (k) => input[k] !== undefined && input[k] !== null;
-  for (const k of ['title', 'description', 'story', 'tips', 'cuisine', 'servings_unit', 'source_name', 'seo_title', 'seo_description']) if (has(k)) out[k] = text(input, k);
+  for (const k of ['title', 'description', 'story', 'tips', 'cuisine', 'servings_unit', 'source_name', 'seo_title', 'seo_description', 'cover_credit']) if (has(k)) out[k] = text(input, k);
+  if (has('cover_credit_url')) out.cover_credit_url = safeUrl(input.cover_credit_url, 'cover_credit_url');
   if (has('source_url')) out.source_url = safeUrl(input.source_url, 'source_url');
   if (has('cover')) out.cover = safeUrl(input.cover, 'cover');
   if (has('images')) {
@@ -161,7 +162,7 @@ function toList(v) {
   return String(v || '').split(',').map((x) => x.trim()).filter(Boolean);
 }
 
-const COLUMNS = ['title', 'description', 'story', 'cover', 'images', 'video', 'ingredients', 'steps', 'tips', 'prep_minutes', 'cook_minutes', 'rest_minutes', 'servings', 'servings_unit', 'difficulty', 'cuisine', 'category_id', 'nutrition', 'diets', 'source_url', 'source_name', 'status', 'featured', 'seo_title', 'seo_description'];
+const COLUMNS = ['title', 'description', 'story', 'cover', 'cover_credit', 'cover_credit_url', 'images', 'video', 'ingredients', 'steps', 'tips', 'prep_minutes', 'cook_minutes', 'rest_minutes', 'servings', 'servings_unit', 'difficulty', 'cuisine', 'category_id', 'nutrition', 'diets', 'source_url', 'source_name', 'status', 'featured', 'seo_title', 'seo_description'];
 const JSON_COLS = new Set(['images', 'video', 'ingredients', 'steps', 'nutrition', 'diets']);
 
 function toDbValue(k, v) {
@@ -223,6 +224,8 @@ function update(id, input) {
     if (!current) throw Object.assign(new Error('Receita não encontrada'), { status: 404 });
     const sets = [];
     const vals = [];
+    // Trocou a foto sem informar crédito novo: o crédito antigo não vale mais
+    if (data.cover !== undefined && data.cover !== current.cover && data.cover_credit === undefined) { data.cover_credit = ''; data.cover_credit_url = ''; }
     for (const c of COLUMNS) {
       if (data[c] === undefined) continue;
       sets.push(`${c} = ?`);
@@ -465,6 +468,8 @@ function toPublic(r, baseUrl = '') {
     likes: r.likes || 0,
     dislikes: r.dislikes || 0,
     cover: r.cover,
+    cover_credit: r.cover_credit || '',
+    cover_credit_url: r.cover_credit_url || '',
     image: r.cover || r.cover_auto || '', // foto ou, se não houver, a capa ilustrada
     images: r.images,
     video: r.video,

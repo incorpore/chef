@@ -238,6 +238,18 @@ O Pinterest confere o feed regularmente e publica as receitas novas, até 200 po
 
 ---
 
+## Passo 9b (opcional) — Fotos automáticas para receitas sem imagem
+
+1. Crie uma chave grátis no **Pexels** (https://www.pexels.com/api/new/) e/ou no **Pixabay** (crie a conta e copie a chave em https://pixabay.com/api/docs/).
+2. Em **Painel → Fotos automáticas**, cole as chaves e salve.
+3. Escolha como colocar as fotos:
+   - **Com revisão:** toque na foto que combina com cada receita.
+   - **Colocar fotos em todas:** coloca automaticamente, em segundo plano. Com o Pixabay, umas 500 receitas levam poucos minutos; só com o Pexels, cerca de 3 horas, por causa do limite de 200 buscas por hora.
+
+As fotos ficam guardadas no seu servidor e a receita mostra o nome do fotógrafo.
+
+---
+
 ## Passo 10 (opcional) — Ver os dados do Google no painel
 
 Em **Painel → Google Search** você vê quantas pessoas acharam suas receitas no Google, com quais buscas e em que posição.

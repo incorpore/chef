@@ -75,6 +75,7 @@ router.get('/anuncios', auth.requireAdmin, (req, res) => res.send(v.adsPage({ us
 router.get('/configuracoes', auth.requireAdmin, (req, res) => res.send(v.settingsPage({ user: req.user, categories: recipes.categories(), siteUrl: mail.siteUrl() })));
 router.get('/usuarios', auth.requireAdmin, (req, res) => res.send(v.usersPage({ user: req.user })));
 router.get('/newsletter', auth.requireAdmin, (req, res) => res.send(v.newsletterAdminPage({ user: req.user, preselect: String(req.query.receita || '').replace(/\D/g, '') })));
+router.get('/fotos', auth.requireAdmin, (req, res) => res.send(v.photosPage({ user: req.user })));
 router.get('/google', auth.requireAdmin, (req, res) => res.send(v.googlePage({ user: req.user })));
 router.get('/auditoria', auth.requireAdmin, (req, res) => res.send(v.auditPage({ user: req.user })));
 

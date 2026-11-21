@@ -141,6 +141,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
     <div class="hero-media">
       ${gallery.length ? `<div class="gallery" data-gallery>${gallery.map((g, i) => `<figure>${c.thumb(g.url, g.caption || r.title, { w: 1200, h: 900, eager: i === 0, sizes: '(min-width: 900px) 50vw, 100vw', max: 1920 })}${g.caption && i ? `<figcaption>${esc(g.caption)}</figcaption>` : ''}</figure>`).join('')}</div>${gallery.length > 1 ? `<div class="gallery-dots">${gallery.map((_, i) => `<button data-goto="${i}" aria-label="Foto ${i + 1}"></button>`).join('')}</div>` : ''}` : `<div class="ph ph-hero">${icon('chef')}</div>`}
       ${r.video ? `<a href="#video" class="chip chip-video hero-video">${icon('play')} Ver vídeo</a>` : ''}
+      ${r.cover && r.cover_credit ? `<p class="photo-credit">${r.cover_credit_url ? `<a href="${esc(r.cover_credit_url)}" target="_blank" rel="nofollow noopener">${esc(r.cover_credit)}</a>` : esc(r.cover_credit)}</p>` : ''}
     </div>
     <div class="hero-info">
       <nav class="crumbs"><a href="/">Início</a> › ${r.category ? `<a href="/categoria/${esc(r.category.slug)}">${esc(r.category.name)}</a> › ` : ''}<span>${esc(r.title)}</span></nav>
