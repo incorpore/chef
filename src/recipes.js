@@ -370,6 +370,7 @@ function search(opts = {}) {
   const order = {
     recent: 'COALESCE(r.published_at, r.created_at) DESC',
     popular: 'r.views DESC',
+    liked: '(r.likes - r.dislikes) DESC, r.likes DESC',
     quick: '(r.prep_minutes + r.cook_minutes + r.rest_minutes) ASC',
     rating: "(SELECT AVG(rating) FROM comments c WHERE c.recipe_id = r.id AND c.status='approved') DESC NULLS LAST",
     title: 'r.title COLLATE NOCASE ASC',
@@ -461,6 +462,8 @@ function toPublic(r, baseUrl = '') {
     title: r.title,
     description: r.description,
     story: r.story,
+    likes: r.likes || 0,
+    dislikes: r.dislikes || 0,
     cover: r.cover,
     image: r.cover || r.cover_auto || '', // foto ou, se não houver, a capa ilustrada
     images: r.images,
@@ -496,7 +499,33 @@ function toPublic(r, baseUrl = '') {
   };
 }
 
+/**
+ * Gostei (1) / não gostei (-1) / tirar voto (0). Um voto por visitante; contadores ficam na receita.
+ * Proteção simples contra votos em massa: no máximo 10 visitantes diferentes por IP em cada receita.
+ */
+function vote(recipeId, voter, ipHash, value) {
+  return db.tx((d) => {
+    const cur = d.prepare('SELECT value FROM recipe_votes WHERE recipe_id = ? AND voter = ?').get(recipeId, voter);
+    const old = cur ? cur.value : 0;
+    if (value !== old) {
+      if (!cur && value && d.prepare('SELECT COUNT(*) AS n FROM recipe_votes WHERE recipe_id = ? AND ip_hash = ?').get(recipeId, ipHash).n >= 10) {
+        // limite por IP atingido: ignora sem erro
+      } else {
+        if (!value) d.prepare('DELETE FROM recipe_votes WHERE recipe_id = ? AND voter = ?').run(recipeId, voter);
+        else d.prepare('INSERT INTO recipe_votes (recipe_id, voter, ip_hash, value) VALUES (?, ?, ?, ?) ON CONFLICT(recipe_id, voter) DO UPDATE SET value = excluded.value, created_at = datetime(\'now\')').run(recipeId, voter, ipHash, value);
+        const likes = (value === 1) - (old === 1);
+        const dislikes = (value === -1) - (old === -1);
+        d.prepare('UPDATE recipes SET likes = MAX(0, likes + ?), dislikes = MAX(0, dislikes + ?) WHERE id = ?').run(likes, dislikes, recipeId);
+      }
+    }
+    const r = d.prepare('SELECT likes, dislikes FROM recipes WHERE id = ?').get(recipeId);
+    const now = d.prepare('SELECT value FROM recipe_votes WHERE recipe_id = ? AND voter = ?').get(recipeId, voter);
+    return { likes: r.likes, dislikes: r.dislikes, value: now ? now.value : 0 };
+  });
+}
+
 module.exports = {
+  vote,
   create, update, remove, getById, getBySlug, getByOldSlug, allIds, getByCode, find, LIMITS, search, suggest, related, products, adjacent,
   incrementViews, incrementCooked, allTags, categories, toPublic, normalizeInput, reindexAll: () => {
     const d = db.get();

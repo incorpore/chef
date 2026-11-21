@@ -129,3 +129,34 @@ test('imagem padrão das receitas sem foto: configurável; vazio = capa ilustrad
   await admin.req('PUT', '/api/v1/settings', { body: { defaultRecipeImage: '' } });
   assert.match((await visitor.req('GET', `/api/v1/recipes/${r.code}`)).data.image, /^\/capa\//);
 });
+
+test('gostei / não gostei: um voto por visitante, trocar e desfazer, limite por IP', async () => {
+  const r = await mk(admin, 'Receita para votar');
+  const v = (voter, value) => visitor.req('POST', `/api/v1/recipes/${r.id}/vote`, { body: { voter, value } });
+  const A = 'visitanteAAAAAAAAAAAAAAAA';
+  const B = 'visitanteBBBBBBBBBBBBBBBB';
+  let x = await v(A, 1);
+  assert.deepEqual(x.data, { likes: 1, dislikes: 0, value: 1 });
+  x = await v(A, 1);
+  assert.equal(x.data.likes, 1, 'votar de novo não soma');
+  x = await v(B, 1);
+  assert.equal(x.data.likes, 2);
+  x = await v(A, -1);
+  assert.deepEqual(x.data, { likes: 1, dislikes: 1, value: -1 }, 'trocar o voto');
+  x = await v(A, 0);
+  assert.deepEqual(x.data, { likes: 1, dislikes: 0, value: 0 }, 'desfazer');
+  assert.equal((await v('curto', 1)).status, 400);
+  assert.equal((await v(A, 5)).status, 400);
+  const pub = (await visitor.req('GET', `/api/v1/recipes/${r.code}`)).data;
+  assert.deepEqual([pub.likes, pub.dislikes], [1, 0]);
+  assert.match((await visitor.req('GET', `/receita/${r.slug}`)).text, /data-vote="1"[^>]*aria-label="Gostei"/);
+  // mesmo IP com muitos "visitantes" diferentes: a partir do 10º é ignorado
+  for (let i = 0; i < 15; i++) await v(`robo${String(i).padStart(14, '0')}xx`, 1);
+  const after = (await visitor.req('GET', `/api/v1/recipes/${r.code}`)).data;
+  assert.equal(after.likes, 10, 'no máximo 10 votos por IP em cada receita');
+  // rascunho não recebe voto; ordenar por mais curtidas funciona
+  const d = await mk(admin, 'Rascunho sem voto', { status: 'draft' });
+  assert.equal((await visitor.req('POST', `/api/v1/recipes/${d.id}/vote`, { body: { voter: A, value: 1 } })).status, 404);
+  const top = (await visitor.req('GET', '/api/v1/recipes?sort=liked&perPage=1')).data.items[0];
+  assert.equal(top.id, r.id);
+});

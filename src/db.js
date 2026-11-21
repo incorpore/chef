@@ -109,6 +109,17 @@ CREATE TABLE IF NOT EXISTS ads (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Gostei / não gostei: um voto por visitante (identificador anônimo guardado só como hash)
+CREATE TABLE IF NOT EXISTS recipe_votes (
+  recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+  voter TEXT NOT NULL,
+  ip_hash TEXT NOT NULL DEFAULT '',
+  value INTEGER NOT NULL CHECK (value IN (-1, 1)),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (recipe_id, voter)
+);
+CREATE INDEX IF NOT EXISTS idx_votes_ip ON recipe_votes(recipe_id, ip_hash);
+
 CREATE TABLE IF NOT EXISTS comments (
   id INTEGER PRIMARY KEY,
   recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
@@ -207,6 +218,8 @@ const COLUMNS = [
   ['subscribers', 'unsubscribed_at', 'TEXT DEFAULT NULL'],
   ['recipes', 'seo_title', "TEXT DEFAULT ''"],
   ['recipes', 'seo_description', "TEXT DEFAULT ''"],
+  ['recipes', 'likes', 'INTEGER NOT NULL DEFAULT 0'],
+  ['recipes', 'dislikes', 'INTEGER NOT NULL DEFAULT 0'],
 ];
 
 function migrate(d) {

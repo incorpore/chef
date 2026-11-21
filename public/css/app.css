@@ -587,3 +587,19 @@ button.code-chip.copied { background: color-mix(in srgb, var(--ok) 20%, #fff); }
 .code-hit a { text-decoration: none; }
 .qr-box .code-copy { margin: 0 auto 6px; }
 @media print { .code-copy-btn, .code-qr { display: none !important; } .code-copy { border: 0; padding: 0; } }
+
+/* Gostei / não gostei (só ícones) */
+.vote { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); overflow: hidden; height: 48px; flex: none; }
+.vote-btn { display: inline-flex; align-items: center; gap: 6px; height: 100%; padding: 0 14px; border: 0; background: none; color: var(--ink-2); cursor: pointer; font: 600 .95rem var(--font); font-variant-numeric: tabular-nums; transition: background .15s, color .15s; }
+.vote-btn + .vote-btn { border-left: 1px solid var(--line); }
+.vote-btn .ico { width: 22px; height: 22px; transition: transform .2s; }
+.vote-down .ico { transform: scale(1, -1); }
+.vote-btn span:empty { display: none; }
+.vote-btn:hover { background: var(--surface-2); color: var(--ink); }
+.vote-btn.on { color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, var(--surface)); }
+.vote-btn.on .ico { fill: color-mix(in srgb, var(--brand) 25%, transparent); }
+.vote-down.on { color: var(--ink); background: var(--surface-2); }
+.vote-down.on .ico { fill: color-mix(in srgb, var(--ink) 15%, transparent); }
+.vote-btn.pop .ico { transform: scale(1.25); }
+.vote-down.pop .ico { transform: scale(1.25, -1.25); }
+@media print { .vote { display: none !important; } }

@@ -7,6 +7,55 @@
   const R = JSON.parse(dataEl.textContent);
   const PKEY = `progress:${R.id}`;
 
+  // ---------------- Gostei / não gostei (um voto por aparelho; tocar de novo desfaz) ----------------
+  const voteBox = $('[data-vote-box]');
+  if (voteBox) {
+    const votes = store.get('votes', {});
+    let voter = store.get('voterId', '');
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(voter)) {
+      const a = new Uint8Array(18);
+      crypto.getRandomValues(a);
+      voter = btoa(String.fromCharCode(...a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      store.set('voterId', voter);
+    }
+    const counts = { 1: Number($('[data-vote-count="1"]', voteBox).textContent) || 0, '-1': Number($('[data-vote-count="-1"]', voteBox).textContent) || 0 };
+    const paint = (mine) => {
+      for (const v of ['1', '-1']) {
+        const b = $(`[data-vote="${v}"]`, voteBox);
+        b.setAttribute('aria-pressed', String(String(mine) === v));
+        b.classList.toggle('on', String(mine) === v);
+        $(`[data-vote-count="${v}"]`, voteBox).textContent = counts[v] > 0 ? counts[v].toLocaleString('pt-BR') : '';
+      }
+    };
+    paint(votes[R.id] || 0);
+    let busy = false;
+    voteBox.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-vote]');
+      if (!b || busy) return;
+      const old = votes[R.id] || 0;
+      const value = Number(b.dataset.vote) === old ? 0 : Number(b.dataset.vote);
+      // mostra na hora (otimista) e confirma com o servidor
+      if (old) counts[old] = Math.max(0, counts[old] - 1);
+      if (value) counts[value] += 1;
+      paint(value);
+      b.classList.add('pop'); setTimeout(() => b.classList.remove('pop'), 300);
+      busy = true;
+      try {
+        const r = await api(`/recipes/${R.id}/vote`, { method: 'POST', body: { value, voter } });
+        counts[1] = r.likes; counts[-1] = r.dislikes;
+        if (r.value) votes[R.id] = r.value; else delete votes[R.id];
+        store.set('votes', votes);
+        paint(r.value);
+        if (value) track(value > 0 ? 'recipe_like' : 'recipe_dislike', { item_id: R.code });
+      } catch (err) {
+        if (value) counts[value] = Math.max(0, counts[value] - 1);
+        if (old) counts[old] += 1;
+        paint(old);
+        toast(err.status === 429 ? 'Calma! Muitos votos seguidos.' : 'Não foi possível registrar agora');
+      } finally { busy = false; }
+    });
+  }
+
   // ---------------- Estado de progresso (salvo no aparelho) ----------------
   const state = Object.assign({ ings: [], steps: [], current: 0, servings: R.servings, metric: false }, store.get(PKEY, {}));
   function save() {

@@ -152,6 +152,10 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
       ${r.diets.length || r.tags.length ? `<div class="tags">${r.diets.map((d) => `<a class="chip chip-diet" href="/busca?diet=${encodeURIComponent(d)}">${esc(d)}</a>`).join('')}${r.tags.map((t) => `<a class="chip" href="/tag/${encodeURIComponent(t)}">#${esc(t)}</a>`).join('')}</div>` : ''}
       <div class="actions">
         <button class="btn btn-primary btn-lg" data-cook-start>${icon('chef')} Modo cozinha</button>
+        <div class="vote" role="group" aria-label="Avalie a receita" data-vote-box>
+          <button type="button" class="vote-btn" data-vote="1" aria-pressed="false" aria-label="Gostei" title="Gostei">${icon('like')}<span data-vote-count="1">${r.likes || ''}</span></button>
+          <button type="button" class="vote-btn vote-down" data-vote="-1" aria-pressed="false" aria-label="Não gostei" title="Não gostei">${icon('like')}<span data-vote-count="-1">${r.dislikes || ''}</span></button>
+        </div>
         <button class="icon-btn lg fav-btn" data-fav="${r.id}" data-slug="${esc(r.slug)}" data-title="${esc(r.title)}" data-cover="${esc(r.cover || r.cover_auto)}" aria-label="Favoritar">${icon('heart')}</button>
         <button class="icon-btn lg" data-share aria-label="Compartilhar" title="Compartilhar">${icon('share')}</button>
         <button class="icon-btn lg" data-add-list aria-label="Adicionar à lista de compras" title="Adicionar à lista de compras">${icon('cart')}</button>

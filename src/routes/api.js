@@ -47,7 +47,8 @@ router.use((req, res, next) => (['GET', 'HEAD'].includes(req.method) ? rateLimit
 
 // Qualquer escrita invalida o cache de páginas
 router.use((req, res, next) => {
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) res.on('finish', () => { if (res.statusCode < 400) pageCache.bump(); });
+  // Votos não limpam o cache de páginas (o contador na página pode atrasar alguns segundos; o botão atualiza na hora)
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !/\/vote$/.test(req.path)) res.on('finish', () => { if (res.statusCode < 400) pageCache.bump(); });
   next();
 });
 
@@ -401,6 +402,17 @@ router.post('/recipes/:ref/duplicate', auth.requireUser, (req, res) => {
   const { code, slug, id, ...pub } = recipes.toPublic(r);
   const copy = recipes.create({ ...pub, title: `${r.title} (cópia)`.slice(0, 200), status: 'draft', featured: false, category_id: r.category_id, products: recipes.products(r.id).map((p) => p.id) }, req.user.id);
   res.status(201).json(recipes.toPublic(copy, baseUrl(req)));
+});
+
+router.post('/recipes/:ref/vote', rateLimit('vote', 30, 60e3), (req, res) => {
+  const r = recipes.find(req.params.ref);
+  if (!r || r.status !== 'published') return notFound(res, 'Receita não encontrada');
+  const value = Number(req.body?.value);
+  const voter = String(req.body?.voter || '');
+  if (![1, -1, 0].includes(value)) return res.status(400).json({ error: 'Voto inválido' });
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(voter)) return res.status(400).json({ error: 'Identificador inválido' });
+  const h = (s) => crypto.createHash('sha256').update(`${s}|${config.secret}`).digest('hex').slice(0, 32);
+  res.json(recipes.vote(r.id, h(voter), h(req.ip || ''), value));
 });
 
 router.post('/recipes/:ref/cooked', rateLimit('cooked', 20, 60e3), (req, res) => {

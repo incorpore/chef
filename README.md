@@ -39,6 +39,9 @@ Site/sistema para publicar e compartilhar suas receitas, com **busca por palavra
 ### Funções de blog de receitas
 Favoritos (funcionam offline), lista de compras que **soma ingredientes** de várias receitas, **cardápio semanal** que gera a lista de compras, conversor de medidas, avaliações com estrelas e comentários moderados (com anti‑spam), "Fiz esta receita!", receitas relacionadas, anterior/próxima, "Me surpreenda", newsletter (exporta CSV), categorias com ícone, tags, dietas, informação nutricional, dicas, história da receita, versão para impressão e compartilhamento (WhatsApp/Web Share).
 
+### Gostei / não gostei
+Botões só com ícone (👍 👎) na receita, com a contagem ao lado. Um voto por aparelho (tocar de novo desfaz), sem login e sem guardar dados pessoais; limite de votos por IP contra robôs. A busca ganhou a ordem "Mais curtidas".
+
 ### Compartilhar
 - Botões de **WhatsApp, Pinterest (Rich Pins), Facebook, Telegram, X e e‑mail**, que funcionam até sem JavaScript. Os links carregam **UTM**, para você ver no Analytics de onde vieram as visitas.
 - **Copiar link**, compartilhamento nativo do celular, **link curto** `/c/CODIGO` e **QR code**.
@@ -93,7 +96,7 @@ Acesse `/admin` para criar a conta de administrador. Em produção, o primeiro a
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | Servidor com recarga automática |
-| `npm test` | 85 testes: funcionalidades, **segurança (ataques)** e **SEO** |
+| `npm test` | 86 testes: funcionalidades, **segurança (ataques)** e **SEO** |
 | `npm run stress` | Teste de carga e de limites da API (2.000 receitas, 32 conexões) |
 | `npm run audit:secrets` | Procura senhas/chaves vazadas nos arquivos **e no histórico do Git** |
 | `sh scripts/smoke-test.sh IMAGEM` | Testa a imagem Docker como se fosse o ZimaOS (instalação, login, upload, reinício) |
