@@ -31,6 +31,7 @@ ${user ? `<aside class="admin-nav">
   ${item('/admin/api', 'qr', 'API', 'api')}
   ${user.role === 'admin' ? item('/admin/configuracoes', 'edit', 'Configurações', 'settings') : ''}
   ${user.role === 'admin' ? item('/admin/usuarios', 'users', 'Usuários', 'users') : ''}
+  ${user.role === 'admin' ? item('/admin/google', 'search', 'Google Search', 'google') : ''}
   ${user.role === 'admin' ? item('/admin/auditoria', 'list', 'Auditoria', 'audit') : ''}
   <a href="/admin/perfil" class="nav-profile ${active === 'profile' ? 'active' : ''}">${avatar(user, 'avatar-xs')}<span>Meu perfil</span></a>
   <a href="/" class="nav-site">${icon('home')}<span>Ver o site</span></a>
@@ -125,6 +126,7 @@ function dashboard({ user }) {
   return adminLayout({ title: 'Painel', user, active: 'dash', body: `
     <header class="admin-head"><h1>Olá, ${esc(user.name.split(' ')[0])} 👋</h1><div><a class="btn btn-primary" href="/admin/receitas/nova">${icon('plus')} Nova receita</a> <a class="btn btn-ghost" href="/admin/importar">${icon('download')} Importar por URL</a></div></header>
     <div class="stats" data-stats><p>Carregando…</p></div>
+    ${user.role === 'admin' ? '<a class="panel gsc-mini" href="/admin/google" data-gsc-mini hidden></a>' : ''}
     <div class="two-col"><section class="panel"><h2>Mais vistas</h2><ol data-top></ol></section><section class="panel"><h2>Produtos mais clicados</h2><ol data-top-products></ol></section></div>` });
 }
 
@@ -243,6 +245,7 @@ function editor({ user, recipe, categories, products }) {
           ${field('Título para o Google', `<input name="seo_title" value="${esc(r.seo_title || '')}" maxlength="120" placeholder="Gerado a partir do título" data-count="60">`, 'Ideal: até 60 caracteres. Use a palavra-chave principal (ex.: “Bolo de cenoura fofinho”).')}
           ${field('Descrição para o Google', `<textarea name="seo_description" rows="3" maxlength="320" placeholder="Gerada automaticamente se vazia" data-count="155">${esc(r.seo_description || '')}</textarea>`, 'Ideal: 120 a 155 caracteres.')}
           <div class="serp" data-serp aria-label="Prévia no Google"><small data-serp-url></small><strong data-serp-title></strong><p data-serp-desc></p></div>
+          ${r.id ? `<div class="gsc-page" data-gsc-page="${esc(r.code)}" hidden></div>` : ''}
         </section>
         <section class="panel">
           <h2>Fonte</h2>
@@ -555,6 +558,61 @@ function usersPage({ user }) {
     <table class="table table-admin"><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th></th></tr></thead><tbody data-user-rows></tbody></table>` });
 }
 
+function googlePage({ user }) {
+  return adminLayout({ title: 'Google Search', user, active: 'google', body: `
+  <header class="admin-head"><h1>Google Search</h1>
+    <div class="gsc-filters" data-gsc-filters hidden>
+      <label class="sr-only" for="gsc-days">Período</label>
+      <select id="gsc-days" data-gsc-days><option value="7">Últimos 7 dias</option><option value="28" selected>Últimos 28 dias</option><option value="90">Últimos 3 meses</option></select>
+      <label class="sr-only" for="gsc-site">Propriedade</label>
+      <select id="gsc-site" data-gsc-site></select>
+    </div>
+  </header>
+
+  <section class="panel gsc-setup" data-gsc-setup hidden>
+    <h2>Ligar o Google Search Console</h2>
+    <p>Veja aqui no painel quantas pessoas encontram suas receitas no Google, com quais buscas e em que posição, e envie o sitemap com um clique. A ligação usa uma <b>conta de serviço</b> do Google, um "usuário robô" que só lê os dados do seu site.</p>
+    <ol class="steps-howto">
+      <li>Abra <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">console.cloud.google.com</a> e crie um projeto (ex.: "Chef").</li>
+      <li>Ative a API: <a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank" rel="noopener">Google Search Console API</a> → <b>Ativar</b>.</li>
+      <li>Vá em <a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener">IAM → Contas de serviço</a> → <b>Criar conta de serviço</b> (nome: "chef"). Não precisa dar nenhum papel.</li>
+      <li>Abra a conta criada → aba <b>Chaves</b> → <b>Adicionar chave</b> → <b>Criar nova chave</b> → <b>JSON</b>. Um arquivo será baixado.</li>
+      <li>Envie esse arquivo abaixo.</li>
+      <li>No <a href="https://search.google.com/search-console" target="_blank" rel="noopener">Search Console</a>, na sua propriedade: <b>Configurações → Usuários e permissões → Adicionar usuário</b>, cole o e-mail da conta de serviço (aparece aqui depois do envio) com permissão <b>Completo</b>.</li>
+    </ol>
+    <div class="gsc-upload">
+      <label class="btn btn-primary">${icon('download')} Enviar arquivo JSON<input type="file" accept="application/json,.json" data-gsc-file hidden></label>
+      <details><summary>ou colar o conteúdo do arquivo</summary><textarea rows="5" data-gsc-paste placeholder='{"type": "service_account", ...}'></textarea><button type="button" class="btn btn-sm" data-gsc-paste-save>Salvar chave</button></details>
+    </div>
+    <p class="hint">A chave fica só no servidor (pasta de dados, com acesso restrito) e nunca é exibida de novo. Você pode removê-la a qualquer momento.</p>
+  </section>
+
+  <section class="panel gsc-account" data-gsc-account hidden>
+    <div><small>Conta de serviço</small><code data-gsc-email></code></div>
+    <div class="gsc-account-btns"><button type="button" class="btn btn-sm" data-gsc-copy-email>Copiar e-mail</button><button type="button" class="btn btn-ghost btn-sm" data-gsc-remove>Remover chave</button></div>
+    <p class="gsc-msg" data-gsc-msg hidden></p>
+  </section>
+
+  <div class="gsc-report" data-gsc-report hidden>
+    <p class="gsc-range" data-gsc-range></p>
+    <div class="gsc-kpis" role="radiogroup" aria-label="Métrica do gráfico" data-gsc-kpis></div>
+    <section class="panel gsc-chart-card">
+      <div class="gsc-chart-head"><h2 data-gsc-chart-title>Cliques por dia</h2><small data-gsc-chart-note></small></div>
+      <div class="gsc-chart" data-gsc-chart></div>
+      <details class="gsc-table-view"><summary>Ver em tabela</summary><div data-gsc-daily></div></details>
+    </section>
+    <div class="two-col">
+      <section class="panel"><h2>Buscas que trazem visitas</h2><div data-gsc-queries></div></section>
+      <section class="panel"><h2>Receitas mais vistas no Google</h2><div data-gsc-pages></div></section>
+    </div>
+    <div class="two-col">
+      <section class="panel"><h2>Aparelhos</h2><div data-gsc-devices></div></section>
+      <section class="panel"><h2>Sitemap</h2><div data-gsc-sitemaps></div><button type="button" class="btn btn-sm" data-gsc-submit>${icon('share')} Enviar sitemap agora</button></section>
+    </div>
+  </div>
+  <p class="gsc-error form-error" data-gsc-error hidden></p>`, scripts: ['/js/gsc.js'] });
+}
+
 function auditPage({ user }) {
   return simplePage({ user, title: 'Auditoria', active: 'audit', body: `
     <section class="panel"><p>Registro das ações sensíveis (logins, falhas de login, chaves de API, configurações, exclusões). IPs são guardados apenas como hash.</p>
@@ -566,4 +624,4 @@ function forbidden({ user }) {
   return simplePage({ user, title: 'Sem permissão', active: '', body: '<section class="panel"><p>Você só pode editar as suas próprias receitas.</p><p><a class="btn" href="/admin/receitas">Voltar</a></p></section>' });
 }
 
-module.exports = { profilePage, forgotPage, resetPage, newsletterAdminPage, auditPage, forbidden, adminLayout, authPage, dashboard, recipeList, editor, importPage, categoriesPage, commentsPage, productsPage, adsPage, settingsPage, apiPage, usersPage };
+module.exports = { googlePage, profilePage, forgotPage, resetPage, newsletterAdminPage, auditPage, forbidden, adminLayout, authPage, dashboard, recipeList, editor, importPage, categoriesPage, commentsPage, productsPage, adsPage, settingsPage, apiPage, usersPage };

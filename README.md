@@ -48,6 +48,15 @@ Botões só com ícone (👍 👎) na receita, com a contagem ao lado. Um voto p
 - **"Incorporar"**: gera um `<iframe>` com o cartão da receita para outros blogs, com link de volta para o seu site.
 - Imagens e textos de pré‑visualização (Open Graph e Twitter Card) em todas as páginas, com imagem padrão configurável.
 
+### Google Search no painel
+**Painel → Google Search** mostra os dados do Google Search Console sem sair do Chef:
+- cliques, impressões, CTR e posição média, comparados com o período anterior;
+- gráfico por dia, com os números também em tabela;
+- as buscas que trazem visitas e as receitas que mais aparecem no Google;
+- aparelhos e situação do sitemap, com o botão "Enviar sitemap agora".
+
+No editor de cada receita aparecem os números dela no Google e as buscas que levam até ela. A ligação usa uma conta de serviço do Google (passo a passo na própria tela). A chave fica só no servidor, em `data/` com permissão 600, ou na variável `GOOGLE_SERVICE_ACCOUNT`, e nunca é exibida.
+
 ### Pinterest automático
 - **Feed para publicação automática** em `/feed/pinterest.xml` (todas) ou `/feed/pinterest.xml?categoria=slug` (uma pasta por categoria). No Pinterest: Configurações → Criar Pins em massa → Publicar automaticamente.
 - Cada receita ganha uma **imagem vertical 1000×1500** (`/pin/CODIGO.jpg`): foto + nome + tempo + endereço do site, ou um "pin de texto" colorido quando não há foto. Fontes embutidas (Playfair Display e Inter, licença OFL).
@@ -108,7 +117,7 @@ Acesse `/admin` para criar a conta de administrador. Em produção, o primeiro a
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | Servidor com recarga automática |
-| `npm test` | 95 testes: funcionalidades, **segurança (ataques)** e **SEO** |
+| `npm test` | 101 testes: funcionalidades, **segurança (ataques)** e **SEO** |
 | `npm run stress` | Teste de carga e de limites da API (2.000 receitas, 32 conexões) |
 | `npm run audit:secrets` | Procura senhas/chaves vazadas nos arquivos **e no histórico do Git** |
 | `sh scripts/smoke-test.sh IMAGEM` | Testa a imagem Docker como se fosse o ZimaOS (instalação, login, upload, reinício) |
@@ -152,6 +161,7 @@ Para gerar a imagem a partir do código: `docker build -t chef .`. Para testar a
 | `MAIL_FROM` / `MAIL_REPLY_TO` | `SMTP_USER` | Remetente e endereço de resposta |
 | `MAIL_ADMIN` | admins | Quem recebe os avisos (separe vários por vírgula) |
 | `MAIL_RATE_PER_MIN` | `30` | Velocidade de envio da newsletter |
+| `GOOGLE_SERVICE_ACCOUNT` | — | (Opcional) JSON da conta de serviço do Search Console, inteiro ou em base64. Alternativa: enviar o arquivo em Painel → Google Search |
 
 > Em produção, use HTTPS (necessário para PWA, microfone e notificações), por exemplo com Caddy ou Nginx na frente.
 

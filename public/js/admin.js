@@ -67,6 +67,27 @@
     });
   }
 
+  // ---------------- Google Search: resumo no painel e números da receita no editor ----------------
+  const gnf = (n, d = 0) => Number(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: d, minimumFractionDigits: d });
+  const mini = $('[data-gsc-mini]');
+  if (mini) {
+    api('/gsc/status').then(async (st) => {
+      if (!st.configured) { mini.innerHTML = '<strong>🔎 Google Search</strong><span>Veja aqui quantas pessoas encontram suas receitas no Google. <u>Ligar agora</u></span>'; mini.hidden = false; return; }
+      const r = await api('/gsc/report?dias=28');
+      const t = r.totals;
+      mini.innerHTML = `<strong>🔎 Google (últimos 28 dias)</strong><span><b>${gnf(t.clicks)}</b> cliques · <b>${gnf(t.impressions)}</b> impressões · posição média <b>${t.position ? gnf(t.position, 1) : '—'}</b></span><u>Ver relatório →</u>`;
+      mini.hidden = false;
+    }).catch(() => {});
+  }
+  const gp = $('[data-gsc-page]');
+  if (gp) {
+    api(`/gsc/page/${encodeURIComponent(gp.dataset.gscPage)}`).then((r) => {
+      if (!r.configured) return;
+      gp.innerHTML = `<p class="gsc-page-h">🔎 No Google · últimos ${r.days} dias</p><div class="gsc-page-n"><span><b>${gnf(r.clicks)}</b> cliques</span><span><b>${gnf(r.impressions)}</b> impressões</span><span>posição <b>${r.position ? gnf(r.position, 1) : '—'}</b></span></div>${r.queries.length ? `<p class="gsc-page-q">Buscas: ${r.queries.map((q) => `<span>${esc(q.query)}</span>`).join('')}</p>` : '<p class="hint">Esta receita ainda não apareceu nas buscas do Google neste período.</p>'}`;
+      gp.hidden = false;
+    }).catch(() => {});
+  }
+
   // ---------------- Lista de receitas (com seleção em massa) ----------------
   const rows = $('[data-recipe-rows]');
   if (rows) {

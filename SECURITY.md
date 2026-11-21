@@ -50,6 +50,14 @@ Rode tudo com `npm test`, os limites com `npm run stress` e a busca por segredos
   - envio controlado por minuto, com pausa automática se o SMTP começar a falhar.
 - Testes: `test/email.test.js`, que inclui um servidor SMTP real com autenticação.
 
+## Google Search Console
+
+- A chave da conta de serviço só é aceita se for um JSON `service_account` com chave privada válida.
+- A chave fica em `data/google-service-account.json` com permissão 600, ou na variável `GOOGLE_SERVICE_ACCOUNT`. Nunca volta pela API nem aparece no painel: só o e-mail da conta é exibido.
+- O token é obtido assinando um JWT RS256 localmente (`node:crypto`). O servidor só conversa com hosts fixos do Google, então não há SSRF.
+- Só administradores enviam, removem ou consultam a chave e o relatório. Autores veem apenas os números das próprias receitas.
+- Enviar e remover a chave e enviar o sitemap ficam registrados na auditoria. As respostas ficam 1 hora em cache, respeitando a cota da API.
+
 ## Achados da auditoria (e correções)
 
 | Achado | Risco | Correção |

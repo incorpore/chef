@@ -35,6 +35,7 @@ const DEFAULTS = {
   commentsModeration: true,
   // E-mail (as credenciais SMTP ficam só nas variáveis de ambiente)
   siteUrl: '',
+  gscProperty: '', // propriedade do Google Search Console (vazio = detecta pelo endereço do site)
   notifyComments: true,
   newsletterDoubleOptIn: true,
   newsletterWelcome: true,
@@ -75,6 +76,7 @@ const PATTERNS = {
   defaultOgImage: [/^((https:\/\/|\/)[^\s"'<>]{1,1000})?$/, 'URL da imagem padrão inválida'],
   defaultRecipeImage: [/^((https:\/\/|\/(?!\/))[^\s"'<>]{1,1000})?$/, 'URL da imagem padrão das receitas inválida'],
   shareNetworks: [/^[a-z,]{0,200}$/, 'Lista de redes inválida'],
+  gscProperty: [/^(sc-domain:[a-z0-9.-]{3,200}|https?:\/\/[a-z0-9.-]{3,200}(:\d{1,5})?\/[^\s"'<>]{0,200})?$/i, 'Propriedade do Search Console inválida'],
   siteUrl: [/^(https?:\/\/[a-z0-9.-]+(:\d{1,5})?)?$/i, 'Endereço do site inválido (ex.: https://receitas.meusite.com.br, sem barra no final)'],
 };
 const MAX_LEN = { headHtml: 20000, adsTxt: 20000, aboutText: 20000, privacyText: 1000, description: 320, siteName: 60, tagline: 120, amazonDisclosure: 300, authorName: 80 };

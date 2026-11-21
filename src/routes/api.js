@@ -708,6 +708,52 @@ router.delete('/subscribers/:id', auth.requireAdmin, (req, res) => {
 });
 
 // ---------------- E-mail (SMTP) ----------------
+// ---------------- Google Search Console (relatório no painel) ----------------
+const gsc = require('../gsc');
+const gscWrap = (fn) => wrap(async (req, res) => {
+  try { await fn(req, res); } catch (e) {
+    if (e instanceof gsc.GscError) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
+});
+router.get('/gsc/status', auth.requireAdmin, (req, res) => res.json({ ...gsc.status(), siteUrl: mail.siteUrl() }));
+router.post('/gsc/key', auth.requireAdmin, rateLimit('gsc-key', 10, 10 * 60e3), gscWrap(async (req, res) => {
+  if (gsc.status().source === 'env') return res.status(409).json({ error: 'A chave está definida na variável GOOGLE_SERVICE_ACCOUNT; altere lá' });
+  const email = gsc.saveKey(typeof req.body?.key === 'string' ? req.body.key.slice(0, 20000) : '');
+  auth.audit(req, 'gsc.key', email);
+  res.json({ ok: true, email });
+}));
+router.delete('/gsc/key', auth.requireAdmin, (req, res) => {
+  gsc.removeKey();
+  auth.audit(req, 'gsc.key.remove');
+  res.json({ ok: true });
+});
+router.get('/gsc/sites', auth.requireAdmin, gscWrap(async (req, res) => res.json({ items: await gsc.sites(), current: await gsc.property() })));
+router.get('/gsc/report', auth.requireAdmin, rateLimit('gsc', 60, 60e3), gscWrap(async (req, res) => {
+  const days = [7, 28, 90].includes(Number(req.query.dias)) ? Number(req.query.dias) : 28;
+  const rep = await gsc.report(days);
+  // Liga cada página do Google à receita correspondente (título e link para editar)
+  const prefix = `${mail.siteUrl()}/receita/`;
+  for (const p of rep.pages) {
+    const slug = p.key.startsWith(prefix) ? decodeURIComponent(p.key.slice(prefix.length).split(/[?#]/)[0]) : '';
+    const r = slug ? db.get().prepare('SELECT id, title FROM recipes WHERE slug = ?').get(slug) : null;
+    p.title = r?.title || ''; p.recipeId = r?.id || null;
+    p.path = p.key.replace(/^https?:\/\/[^/]+/, '') || '/';
+  }
+  res.json(rep);
+}));
+router.get('/gsc/page/:ref', auth.requireUser, rateLimit('gsc', 60, 60e3), gscWrap(async (req, res) => {
+  const r = recipes.find(req.params.ref);
+  if (!r || !auth.canEditRecipe(req.user, r)) return notFound(res, 'Receita não encontrada');
+  if (!gsc.status().configured || !mail.siteUrl()) return res.json({ configured: false });
+  res.json({ configured: true, ...(await gsc.page(`${mail.siteUrl()}/receita/${r.slug}`)) });
+}));
+router.post('/gsc/sitemap', auth.requireAdmin, rateLimit('gsc-sitemap', 10, 60 * 60e3), gscWrap(async (req, res) => {
+  const url = await gsc.submitSitemap();
+  auth.audit(req, 'gsc.sitemap', url);
+  res.json({ ok: true, url });
+}));
+
 router.get('/mail/status', auth.requireAdmin, (req, res) => res.json(mail.status()));
 router.post('/mail/test', auth.requireAdmin, rateLimit('mail-test', 10, 10 * 60e3), wrap(async (req, res) => {
   const v = await mail.verify();

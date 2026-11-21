@@ -238,6 +238,19 @@ O Pinterest confere o feed regularmente e publica as receitas novas, até 200 po
 
 ---
 
+## Passo 10 (opcional) — Ver os dados do Google no painel
+
+Em **Painel → Google Search** você vê quantas pessoas acharam suas receitas no Google, com quais buscas e em que posição.
+
+1. O site precisa estar verificado no Google Search Console. O jeito mais fácil é pelo Tag Manager ou pelo campo **Configurações → Verificação → Google Search Console**.
+2. Abra **Painel → Google Search** e siga os 6 passos da tela. Em resumo:
+   - crie uma "conta de serviço" no Google Cloud;
+   - baixe o arquivo JSON e envie no painel;
+   - adicione o e-mail dela como usuário no Search Console.
+3. Pronto. Os números se atualizam sozinhos (o Google leva cerca de 2 dias para fechar cada dia), e o botão **Enviar sitemap agora** avisa o Google na hora.
+
+---
+
 ## Backup (importante!)
 
 Escolha uma das opções:

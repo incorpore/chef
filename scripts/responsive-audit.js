@@ -147,7 +147,7 @@ const detect = () => {
     await p.evaluate(() => localStorage.clear());
     // admin
     await ctx.addCookies(cookies);
-    for (const u of ['/admin', '/admin/receitas', '/admin/receitas/2', '/admin/importar', '/admin/configuracoes', '/admin/produtos', '/admin/anuncios', '/admin/api', '/admin/comentarios', '/admin/auditoria', '/admin/newsletter', '/admin/usuarios', '/admin/perfil']) {
+    for (const u of ['/admin', '/admin/receitas', '/admin/receitas/2', '/admin/importar', '/admin/configuracoes', '/admin/produtos', '/admin/anuncios', '/admin/api', '/admin/comentarios', '/admin/auditoria', '/admin/newsletter', '/admin/usuarios', '/admin/perfil', '/admin/google']) {
       await p.goto(B + u); await p.waitForTimeout(300);
       add(`${w}px ${u}`, await p.evaluate(detect));
     }
