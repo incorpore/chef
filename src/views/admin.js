@@ -399,6 +399,10 @@ function imageInput(name, value, fallback = '') {
   </div>`;
 }
 
+function feedRow(label, url, count) {
+  return `<div class="feed-row"><div><strong>${esc(label)}</strong>${count ? ` <small>${count} receitas</small>` : ''}<code>${esc(url)}</code></div><div class="feed-btns"><button type="button" class="btn btn-sm" data-copy-text="${esc(url)}">Copiar</button><a class="btn btn-ghost btn-sm" href="${esc(url)}" target="_blank" rel="noopener">Ver</a></div></div>`;
+}
+
 function simplePage({ user, title, active, body }) {
   return adminLayout({ title, user, active, body: `<header class="admin-head"><h1>${title}</h1></header>${body}` });
 }
@@ -461,7 +465,7 @@ function adsPage({ user }) {
     <table class="table table-admin"><thead><tr><th>Nome</th><th>Posição</th><th>Dispositivo</th><th>Impressões</th><th>Ativo</th><th></th></tr></thead><tbody data-ad-rows></tbody></table>` });
 }
 
-function settingsPage({ user }) {
+function settingsPage({ user, categories = [], siteUrl = '' }) {
   const s = settings.all();
   const v = (k) => esc(s[k]);
   return simplePage({ user, title: 'Configurações', active: 'settings', body: `
@@ -485,6 +489,21 @@ function settingsPage({ user }) {
       <p><small>Cole apenas o código do atributo <code>content</code> da meta tag fornecida por cada serviço.</small></p>
       <div class="row2">${field('Google Search Console', `<input name="googleSiteVerification" value="${v('googleSiteVerification')}">`)}${field('Bing Webmaster', `<input name="bingSiteVerification" value="${v('bingSiteVerification')}">`)}
       ${field('Pinterest', `<input name="pinterestVerification" value="${v('pinterestVerification')}">`)}${field('Facebook (domínio)', `<input name="facebookDomainVerification" value="${v('facebookDomainVerification')}">`)}</div>
+    </section>
+    <section class="panel" id="pinterest"><h2>📌 Pinterest (publicação automática)</h2>
+      <p>O Pinterest pode criar um Pin sozinho para cada receita nova, a partir de um <b>feed</b>. Cada Pin usa uma imagem vertical (1000×1500) gerada pelo site, com foto, nome da receita, tempo e o endereço do site.</p>
+      ${siteUrl ? '' : '<p class="form-error">Defina o <b>Endereço do site</b> (na seção E-mail) ou a variável BASE_URL: o Pinterest precisa do endereço público completo.</p>'}
+      <div class="feed-list">
+        ${feedRow('Todas as receitas', `${siteUrl}/feed/pinterest.xml`)}
+        ${categories.filter((c) => c.count).map((c) => feedRow(`${c.icon || ''} ${c.name}`.trim(), `${siteUrl}/feed/pinterest.xml?categoria=${encodeURIComponent(c.slug)}`, c.count)).join('')}
+      </div>
+      <details class="howto"><summary>Como ligar no Pinterest (5 minutos)</summary><ol>
+        <li>Use uma <b>conta comercial</b> do Pinterest (é grátis; dá para converter a sua em Configurações → Conta).</li>
+        <li><b>Reivindique o site</b>: Configurações → Contas reivindicadas → Sites. Escolha "Adicionar tag HTML", copie só o código do <code>content</code> e cole em <b>Verificação → Pinterest</b> aqui nesta página. Salve e confirme no Pinterest.</li>
+        <li>Crie uma <b>pasta</b> para cada feed que quiser (ex.: "Bolos", ou uma pasta só com todas as receitas).</li>
+        <li>No Pinterest: Configurações → <b>Criar Pins em massa</b> → <b>Publicar automaticamente</b> (Auto-publish) → cole o endereço do feed e escolha a pasta. Repita para cada categoria.</li>
+        <li>Pronto: o Pinterest confere o feed regularmente (até 1 vez por dia) e publica as receitas novas, até 200 Pins por dia.</li>
+      </ol><p><small>Dica: com a verificação do site feita, os Pins viram <b>Rich Pins</b> (mostram ingredientes e tempo) automaticamente, porque as páginas já têm os dados estruturados de receita.</small></p></details>
     </section>
     <section class="panel"><h2>Compartilhamento</h2>
       <div class="row2">${field('Botões de compartilhar (ordem)', `<input name="shareNetworks" value="${v('shareNetworks')}">`, 'Opções: whatsapp, pinterest, facebook, telegram, x, email')}${field('@ no X/Twitter', `<input name="twitterHandle" value="${v('twitterHandle')}" placeholder="@seusite">`)}</div>

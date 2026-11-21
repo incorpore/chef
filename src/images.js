@@ -16,6 +16,11 @@ const config = require('./config');
 
 let sharp = null;
 try {
+  // Fontes embutidas (assets/fonts) para o texto das imagens do Pinterest; evita depender de fontes do sistema
+  if (!process.env.FONTCONFIG_FILE) {
+    process.env.FONTCONFIG_FILE = path.join(config.root, 'assets', 'fonts', 'fonts.conf');
+    try { fs.mkdirSync('/tmp/chef-fontconfig', { recursive: true }); } catch { /* sem cache de fontes: só fica mais lento */ }
+  }
   sharp = require('sharp');
   sharp.concurrency(1); // aparelhos pequenos (ZimaOS/Raspberry): uma imagem por vez, pouca memória
   sharp.cache(false);

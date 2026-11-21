@@ -225,6 +225,19 @@ Se der erro, a mensagem explica o motivo (senha recusada, porta errada etc.).
 
 ---
 
+## Passo 9 (opcional) — Pinterest automático
+
+O Chef cria sozinho um Pin para cada receita nova. Os Pins usam uma imagem vertical com a foto, o nome da receita e o endereço do seu site.
+
+1. O site precisa estar aberto na internet (passo 6), com o `BASE_URL` preenchido.
+2. No Pinterest, use uma **conta comercial** (é grátis) e **reivindique o site**: Configurações → Contas reivindicadas → Sites → "Adicionar tag HTML". Cole o código em **Painel do Chef → Configurações → Verificação → Pinterest** e salve.
+3. Em **Painel → Configurações → Pinterest**, copie o endereço do feed: um com todas as receitas, ou um por categoria.
+4. No Pinterest: Configurações → **Criar Pins em massa** → **Publicar automaticamente** → cole o endereço e escolha a pasta.
+
+O Pinterest confere o feed regularmente e publica as receitas novas, até 200 por dia.
+
+---
+
 ## Backup (importante!)
 
 Escolha uma das opções:

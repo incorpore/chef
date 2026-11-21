@@ -166,3 +166,51 @@ test('WebP já otimizado (como o painel envia) não é comprimido de novo', asyn
   const saved = fs.readFileSync(path.join(process.env.UPLOADS_DIR, path.basename(r.data.files[0].url)));
   assert.ok(saved.equals(webp), 'arquivo guardado exatamente como enviado');
 });
+
+test('Pinterest: imagem vertical 1000×1500 em JPEG, com e sem foto; rascunho não aparece', async () => {
+  const png = await sharp({ create: { width: 1600, height: 1200, channels: 3, background: '#c9a227' } }).png().toBuffer();
+  const cover = (await upload(png, 'image/png', 'pin.png')).data.files[0].url;
+  const withPhoto = await (await req('POST', '/api/v1/recipes', { body: { title: 'Pudim de leite condensado', cover, ingredients: 'a\nb\nc', steps: 'x\ny\nz', prep_minutes: 20, cook_minutes: 50, status: 'published' } })).json();
+  const noPhoto = await (await req('POST', '/api/v1/recipes', { body: { title: 'Caldo verde da vovó com linguiça calabresa e couve bem fininha', ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'published' } })).json();
+  for (const r of [withPhoto, noPhoto]) {
+    const res = await fetch(`${base}/pin/${r.code}.jpg`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'image/jpeg');
+    const m = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+    assert.deepEqual([m.format, m.width, m.height], ['jpeg', 1000, 1500]);
+  }
+  const draft = await (await req('POST', '/api/v1/recipes', { body: { title: 'Rascunho', ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'draft' } })).json();
+  assert.equal((await fetch(`${base}/pin/${draft.code}.jpg`)).status, 404);
+  // a imagem muda (nova versão) quando o título muda
+  const pin = require('../src/pin');
+  const recipes = require('../src/recipes');
+  const v1 = pin.pinUrl(recipes.getById(withPhoto.id));
+  await req('PUT', `/api/v1/recipes/${withPhoto.id}`, { body: { title: 'Pudim de leite condensado sem furinhos' } });
+  assert.notEqual(pin.pinUrl(recipes.getById(withPhoto.id)), v1);
+  // botão "Pinterest" da receita usa a imagem vertical
+  const page = await (await fetch(`${base}/receita/${noPhoto.slug}`)).text();
+  assert.match(page, new RegExp(`pinterest\\.com/pin/create/button/\\?url=[^"]+&amp;media=${encodeURIComponent(`${base}/pin/${noPhoto.code}.jpg?v=`).replace(/[.?]/g, '\\$&')}`));
+});
+
+test('Pinterest: feed RSS com imagem vertical, descrição com hashtags, UTM e filtro por categoria', async () => {
+  await req('POST', '/api/v1/categories', { body: { name: 'Sobremesas' } });
+  const cat = (await (await fetch(`${base}/api/v1/categories`)).json()).items.find((c) => c.name === 'Sobremesas');
+  await req('POST', '/api/v1/recipes', { body: { title: 'Mousse de maracujá', description: 'Cremosa e pronta em 10 minutos.', category_id: cat.id, tags: ['mousse', 'maracujá'], ingredients: 'a\nb\nc', steps: 'x\ny\nz', prep_minutes: 10, difficulty: 1, servings: 6, status: 'published' } });
+  let res = await fetch(`${base}/feed/pinterest.xml`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /application\/rss\+xml/);
+  const xml = await res.text();
+  assert.match(xml, /^<\?xml version="1.0" encoding="UTF-8"\?>\n<rss version="2.0"/);
+  assert.match(xml, /<item><title>Mousse de maracujá<\/title><link>[^<]+\/receita\/mousse-de-maracuja\?utm_source=pinterest&amp;utm_medium=social&amp;utm_campaign=rss<\/link>/);
+  assert.match(xml, /<enclosure url="[^"]+\/pin\/[A-Z0-9]+\.jpg\?v=[0-9a-f]{10}" type="image\/jpeg" length="0"\/>/);
+  assert.match(xml, /<media:content url="[^"]+\/pin\/[A-Z0-9]+\.jpg\?v=[0-9a-f]{10}" medium="image" type="image\/jpeg" width="1000" height="1500"\/>/);
+  assert.match(xml, /Cremosa e pronta em 10 minutos\.\n\n⏱ 10 min · Dificuldade: Fácil · Rende 6 porções/);
+  assert.match(xml, /#maracuja #mousse #Sobremesas/);
+  assert.doesNotMatch(xml, /Rascunho/, 'rascunhos ficam fora');
+  res = await fetch(`${base}/feed/pinterest.xml?categoria=${cat.slug}`);
+  const only = await res.text();
+  assert.equal((only.match(/<item>/g) || []).length, 1, 'só a categoria pedida');
+  assert.equal((await fetch(`${base}/feed/pinterest.xml?categoria=nao-existe`)).status, 404);
+  const settings = await (await req('GET', '/admin/configuracoes')).text();
+  assert.match(settings, /\/feed\/pinterest\.xml\?categoria=sobremesas/, 'painel lista o feed de cada categoria');
+});

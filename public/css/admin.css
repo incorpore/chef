@@ -261,3 +261,14 @@ td.row-actions > * + * { margin-left: 10px; }
   .table-recipes tr.row-selected { background: color-mix(in srgb, var(--brand) 8%, var(--surface)); }
   .admin-filter select { flex: 1 1 40%; }
 }
+
+/* Pinterest: lista de feeds */
+.feed-list { display: grid; gap: 8px; margin: 12px 0; }
+.feed-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.feed-row > div:first-child { min-width: 0; flex: 1 1 260px; display: grid; gap: 2px; }
+.feed-row small { color: var(--ink-3); font-weight: 400; }
+.feed-row code { font-size: .8rem; color: var(--ink-2); overflow-wrap: anywhere; background: none; padding: 0; }
+.feed-btns { display: flex; gap: 6px; }
+.howto summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+.howto ol { padding-left: 1.2rem; line-height: 1.6; }
+.row3 .field:has(.image-input), .row2 .field:has(.image-input) { grid-column: 1 / -1; }

@@ -210,6 +210,53 @@ ${items.map((r) => `<item><title>${u.esc(r.title)}</title><link>${b}/receita/${u
   res.type('application/rss+xml').send(xml);
 });
 
+// ---------------- Pinterest: imagem vertical do pin e feed RSS para publicação automática ----------------
+router.get('/pin/:code.jpg', async (req, res, next) => {
+  try {
+    const r = recipes.getByCode(req.params.code);
+    if (!r || r.status !== 'published') return res.sendStatus(404);
+    const file = await require('../pin').file(r);
+    if (!file) return res.redirect(302, r.cover || r.cover_auto || '/icons/icon-512.png');
+    res.set('Cache-Control', 'public, max-age=604800').type('image/jpeg').sendFile(file, { dotfiles: 'allow' });
+  } catch (e) { next(e); }
+});
+
+/**
+ * Feed para o Pinterest (Configurações da conta comercial → Criar Pins em massa → Publicar automaticamente).
+ * Um feed por pasta: /feed/pinterest.xml (todas) ou ?categoria=slug. Cada item: título, descrição com
+ * tempo/dificuldade e hashtags, link com UTM e a imagem vertical 1000×1500 em JPEG.
+ */
+router.get('/feed/pinterest.xml', (req, res) => {
+  const b = base(req);
+  const s = settings.all();
+  const catSlug = String(req.query.categoria || '').slice(0, 80);
+  const cat = catSlug ? recipes.categories().find((c) => c.slug === catSlug) : null;
+  if (catSlug && !cat) return res.status(404).type('text/plain').send('Categoria não encontrada');
+  const limit = Math.min(200, Math.max(1, Number(req.query.limite) || 100));
+  const items = recipes.search({ sort: 'recent', perPage: 100, category: cat ? cat.slug : undefined }).items
+    .concat(limit > 100 ? recipes.search({ sort: 'recent', perPage: 100, page: 2, category: cat ? cat.slug : undefined }).items : [])
+    .slice(0, limit);
+  const pin = require('../pin');
+  const D = { 1: 'Fácil', 2: 'Média', 3: 'Difícil' };
+  const cut = (t, n) => (t.length > n ? `${t.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : t);
+  const desc = (r) => {
+    const meta = [r.total_minutes ? `⏱ ${u.formatMinutes(r.total_minutes)}` : '', D[r.difficulty] ? `Dificuldade: ${D[r.difficulty]}` : '', r.servings ? `Rende ${String(r.servings).replace('.', ',')} ${r.servings_unit || 'porções'}` : ''].filter(Boolean).join(' · ');
+    const tags = [...(r.tags || []), r.category?.name].filter(Boolean).slice(0, 6).map((t) => `#${u.stripAccents(t).replace(/[^A-Za-z0-9]+/g, '')}`).filter((t) => t.length > 2);
+    return cut([r.description, meta, `Receita completa e passo a passo no ${s.siteName}.`, tags.join(' ')].filter(Boolean).join('\n\n'), 500);
+  };
+  const self = `${b}/feed/pinterest.xml${cat ? `?categoria=${encodeURIComponent(cat.slug)}` : ''}`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
+<title>${u.esc(cat ? `${cat.name} · ${s.siteName}` : s.siteName)}</title><link>${b}/${cat ? `categoria/${u.esc(cat.slug)}` : ''}</link><description>${u.esc(cat?.description || s.description)}</description><language>pt-BR</language><atom:link href="${u.esc(self)}" rel="self" type="application/rss+xml"/>
+${items.map((r) => {
+    const img = `${b}${pin.pinUrl(r)}`;
+    const link = `${b}/receita/${r.slug}?utm_source=pinterest&utm_medium=social&utm_campaign=rss`;
+    return `<item><title>${u.esc(cut(r.title, 100))}</title><link>${u.esc(link)}</link><guid isPermaLink="false">${u.esc(r.code)}</guid><pubDate>${new Date(r.published_at || r.created_at).toUTCString()}</pubDate><description>${u.esc(desc(r))}</description><enclosure url="${u.esc(img)}" type="image/jpeg" length="0"/><media:content url="${u.esc(img)}" medium="image" type="image/jpeg" width="${pin.W}" height="${pin.H}"/></item>`;
+  }).join('\n')}
+</channel></rss>`;
+  res.set('Cache-Control', 'public, max-age=900').type('application/rss+xml').send(xml);
+});
+
 router.get('/manifest.webmanifest', (req, res) => {
   const s = settings.all();
   res.type('application/manifest+json').send(JSON.stringify({

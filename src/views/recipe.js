@@ -313,10 +313,12 @@ function shareBar(r, base) {
   const enc = encodeURIComponent;
   const text = `${r.title} — receita #${r.code}`;
   const img = r.cover ? (r.cover.startsWith('/') ? base + r.cover : r.cover) : '';
+  const pinPath = require('../pin').pinUrl(r); // imagem vertical 2:3 feita para o Pinterest
+  const pinImg = pinPath && r.status === 'published' ? base + pinPath : '';
   const utm = (src) => `${url}?utm_source=${src}&utm_medium=social&utm_campaign=share`;
   const nets = {
     whatsapp: ['WhatsApp', `https://wa.me/?text=${enc(`${text}\n${utm('whatsapp')}`)}`, '#25D366'],
-    pinterest: ['Pinterest', `https://pinterest.com/pin/create/button/?url=${enc(utm('pinterest'))}&media=${enc(img)}&description=${enc(text)}`, '#E60023'],
+    pinterest: ['Pinterest', `https://pinterest.com/pin/create/button/?url=${enc(utm('pinterest'))}&media=${enc(pinImg || img)}&description=${enc(text)}`, '#E60023'],
     facebook: ['Facebook', `https://www.facebook.com/sharer/sharer.php?u=${enc(utm('facebook'))}`, '#1877F2'],
     telegram: ['Telegram', `https://t.me/share/url?url=${enc(utm('telegram'))}&text=${enc(text)}`, '#26A5E4'],
     x: ['X', `https://x.com/intent/post?url=${enc(utm('x'))}&text=${enc(text)}${s.twitterHandle ? `&via=${enc(s.twitterHandle.replace(/^@/, ''))}` : ''}`, '#000'],

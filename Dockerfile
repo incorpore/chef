@@ -28,6 +28,7 @@ COPY package.json server.js ./
 COPY src ./src
 COPY public ./public
 COPY scripts ./scripts
+COPY assets ./assets
 RUN mkdir -p /app/data /app/uploads \
  && chown -R node:node /app/data /app/uploads
 

@@ -66,6 +66,11 @@ ok "instalação com token + login funcionando em HTTP"
 curl -fsS -b "$JAR" -H "origin: $BASE" -X POST "$BASE/api/v1/recipes" -H 'content-type: application/json' \
   -d '{"title":"Bolo de teste","code":"ZIMA01","ingredients":"2 ovos\n1 xícara de açúcar","steps":"Misture.\nAsse por 30 minutos.","status":"published"}' | grep -q '"code":"ZIMA01"' || fail "criar receita"
 curl -fsS "$BASE/receita/bolo-de-teste" | grep -q 'ZIMA01' || fail "página da receita"
+CT="$(curl -fsS -o "$DIR/pin.jpg" -w '%{content_type}' "$BASE/pin/ZIMA01.jpg")" || fail "imagem do Pinterest não abre"
+[ "$CT" = "image/jpeg" ] && [ "$(wc -c < "$DIR/pin.jpg")" -gt 10000 ] || fail "imagem do Pinterest inválida ($CT)"
+curl -fsS "$BASE/feed/pinterest.xml" | grep -q '/pin/ZIMA01.jpg' || fail "feed do Pinterest sem a receita"
+docker logs "$NAME" 2>&1 | grep -qi 'fontconfig error' && fail "erro de fontes ao gerar a imagem do Pinterest"
+ok "Pinterest: imagem vertical (com fontes embutidas) e feed funcionando"
 ok "receita criada e publicada"
 
 printf '\211PNG\r\n\032\n\000\000\000\rIHDR\000\000\000\001\000\000\000\001\010\006\000\000\000\037\025\304\211\000\000\000\rIDATx\332c\374\317\300P\017\000\004\205\001\200\204\251\214!\000\000\000\000IEND\256B`\202' > "$DIR/foto.png"

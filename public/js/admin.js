@@ -564,6 +564,11 @@
   });
   document.addEventListener('input', (e) => { const box = e.target.closest?.('[data-image-input]'); if (box) paintImageInput(box); });
 
+  // Botões "Copiar" genéricos (ex.: endereços dos feeds do Pinterest)
+  on('[data-copy-text]', 'click', async (e, b) => {
+    if (await window.Chef.copyText(b.dataset.copyText)) { toast('📋 Copiado'); b.textContent = 'Copiado ✓'; setTimeout(() => { b.textContent = 'Copiar'; }, 1800); } else prompt('Copie:', b.dataset.copyText);
+  });
+
   // ---------------- Meu perfil ----------------
   const prof = $('[data-profile]');
   if (prof) {

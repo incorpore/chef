@@ -48,6 +48,12 @@ Botões só com ícone (👍 👎) na receita, com a contagem ao lado. Um voto p
 - **"Incorporar"**: gera um `<iframe>` com o cartão da receita para outros blogs, com link de volta para o seu site.
 - Imagens e textos de pré‑visualização (Open Graph e Twitter Card) em todas as páginas, com imagem padrão configurável.
 
+### Pinterest automático
+- **Feed para publicação automática** em `/feed/pinterest.xml` (todas) ou `/feed/pinterest.xml?categoria=slug` (uma pasta por categoria). No Pinterest: Configurações → Criar Pins em massa → Publicar automaticamente.
+- Cada receita ganha uma **imagem vertical 1000×1500** (`/pin/CODIGO.jpg`): foto + nome + tempo + endereço do site, ou um "pin de texto" colorido quando não há foto. Fontes embutidas (Playfair Display e Inter, licença OFL).
+- Descrição com tempo, dificuldade, rendimento e hashtags; link com UTM (`utm_source=pinterest`) para medir as visitas no Analytics.
+- O botão "Pinterest" da receita também usa a imagem vertical. Os endereços dos feeds e o passo a passo ficam em **Painel → Configurações → Pinterest**.
+
 ### Google AdSense, Analytics e outros (Painel → Configurações)
 Basta colar os IDs; os scripts são inseridos automaticamente:
 - **Google Analytics 4**, **Google Tag Manager**, **Google AdSense** (com `ads.txt` e a meta `google-adsense-account`), **Meta Pixel** e **Microsoft Clarity**.
@@ -102,7 +108,7 @@ Acesse `/admin` para criar a conta de administrador. Em produção, o primeiro a
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | Servidor com recarga automática |
-| `npm test` | 93 testes: funcionalidades, **segurança (ataques)** e **SEO** |
+| `npm test` | 95 testes: funcionalidades, **segurança (ataques)** e **SEO** |
 | `npm run stress` | Teste de carga e de limites da API (2.000 receitas, 32 conexões) |
 | `npm run audit:secrets` | Procura senhas/chaves vazadas nos arquivos **e no histórico do Git** |
 | `sh scripts/smoke-test.sh IMAGEM` | Testa a imagem Docker como se fosse o ZimaOS (instalação, login, upload, reinício) |
