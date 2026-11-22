@@ -2,7 +2,7 @@
 
 [![Imagem Docker](https://github.com/incorpore/chef/actions/workflows/docker.yml/badge.svg)](https://github.com/incorpore/chef/actions/workflows/docker.yml) · Imagem: [`ghcr.io/incorpore/chef:latest`](https://github.com/users/incorpore/packages/container/package/chef)
 
-Site/sistema para publicar e compartilhar suas receitas, com **busca por palavra‑chave ou código**, **fotos e vídeos**, **API REST**, **importação por URL**, **anúncios**, **afiliados da Amazon** e um **Modo Cozinha** para acompanhar a receita passo a passo — instalável no celular como um app nativo.
+Site/sistema para publicar e compartilhar suas receitas, com **busca por palavra‑chave ou código**, **fotos e vídeos**, **API REST**, **importação por URL**, **anúncios**, **afiliados (Amazon, Shopee e Mercado Livre)** e um **Modo Cozinha** para acompanhar a receita passo a passo — instalável no celular como um app nativo.
 
 ## Destaques
 
@@ -34,7 +34,13 @@ Site/sistema para publicar e compartilhar suas receitas, com **busca por palavra
 
 ### Monetização
 - **Anúncios** em 9 posições (topo, entre receitas, antes dos ingredientes, entre os passos, barra lateral, tela final do modo cozinha…), com rotação por peso, segmentação celular/desktop e contagem de impressões. Integração com **Google AdSense**, incluindo o `ads.txt` automático.
-- **Afiliados Amazon**: cadastre produtos por link ou ASIN e a **tag de associado é adicionada automaticamente**. Os cliques são contados em `/go/ID`. Há vitrine de produtos por receita e **botão de compra ao lado do ingrediente**, que aparece por palavra‑chave. O aviso de afiliado é exibido junto.
+- **Afiliados (Amazon, Shopee, Mercado Livre)**: em Painel → Afiliados, **cole o link do produto** e título, foto, preço e link de afiliado são preenchidos sozinhos; é só conferir e salvar.
+  - **Amazon**: o ASIN é lido do link (inclusive `amzn.to`) e a **tag de associado entra automaticamente**. Quando a Amazon bloqueia a leitura, o título vem do link e a foto do ASIN (com aviso para conferir).
+  - **Shopee**: com o AppID e a Senha da Open API de afiliados (painel ou variáveis `SHOPEE_APP_ID` / `SHOPEE_SECRET`), o site gera o **link de comissão** e lê os dados pela API oficial. Há botão "Testar conexão".
+  - **Mercado Livre**: cole o link gerado no painel de afiliados (`meli.la/…`); os dados vêm da página do produto. (O Mercado Livre não oferece busca pública por API, então a busca automática é só pela Shopee.)
+  - **Atualização automática** de preço, disponibilidade e link a cada 6 h a 4 dias (padrão 24 h), com status e "atualizar agora" por produto.
+  - **Utensílios automáticos**: o site detecta os utensílios citados no preparo ("bata no liquidificador", "forma de 25 cm", "micro-ondas"…) e mostra o produto certo na seção **"Utensílios desta receita"**. Com a Shopee configurada, busca sozinho produtos para os utensílios que faltam. Se a receita não cita utensílio, aparece a vitrine **"Para a sua cozinha"**.
+  - Cliques contados em `/go/ID`, botão de compra ao lado do ingrediente (por palavra‑chave), ações em massa e aviso de afiliado.
 
 ### Funções de blog de receitas
 Favoritos (funcionam offline), lista de compras que **soma ingredientes** de várias receitas, **cardápio semanal** que gera a lista de compras, conversor de medidas, avaliações com estrelas e comentários moderados (com anti‑spam), "Fiz esta receita!", receitas relacionadas, anterior/próxima, "Me surpreenda", newsletter (exporta CSV), categorias com ícone, tags, dietas, informação nutricional, dicas, história da receita, versão para impressão e compartilhamento (WhatsApp/Web Share).
@@ -170,6 +176,7 @@ Para gerar a imagem a partir do código: `docker build -t chef .`. Para testar a
 | `MAIL_FROM` / `MAIL_REPLY_TO` | `SMTP_USER` | Remetente e endereço de resposta |
 | `MAIL_ADMIN` | admins | Quem recebe os avisos (separe vários por vírgula) |
 | `MAIL_RATE_PER_MIN` | `30` | Velocidade de envio da newsletter |
+| `SHOPEE_APP_ID` / `SHOPEE_SECRET` | — | (Opcional) Credenciais da Open API da Shopee Afiliados (alternativa: Painel → Afiliados) |
 | `PEXELS_API_KEY` / `PIXABAY_API_KEY` | — | (Opcional) Chaves dos bancos de imagens para as fotos automáticas (alternativa: Painel → Fotos automáticas) |
 | `GOOGLE_SERVICE_ACCOUNT` | — | (Opcional) JSON da conta de serviço do Search Console, inteiro ou em base64. Alternativa: enviar o arquivo em Painel → Google Search |
 
@@ -202,7 +209,10 @@ src/app.js           Express e middlewares
 src/db.js            esquema SQLite e FTS5
 src/recipes.js       CRUD, busca (palavra-chave, código, ingredientes)
 src/importer.js      importação por URL (JSON-LD, microdata, heurística)
-src/monetization.js  anúncios e afiliados Amazon
+src/monetization.js  anúncios e vitrine de produtos
+src/affiliates.js    afiliados por link (Amazon, Shopee, Mercado Livre) e atualização automática
+src/shopee.js        cliente da Open API da Shopee Afiliados
+src/utensils.js      detecção de utensílios no modo de preparo
 src/routes/          api.js (REST), pages.js (site), admin.js (painel)
 src/views/           templates HTML renderizados no servidor
 public/js/           app.js (PWA, timers, favoritos), recipe.js (modo cozinha), tools.js, admin.js

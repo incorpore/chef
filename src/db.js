@@ -90,6 +90,12 @@ CREATE TABLE IF NOT EXISTS products (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Utensílios já buscados automaticamente (evita repetir a busca toda hora)
+CREATE TABLE IF NOT EXISTS utensil_searches (
+  key TEXT PRIMARY KEY,
+  searched_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS recipe_products (
   recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
   product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -223,6 +229,18 @@ const COLUMNS = [
   // Crédito da foto de capa (ex.: "Foto: Ana Lima / Pexels") e link do autor/banco de imagens
   ['recipes', 'cover_credit', "TEXT DEFAULT ''"],
   ['recipes', 'cover_credit_url', "TEXT DEFAULT ''"],
+  // Afiliados por link (Amazon, Shopee, Mercado Livre) com atualização automática
+  ['products', 'store', "TEXT NOT NULL DEFAULT 'amazon'"],
+  ['products', 'external_id', "TEXT DEFAULT ''"],
+  ['products', 'source_url', "TEXT DEFAULT ''"],
+  ['products', 'aff_url', "TEXT DEFAULT ''"],
+  ['products', 'price_value', 'REAL DEFAULT NULL'],
+  ['products', 'refreshed_at', 'TEXT DEFAULT NULL'],
+  ['products', 'refresh_error', "TEXT DEFAULT ''"],
+  ['products', 'available', 'INTEGER NOT NULL DEFAULT 1'],
+  ['products', 'auto', 'INTEGER NOT NULL DEFAULT 0'],
+  ['products', 'utensil', "TEXT DEFAULT ''"],
+  ['products', 'category', "TEXT DEFAULT ''"],
 ];
 
 function migrate(d) {
@@ -230,6 +248,7 @@ function migrate(d) {
     const exists = d.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
     if (!exists) d.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
   }
+  d.exec("CREATE INDEX IF NOT EXISTS idx_products_ext ON products(store, external_id); CREATE INDEX IF NOT EXISTS idx_products_utensil ON products(utensil)");
   // Categorias sem ícone (ex.: criadas por importação) ganham um emoji a partir do nome
   const { categoryEmoji } = require('./cover');
   for (const c of d.prepare("SELECT id, name FROM categories WHERE icon IS NULL OR trim(icon) = ''").all()) {

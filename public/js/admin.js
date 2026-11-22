@@ -544,13 +544,6 @@
   }
 
   crud({
-    form: '[data-product-form]', list: '[data-product-list]', path: '/products',
-    toBody: (f) => { const b = Object.fromEntries(new FormData(f)); if (/^[A-Z0-9]{10}$/i.test(b.url.trim())) { b.asin = b.url.trim(); b.url = ''; } return b; },
-    fill: (f, p) => { for (const k of ['id', 'title', 'image', 'price', 'badge', 'description', 'keywords']) f[k].value = p[k] || ''; f.url.value = p.url || p.asin; },
-    row: (p) => `<div class="product-admin">${p.image ? `<img src="${esc(p.image)}" alt="">` : '<div class="product-ph">🛒</div>'}<div><strong>${esc(p.title)}</strong><br><small>${p.asin ? `ASIN ${esc(p.asin)} · ` : ''}${p.clicks} cliques${p.keywords ? ` · 🔑 ${esc(p.keywords)}` : ''}</small><div class="row-actions"><a href="/go/${p.id}" target="_blank">testar link</a> <button class="link" data-edit="${p.id}">editar</button> <button class="link" data-del="${p.id}">remover</button></div></div></div>`,
-  });
-
-  crud({
     form: '[data-ad-form]', list: '[data-ad-rows]', path: '/ads',
     toBody: (f) => ({ ...Object.fromEntries(new FormData(f)), active: f.active.checked }),
     fill: (f, a) => { for (const k of ['id', 'name', 'slot', 'device', 'html', 'weight']) f[k].value = a[k]; f.active.checked = !!a.active; },

@@ -350,6 +350,7 @@ select { padding: .65rem 2rem .65rem .9rem; border-radius: 999px; border: 1px so
 .product-info small { color: var(--ink-3); font-size: .8rem; }
 .product-cta { margin-top: auto; font-size: .85rem; font-weight: 700; color: #c45500; }
 .product-cta em { font-style: normal; color: var(--ink); margin-right: 6px; }
+.product-for { align-self: flex-start; font-size: .72rem; font-weight: 700; padding: .12em .55em; border-radius: 999px; background: color-mix(in srgb, var(--brand) 12%, var(--surface)); color: var(--brand); }
 .badge { align-self: flex-start; font-size: .68rem; font-weight: 700; padding: .1em .5em; border-radius: 6px; background: #ff9900; color: #111; text-transform: uppercase; }
 .disclosure { font-size: .78rem; color: var(--ink-3); margin: 12px 0 0; }
 

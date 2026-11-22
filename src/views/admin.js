@@ -25,7 +25,7 @@ ${user ? `<aside class="admin-nav">
   ${item('/admin/importar', 'download', 'Importar', 'import')}
   ${user.role === 'admin' ? item('/admin/categorias', 'layers', 'Categorias', 'cats') : ''}
   ${item('/admin/comentarios', 'star', 'Comentários', 'comments')}
-  ${user.role === 'admin' ? item('/admin/produtos', 'cart', 'Afiliados Amazon', 'products') : ''}
+  ${user.role === 'admin' ? item('/admin/produtos', 'cart', 'Afiliados', 'products') : ''}
   ${user.role === 'admin' ? item('/admin/anuncios', 'flame', 'Anúncios', 'ads') : ''}
   ${user.role === 'admin' ? item('/admin/newsletter', 'share', 'Newsletter', 'newsletter') : ''}
   ${item('/admin/api', 'qr', 'API', 'api')}
@@ -452,19 +452,71 @@ function commentsPage({ user }) {
 
 function productsPage({ user }) {
   const s = settings.all();
-  return simplePage({ user, title: 'Afiliados Amazon', active: 'products', body: `
-    <section class="panel">
-      <p>Tag de associado: <b>${s.amazonTag ? esc(s.amazonTag) : '<span class="warn">não configurada</span>'}</b> — <a href="/admin/configuracoes">alterar</a>. A tag é adicionada automaticamente a todos os links da Amazon. Cliques passam por <code>/go/ID</code> para contagem.</p>
-      <form class="product-form" data-product-form>
-        <input type="hidden" name="id">
-        <div class="row2">${field('Link da Amazon ou ASIN', '<input name="url" placeholder="https://www.amazon.com.br/dp/B0... ou amzn.to/..." required>')}${field('Título', '<input name="title" required>')}</div>
-        <div class="row3">${field('Imagem (URL)', '<input name="image" placeholder="https://m.media-amazon.com/images/...">')}${field('Preço (texto)', '<input name="price" placeholder="R$ 89,90">')}${field('Selo', '<input name="badge" placeholder="Mais vendido">')}</div>
-        ${field('Descrição curta', '<input name="description">')}
-        ${field('Palavras-chave (ingredientes)', '<input name="keywords" placeholder="chocolate, cacau">', 'Quando um ingrediente da receita contiver uma dessas palavras, um botão de compra aparece ao lado dele.')}
-        <div><button class="btn btn-primary">Salvar produto</button> <button type="reset" class="btn btn-ghost">Limpar</button></div>
+  const utensilOptions = require('../utensils').options().map((o) => `<option value="${esc(o.key)}">${esc(o.label)}</option>`).join('');
+  return adminLayout({ title: 'Afiliados', user, active: 'products', scripts: ['/js/products.js'], body: `
+  <header class="admin-head"><h1>Afiliados</h1></header>
+
+  <section class="panel aff-add">
+    <h2>Adicionar produto pelo link</h2>
+    <p class="hint">Cole o link do produto da <b>Amazon</b>, da <b>Shopee</b> ou do <b>Mercado Livre</b>. Título, foto, preço e link de afiliado são preenchidos sozinhos; você só confere e salva.</p>
+    <form class="aff-paste" data-aff-paste>
+      <input name="url" type="text" inputmode="url" placeholder="https://www.amazon.com.br/dp/…  ·  https://shopee.com.br/…  ·  https://meli.la/…" aria-label="Link do produto" autocomplete="off" spellcheck="false" required>
+      <button class="btn btn-primary">Buscar dados</button>
+    </form>
+    <div class="aff-preview" data-aff-preview hidden>
+      <div class="aff-preview-img"><img alt="" data-aff-img><span class="aff-store" data-aff-store></span></div>
+      <form class="aff-form" data-aff-form>
+        <input type="hidden" name="id"><input type="hidden" name="store"><input type="hidden" name="external_id"><input type="hidden" name="source_url"><input type="hidden" name="aff_url"><input type="hidden" name="asin"><input type="hidden" name="price_value">
+        <ul class="aff-warn" data-aff-warn hidden></ul>
+        ${field('Título', '<input name="title" required maxlength="200">')}
+        <div class="row3">${field('Preço', '<input name="price" placeholder="R$ 89,90">')}${field('Selo (opcional)', '<input name="badge" placeholder="Mais vendido" maxlength="30">')}${field('Utensílio', `<select name="utensil"><option value="">— nenhum —</option>${utensilOptions}</select>`, 'Aparece nas receitas que citam esse utensílio.')}</div>
+        ${field('Imagem', '<input name="image" placeholder="https://…">')}
+        ${field('Link do produto', '<input name="url" placeholder="https://…">')}
+        ${field('Palavras-chave (ingredientes)', '<input name="keywords" placeholder="chocolate, cacau">', 'Opcional: quando um ingrediente contiver uma dessas palavras, aparece um carrinho ao lado dele.')}
+        ${field('Descrição curta (opcional)', '<input name="description" maxlength="300">')}
+        <label class="check"><input type="checkbox" name="cozinha"> Mostrar também como sugestão geral de cozinha (receitas sem utensílio)</label>
+        <div class="aff-actions"><button class="btn btn-primary" data-aff-save>Salvar produto</button><button type="button" class="btn btn-ghost" data-aff-cancel>Cancelar</button></div>
       </form>
+    </div>
+  </section>
+
+  <div class="two-col aff-cols">
+    <section class="panel aff-shopee" data-aff-shopee>
+      <div class="aff-head"><h2>Shopee Afiliados</h2><span class="stock-badge" data-shopee-badge>—</span></div>
+      <p class="hint">No <a href="https://affiliate.shopee.com.br/open_api" target="_blank" rel="noopener">painel de afiliados da Shopee → Open API</a>, copie o <b>AppID</b> e a <b>Senha</b>. Com isso o site gera links de comissão e encontra utensílios sozinho.</p>
+      <form class="aff-shopee-form" data-shopee-form>
+        <div class="row2">${field('AppID', '<input name="appId" inputmode="numeric" autocomplete="off" spellcheck="false">')}${field('Senha (Secret)', '<input name="secret" type="password" autocomplete="new-password" spellcheck="false">')}</div>
+        <div class="aff-actions"><button class="btn btn-sm btn-primary">Salvar</button><button type="button" class="btn btn-sm" data-shopee-test>Testar conexão</button><button type="button" class="link danger" data-shopee-remove hidden>remover</button></div>
+      </form>
+      <p class="hint" data-shopee-result></p>
     </section>
-    <div class="product-admin-grid" data-product-list></div>` });
+    <section class="panel aff-auto" data-aff-auto>
+      <h2>Automático</h2>
+      <form class="aff-auto-form" data-aff-auto-form>
+        <label class="check"><input type="checkbox" name="productAutoRefresh"> Atualizar preço, estoque e link sozinho</label>
+        <label class="aff-hours"><span>A cada</span><select name="productRefreshHours"><option value="6">6 horas</option><option value="12">12 horas</option><option value="24">24 horas</option><option value="48">2 dias</option><option value="72">3 dias</option><option value="96">4 dias</option></select></label>
+        <label class="check"><input type="checkbox" name="utensilsAuto"> Buscar na Shopee os utensílios citados nas receitas</label>
+      </form>
+      <p class="hint">Amazon: tag <b>${s.amazonTag ? esc(s.amazonTag) : '<span class="warn">não configurada</span>'}</b> (<a href="/admin/configuracoes">alterar</a>) — vai em todos os links da Amazon. Mercado Livre: cole o link gerado no painel de afiliados (<code>meli.la/…</code>).</p>
+    </section>
+  </div>
+
+  <section class="panel aff-cov" data-aff-cov>
+    <div class="aff-head"><h2>Utensílios nas receitas</h2><button type="button" class="btn btn-sm" data-aff-fill>Buscar produtos agora</button></div>
+    <p class="hint" data-aff-cov-sum>Carregando…</p>
+    <div class="aff-chips" data-aff-cov-list></div>
+  </section>
+
+  <section class="panel aff-list-panel">
+    <div class="aff-toolbar">
+      <div class="aff-filters" role="tablist" data-aff-filters>
+        <button type="button" class="on" data-store="">Todos</button><button type="button" data-store="amazon">Amazon</button><button type="button" data-store="shopee">Shopee</button><button type="button" data-store="mercadolivre">Mercado Livre</button><button type="button" data-store="erro">Com erro</button>
+      </div>
+      <input type="search" placeholder="Filtrar…" aria-label="Filtrar produtos" data-aff-q>
+    </div>
+    <div class="aff-bulk" data-aff-bulk hidden><b data-aff-sel>0</b> selecionados <button type="button" class="btn btn-sm" data-aff-bulk-do="activate">Ativar</button><button type="button" class="btn btn-sm" data-aff-bulk-do="deactivate">Desativar</button><button type="button" class="btn btn-sm danger" data-aff-bulk-do="delete">Excluir</button></div>
+    <div class="aff-list" data-aff-list><p class="empty">Carregando…</p></div>
+  </section>` });
 }
 
 function adsPage({ user }) {

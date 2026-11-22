@@ -94,7 +94,8 @@ router.get('/receita/:slug', (req, res) => {
     r.author_name = author?.name;
     r.author = author || null;
     const comments = db.get().prepare("SELECT name, body, rating, created_at FROM comments WHERE recipe_id = ? AND status = 'approved' ORDER BY id DESC LIMIT 100").all(r.id);
-    return recipePage({ r, base: base(req), related: recipes.related(r, 4), products: recipes.products(r.id), adjacent: recipes.adjacent(r), comments, user: req.user });
+    const shop = require('../affiliates').forRecipe(r, recipes.products(r.id));
+    return recipePage({ r, base: base(req), related: recipes.related(r, 4), products: shop.list, productsTitle: shop.title, adjacent: recipes.adjacent(r), comments, user: req.user });
   });
 });
 

@@ -43,6 +43,8 @@ function productLink(p) {
   return `/go/${p.id}`;
 }
 
+const CTA = { amazon: 'Ver na Amazon', shopee: 'Ver na Shopee', mercadolivre: 'Ver no Mercado Livre' };
+
 function renderProducts(list, { title = 'Utensílios e ingredientes que eu uso', compact = false } = {}) {
   if (!list || !list.length) return '';
   const s = settings.all();
@@ -50,13 +52,15 @@ function renderProducts(list, { title = 'Utensílios e ingredientes que eu uso',
     <a class="product-card" href="${productLink(p)}" target="_blank" rel="sponsored noopener nofollow">
       ${p.image ? `<img src="${u.esc(require('./images').sized(p.image, 320))}" alt="" loading="lazy" width="120" height="120">` : '<div class="product-ph">🛒</div>'}
       <span class="product-info">
-        ${p.badge ? `<span class="badge">${u.esc(p.badge)}</span>` : ''}
+        ${p.forLabel ? `<span class="product-for">Para: ${u.esc(p.forLabel)}</span>` : p.badge ? `<span class="badge">${u.esc(p.badge)}</span>` : ''}
         <strong>${u.esc(p.title)}</strong>
         ${!compact && p.description ? `<small>${u.esc(p.description)}</small>` : ''}
-        <span class="product-cta">${p.price ? `<em>${u.esc(p.price)}</em>` : ''} Ver na Amazon →</span>
+        <span class="product-cta">${p.price ? `<em>${u.esc(p.price)}</em>` : ''} ${CTA[p.store] || 'Ver na loja'} →</span>
       </span>
     </a>`).join('');
-  return `<section class="products"><h2>${u.esc(title)}</h2><div class="product-grid">${cards}</div>${s.amazonDisclosure ? `<p class="disclosure">${u.esc(s.amazonDisclosure)}</p>` : ''}</section>`;
+  const stores = new Set(list.map((p) => p.store || 'amazon'));
+  const disclosure = stores.size === 1 && stores.has('amazon') ? s.amazonDisclosure : s.affiliateDisclosure || s.amazonDisclosure;
+  return `<section class="products"><h2>${u.esc(title)}</h2><div class="product-grid">${cards}</div>${disclosure ? `<p class="disclosure">${u.esc(disclosure)}</p>` : ''}</section>`;
 }
 
 /** Produtos cujas palavras-chave aparecem nos ingredientes (sugestão automática). */
@@ -74,6 +78,8 @@ function productsForIngredients(ingredients, excludeIds = []) {
 }
 
 function outboundUrl(product) {
+  if (product.aff_url && /^https:\/\//i.test(product.aff_url)) return product.aff_url;
+  if (product.store && product.store !== 'amazon') return /^https:\/\//i.test(product.url || '') ? product.url : '';
   return u.amazonUrl(product, settings.all().amazonTag);
 }
 

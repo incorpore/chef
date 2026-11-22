@@ -17,6 +17,9 @@ const openapi = require('../openapi');
 const pageCache = require('../cache');
 const mail = require('../mail');
 const notify = require('../notify');
+const affiliates = require('../affiliates');
+const shopee = require('../shopee');
+const utensils = require('../utensils');
 
 const router = express.Router();
 const { rateLimit } = sec;
@@ -624,33 +627,108 @@ router.delete('/categories/:id', auth.requireAdmin, (req, res) => {
 });
 router.get('/tags', (req, res) => res.json({ items: recipes.allTags(200) }));
 
-// ---------------- Produtos de afiliado (Amazon) ----------------
+// ---------------- Produtos de afiliado (Amazon, Shopee, Mercado Livre) ----------------
 // Autores podem listar (para vincular às receitas); só o admin cadastra/edita
 router.get('/products', auth.requireUser, (req, res) => res.json({ items: db.get().prepare('SELECT * FROM products ORDER BY id DESC').all() }));
+const httpsUrl = (v, what) => {
+  const x = String(v || '').trim();
+  if (x && (!/^https:\/\/[^\s"'<>]+$/i.test(x) || x.length > 2000)) throw Object.assign(new Error(`${what} inválido (use https://)`), { status: 400 });
+  return x;
+};
 function productPayload(b, current = {}) {
   const p = { ...current, ...b };
-  const asin = String(p.asin || u.extractAsin(p.url) || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+  const store = Object.hasOwn(affiliates.STORES, p.store) ? p.store : 'amazon';
+  const asin = store === 'amazon' ? String(p.asin || u.extractAsin(p.url) || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) : '';
   const title = sec.cleanText(p.title, 200).trim();
   if (!title) throw Object.assign(new Error('Título do produto é obrigatório'), { status: 400 });
-  if (!asin && !p.url) throw Object.assign(new Error('Informe o ASIN ou o link do produto'), { status: 400 });
-  if (p.url && (!/^https:\/\/[^\s]+$/i.test(p.url) || String(p.url).length > 2000)) throw Object.assign(new Error('Link inválido (use https://)'), { status: 400 });
+  const url = httpsUrl(p.url, 'Link');
+  if (!asin && !url) throw Object.assign(new Error(store === 'amazon' ? 'Informe o ASIN ou o link do produto' : 'Informe o link do produto'), { status: 400 });
   if (p.image && !/^(https:\/\/|\/uploads\/)[^\s"'<>]+$/i.test(p.image)) throw Object.assign(new Error('URL da imagem inválida'), { status: 400 });
-  return [title, asin, String(p.url || ''), String(p.image || ''), sec.cleanText(p.price || '', 40), sec.cleanText(p.description || '', 300), sec.cleanText(p.badge || '', 30), sec.cleanText(p.keywords || '', 300), p.active === false || p.active === 0 || p.active === '0' ? 0 : 1];
+  const utensil = String(p.utensil || '').trim();
+  if (utensil && !utensils.BY_KEY.has(utensils.baseKey(utensil))) throw Object.assign(new Error('Utensílio desconhecido'), { status: 400 });
+  const priceValue = p.price_value === '' || p.price_value === null || p.price_value === undefined ? null : Number(p.price_value);
+  return {
+    title, asin, url, image: String(p.image || ''), price: sec.cleanText(p.price || '', 40), description: sec.cleanText(p.description || '', 300), badge: sec.cleanText(p.badge || '', 30),
+    keywords: sec.cleanText(p.keywords || '', 300), active: p.active === false || p.active === 0 || p.active === '0' ? 0 : 1,
+    store, external_id: sec.cleanText(p.external_id || asin || '', 60), source_url: /^[A-Z0-9]{10}$/i.test(p.source_url || '') ? String(p.source_url).toUpperCase() : httpsUrl(p.source_url, 'Link de origem'),
+    aff_url: httpsUrl(p.aff_url, 'Link de afiliado'), price_value: Number.isFinite(priceValue) && priceValue > 0 ? priceValue : null,
+    utensil: /^[a-z-]+(:\d{2}(x\d{2})?)?$/.test(utensil) ? utensil : '', category: p.category === 'cozinha' ? 'cozinha' : '',
+    available: p.available === false || p.available === 0 ? 0 : 1,
+  };
 }
+const PRODUCT_COLS = ['title', 'asin', 'url', 'image', 'price', 'description', 'badge', 'keywords', 'active', 'store', 'external_id', 'source_url', 'aff_url', 'price_value', 'utensil', 'category', 'available'];
+const getProduct = (id) => db.get().prepare('SELECT * FROM products WHERE id = ?').get(id);
 router.post('/products', auth.requireAdmin, (req, res) => {
-  const info = db.get().prepare('INSERT INTO products (title, asin, url, image, price, description, badge, keywords, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...productPayload(req.body || {}));
-  res.status(201).json(db.get().prepare('SELECT * FROM products WHERE id = ?').get(info.lastInsertRowid));
+  const v = productPayload(req.body || {});
+  const dup = v.external_id ? db.get().prepare('SELECT id, title FROM products WHERE store = ? AND external_id = ?').get(v.store, v.external_id) : null;
+  if (dup) return res.status(409).json({ error: `Esse produto já está cadastrado: “${dup.title}”`, id: dup.id });
+  const info = db.get().prepare(`INSERT INTO products (${PRODUCT_COLS.join(', ')}, refreshed_at) VALUES (${PRODUCT_COLS.map(() => '?').join(', ')}, ${v.source_url ? "datetime('now')" : 'NULL'})`).run(...PRODUCT_COLS.map((k) => v[k]));
+  pageCache.bump();
+  res.status(201).json(getProduct(info.lastInsertRowid));
 });
 router.put('/products/:id', auth.requireAdmin, (req, res) => {
-  const p = db.get().prepare('SELECT * FROM products WHERE id = ?').get(idParam(req.params.id));
+  const p = getProduct(idParam(req.params.id));
   if (!p) return notFound(res, 'Produto não encontrado');
-  db.get().prepare('UPDATE products SET title = ?, asin = ?, url = ?, image = ?, price = ?, description = ?, badge = ?, keywords = ?, active = ? WHERE id = ?').run(...productPayload(req.body || {}, p), p.id);
-  res.json(db.get().prepare('SELECT * FROM products WHERE id = ?').get(p.id));
+  const v = productPayload(req.body || {}, p);
+  db.get().prepare(`UPDATE products SET ${PRODUCT_COLS.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...PRODUCT_COLS.map((k) => v[k]), p.id);
+  pageCache.bump();
+  res.json(getProduct(p.id));
 });
 router.delete('/products/:id', auth.requireAdmin, (req, res) => {
   db.get().prepare('DELETE FROM products WHERE id = ?').run(idParam(req.params.id));
+  pageCache.bump();
   res.json({ ok: true });
 });
+// Cole o link → dados do produto (não grava; o painel mostra para conferir antes de salvar)
+router.post('/products/preview', auth.requireAdmin, async (req, res) => {
+  const d = await affiliates.fromUrl(req.body?.url);
+  const dup = d.externalId ? db.get().prepare('SELECT id, title FROM products WHERE store = ? AND external_id = ?').get(d.store, d.externalId) : null;
+  res.json({ ...d, duplicate: dup || null });
+});
+router.post('/products/:id/refresh', auth.requireAdmin, async (req, res) => {
+  const p = getProduct(idParam(req.params.id));
+  if (!p) return notFound(res, 'Produto não encontrado');
+  const out = await affiliates.refresh(p);
+  pageCache.bump();
+  res.json(out);
+});
+router.post('/products/bulk', auth.requireAdmin, (req, res) => {
+  const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 500);
+  const action = req.body?.action;
+  if (!ids.length) return res.status(400).json({ error: 'Selecione ao menos um produto' });
+  const q = ids.map(() => '?').join(',');
+  const sql = { delete: `DELETE FROM products WHERE id IN (${q})`, activate: `UPDATE products SET active = 1 WHERE id IN (${q})`, deactivate: `UPDATE products SET active = 0 WHERE id IN (${q})` }[action];
+  if (!sql) return res.status(400).json({ error: 'Ação inválida' });
+  const n = db.get().prepare(sql).run(...ids).changes;
+  pageCache.bump();
+  res.json({ ok: true, count: n });
+});
+
+router.get('/affiliates/status', auth.requireAdmin, (req, res) => {
+  const s = settings.all();
+  const d = db.get();
+  res.json({
+    shopee: shopee.status(), amazonTag: s.amazonTag, productAutoRefresh: s.productAutoRefresh, productRefreshHours: s.productRefreshHours, utensilsAuto: s.utensilsAuto,
+    counts: d.prepare("SELECT store, COUNT(*) n, SUM(CASE WHEN refresh_error != '' THEN 1 ELSE 0 END) errors FROM products GROUP BY store").all(),
+    coverage: affiliates.coverage(), utensils: utensils.options(),
+  });
+});
+router.put('/affiliates/settings', auth.requireAdmin, (req, res) => {
+  const b = req.body || {};
+  const patch = {};
+  for (const k of ['productAutoRefresh', 'utensilsAuto']) if (k in b) patch[k] = b[k];
+  if ('productRefreshHours' in b) patch.productRefreshHours = b.productRefreshHours;
+  settings.update(patch);
+  res.json({ ok: true });
+});
+router.put('/affiliates/shopee', auth.requireAdmin, (req, res) => {
+  if (shopee.status().fromEnv) return res.status(400).json({ error: 'As credenciais da Shopee estão nas variáveis de ambiente (SHOPEE_APP_ID/SHOPEE_SECRET); altere lá.' });
+  shopee.saveCreds(req.body?.appId, req.body?.secret);
+  auth.audit(req, 'shopee.credentials', req.body?.appId ? 'salvas' : 'removidas');
+  res.json(shopee.status());
+});
+router.post('/affiliates/shopee/test', auth.requireAdmin, async (req, res) => res.json(await shopee.test()));
+router.post('/affiliates/utensils/fill', auth.requireAdmin, async (req, res) => res.json(await affiliates.autoFill({ max: 5 })));
 
 // ---------------- Anúncios (HTML confiável: somente administradores) ----------------
 router.get('/ads', auth.requireAdmin, (req, res) => res.json({ slots: AD_SLOTS, items: db.get().prepare('SELECT * FROM ads ORDER BY slot, id').all() }));
@@ -880,6 +958,7 @@ router.use((req, res) => notFound(res, 'Rota não encontrada'));
 // Erros: mensagem amigável para o cliente, detalhes técnicos só no log do servidor
 // eslint-disable-next-line no-unused-vars
 router.use((err, req, res, _next) => {
+  if (err instanceof shopee.ShopeeError) return res.status(err.status).json({ error: err.message });
   let status = err.status || err.statusCode || 500;
   let message = err.message;
   if (err.code === 'LIMIT_FILE_SIZE') { status = 413; message = `Arquivo maior que ${config.maxUploadMb} MB`; }

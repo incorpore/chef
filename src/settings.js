@@ -28,6 +28,10 @@ const DEFAULTS = {
   shareNetworks: 'whatsapp,pinterest,facebook,telegram,x,email',
   amazonTag: '',
   amazonDisclosure: 'Como associado da Amazon, recebo por compras qualificadas. Isso não altera o preço para você.',
+  affiliateDisclosure: 'Alguns links são de afiliados (Amazon, Shopee, Mercado Livre): posso receber uma comissão, sem custo extra para você.',
+  productAutoRefresh: true, // atualiza preço/disponibilidade/link dos produtos sozinho
+  productRefreshHours: 24, // de quantas em quantas horas (1 a 100)
+  utensilsAuto: true, // com a API da Shopee: busca produtos para os utensílios citados nas receitas
   adsEnabled: true,
   adsenseClient: '',
   adsenseAutoAds: false,
@@ -81,7 +85,7 @@ const PATTERNS = {
   gscProperty: [/^(sc-domain:[a-z0-9.-]{3,200}|https?:\/\/[a-z0-9.-]{3,200}(:\d{1,5})?\/[^\s"'<>]{0,200})?$/i, 'Propriedade do Search Console inválida'],
   siteUrl: [/^(https?:\/\/[a-z0-9.-]+(:\d{1,5})?)?$/i, 'Endereço do site inválido (ex.: https://receitas.meusite.com.br, sem barra no final)'],
 };
-const MAX_LEN = { headHtml: 20000, adsTxt: 20000, aboutText: 20000, privacyText: 1000, description: 320, siteName: 60, tagline: 120, amazonDisclosure: 300, authorName: 80 };
+const MAX_LEN = { headHtml: 20000, adsTxt: 20000, aboutText: 20000, privacyText: 1000, description: 320, siteName: 60, tagline: 120, amazonDisclosure: 300, affiliateDisclosure: 300, authorName: 80 };
 
 function invalid(msg) {
   return Object.assign(new Error(msg), { status: 400 });

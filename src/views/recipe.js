@@ -113,7 +113,7 @@ function voteBox(r, size = '') {
   return `<div class="vote${size ? ` vote-${size}` : ''}" role="group" aria-label="Avalie a receita" data-vote-box>${btn(1, 'Gostei', r.likes)}${btn(-1, 'Não gostei', r.dislikes)}</div>`;
 }
 
-function recipePage({ r, base, related, products, adjacent, comments, user }) {
+function recipePage({ r, base, related, products, productsTitle, adjacent, comments, user }) {
   const s = settings.all();
   const links = c.linkIngredients(r.steps, r.ingredients);
   const productByKw = productsForIngredients(r.ingredients, products.map((p) => p.id));
@@ -215,7 +215,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
 
       ${r.tips ? `<section class="tips prose"><h2>💡 Dicas</h2>${u.miniMarkdown(r.tips)}</section>` : ''}
       ${r.nutrition ? nutritionTable(r) : ''}
-      ${renderProducts(products)}
+      ${renderProducts(products, { title: productsTitle })}
       ${renderAd('recipe_bottom')}
       ${r.author?.bio ? `<aside class="author-card">${avatar(r.author, 'avatar-lg2')}<div><p class="author-k">Quem fez esta receita</p><p class="author-n">${esc(r.author.name)}</p>${u.miniMarkdown(String(r.author.bio).slice(0, 600))}</div></aside>` : ''}
       ${r.source_url ? `<p class="source">Fonte/inspiração: <a href="${esc(r.source_url)}" rel="nofollow noopener" target="_blank">${esc(r.source_name || r.source_url)}</a></p>` : ''}

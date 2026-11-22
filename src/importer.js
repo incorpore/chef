@@ -68,10 +68,10 @@ function safeLookup(hostname, options, cb) {
   });
 }
 
-function requestOnce(url, { accept, maxBytes }) {
+function requestOnce(url, { accept, maxBytes, userAgent = UA }) {
   return new Promise((resolve, reject) => {
     const mod = url.protocol === 'https:' ? https : http;
-    const req = mod.request(url, { method: 'GET', lookup: safeLookup, timeout: 15000, headers: { 'user-agent': UA, accept, 'accept-language': 'pt-BR,pt;q=0.9,en;q=0.8', 'accept-encoding': 'identity' } }, (res) => {
+    const req = mod.request(url, { method: 'GET', lookup: safeLookup, timeout: 15000, headers: { 'user-agent': userAgent, accept, 'accept-language': 'pt-BR,pt;q=0.9,en;q=0.8', 'accept-encoding': 'identity' } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
         return resolve({ redirect: new URL(res.headers.location, url).toString() });
@@ -103,11 +103,11 @@ function requestOnce(url, { accept, maxBytes }) {
   });
 }
 
-async function fetchLimited(raw, { accept = 'text/html,application/xhtml+xml', maxBytes = MAX_BYTES } = {}) {
+async function fetchLimited(raw, { accept = 'text/html,application/xhtml+xml', maxBytes = MAX_BYTES, userAgent } = {}) {
   let current = raw;
   for (let i = 0; i < 5; i++) {
     const url = await assertPublicUrl(current); // cada redirecionamento é validado de novo
-    const r = await requestOnce(url, { accept, maxBytes });
+    const r = await requestOnce(url, { accept, maxBytes, userAgent }).catch((e) => { e.finalUrl = url.toString(); throw e; });
     if (r.redirect) { current = r.redirect; continue; }
     return { ...r, finalUrl: url.toString() };
   }
