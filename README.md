@@ -48,10 +48,11 @@ Botões só com ícone (👍 👎) na receita, com a contagem ao lado. Um voto p
 - **"Incorporar"**: gera um `<iframe>` com o cartão da receita para outros blogs, com link de volta para o seu site.
 - Imagens e textos de pré‑visualização (Open Graph e Twitter Card) em todas as páginas, com imagem padrão configurável.
 
-### Fotos automáticas (Pexels e Pixabay)
-**Painel → Fotos automáticas** encontra fotos para as receitas que ainda não têm imagem, em bancos gratuitos com licença para uso comercial:
-- **Com revisão:** para cada receita aparecem algumas opções e você toca na que combina. Dá para mudar o termo da busca ou pular.
-- **Automático:** coloca a primeira foto encontrada em todas, em segundo plano, respeitando os limites gratuitos (Pixabay 100/min, Pexels 200/h).
+### Fotos das receitas (Pexels e Pixabay)
+**Painel → Fotos das receitas** encontra fotos para as receitas sem imagem, em bancos gratuitos com licença para uso comercial:
+- **Busca em inglês automática:** os bancos descrevem as fotos em inglês. Um dicionário de culinária traduz o nome do prato, inclusive pratos brasileiros ("pão de queijo" → "brazilian cheese bread"), e cada foto recebe uma nota pela descrição. As que citam o prato ganham o selo **✓ combina** e aparecem primeiro.
+- **Revisão uma por vez:** fotos grandes, "Usar esta foto", pular, voltar, desfazer e teclas 1–6. A aba **Fotos dos bancos** serve para conferir e trocar as que já foram aplicadas.
+- **Automático:** só aplica quando a foto confirma o prato; o resto fica para a revisão. Respeita os limites gratuitos (Pixabay 100/min, Pexels 200/h). Há também um botão para remover de uma vez todas as fotos que vieram dos bancos.
 - **No editor:** o botão **"Buscar foto grátis"** (autores também podem usar) abre a busca já com o nome da receita; a foto escolhida entra como capa, mesmo numa receita ainda não salva.
 - A foto é **baixada** para o servidor (vira WebP/AVIF) e a receita mostra o **crédito do fotógrafo**. Se você trocar a foto depois, o crédito some.
 - As chaves (grátis) ficam em `data/stock-keys.json` (600) ou nas variáveis `PEXELS_API_KEY` / `PIXABAY_API_KEY`. O servidor só baixa imagens dos servidores do Pexels e do Pixabay.
@@ -73,7 +74,7 @@ No editor de cada receita aparecem os números dela no Google e as buscas que le
 
 ### Google AdSense, Analytics e outros (Painel → Configurações)
 Basta colar os IDs; os scripts são inseridos automaticamente:
-- **Google Analytics 4**, **Google Tag Manager**, **Google AdSense** (com `ads.txt` e a meta `google-adsense-account`), **Meta Pixel** e **Microsoft Clarity**.
+- **Google Analytics 4**, **Google Tag Manager**, **Google AdSense** (com `ads.txt` e a meta `google-adsense-account`), **Meta Pixel**, **Microsoft Clarity** e **Cloudflare Web Analytics**. No caso da Cloudflare, cole o token e desligue a instalação automática dela, que a política de segurança bloqueia.
 - **Aviso de cookies (LGPD) com Google Consent Mode v2**: nada é rastreado antes do "Aceitar". Sem consentimento, o AdSense mostra anúncios não personalizados, e o Pixel e o Clarity só carregam após o aceite.
 - Páginas de **Política de privacidade** e **Termos de uso**, exigidas pelo AdSense.
 - **Verificação de propriedade**: Google Search Console, Bing, Pinterest e Facebook.
@@ -125,7 +126,7 @@ Acesse `/admin` para criar a conta de administrador. Em produção, o primeiro a
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | Servidor com recarga automática |
-| `npm test` | 108 testes: funcionalidades, **segurança (ataques)** e **SEO** |
+| `npm test` | 112 testes: funcionalidades, **segurança (ataques)** e **SEO** |
 | `npm run stress` | Teste de carga e de limites da API (2.000 receitas, 32 conexões) |
 | `npm run audit:secrets` | Procura senhas/chaves vazadas nos arquivos **e no histórico do Git** |
 | `sh scripts/smoke-test.sh IMAGEM` | Testa a imagem Docker como se fosse o ZimaOS (instalação, login, upload, reinício) |

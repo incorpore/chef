@@ -31,7 +31,7 @@ ${user ? `<aside class="admin-nav">
   ${item('/admin/api', 'qr', 'API', 'api')}
   ${user.role === 'admin' ? item('/admin/configuracoes', 'edit', 'Configurações', 'settings') : ''}
   ${user.role === 'admin' ? item('/admin/usuarios', 'users', 'Usuários', 'users') : ''}
-  ${user.role === 'admin' ? item('/admin/fotos', 'camera', 'Fotos automáticas', 'photos') : ''}
+  ${user.role === 'admin' ? item('/admin/fotos', 'camera', 'Fotos das receitas', 'photos') : ''}
   ${user.role === 'admin' ? item('/admin/google', 'search', 'Google Search', 'google') : ''}
   ${user.role === 'admin' ? item('/admin/auditoria', 'list', 'Auditoria', 'audit') : ''}
   <a href="/admin/perfil" class="nav-profile ${active === 'profile' ? 'active' : ''}">${avatar(user, 'avatar-xs')}<span>Meu perfil</span></a>
@@ -264,8 +264,9 @@ function editor({ user, recipe, categories, products, stockReady = false }) {
   <dialog class="stock-dialog" data-stock-dialog aria-labelledby="stock-dialog-title">
     <div class="stock-dialog-head"><h2 id="stock-dialog-title">Buscar foto grátis</h2><button type="button" class="icon-btn" data-stock-close aria-label="Fechar">${icon('x')}</button></div>
     <div class="stock-q stock-dialog-q"><input type="search" data-stock-q aria-label="O que buscar" placeholder="Ex.: bolo de cenoura"><button type="button" class="btn btn-primary btn-sm" data-stock-go>Buscar</button></div>
-    <p class="hint">Dica: termos curtos funcionam melhor ("bolo de cenoura", "feijoada"). Em inglês costuma haver mais opções ("carrot cake").</p>
-    <div class="stock-grid stock-dialog-grid" data-stock-results></div>
+    <p class="hint">O nome é traduzido para inglês automaticamente (os bancos descrevem as fotos em inglês). Fotos com <b>✓ combina</b> citam o prato na descrição.</p>
+    <span class="ph-chip" data-stock-chip></span>
+    <div class="ph-grid stock-dialog-grid" data-stock-results></div>
   </dialog>
   </form>
 <dialog class="paste-dialog"><form method="dialog"><h3>Colar modo de preparo</h3><p>Um passo por linha (numeração é removida). “## Cobertura” cria grupos.</p><textarea rows="12" data-paste-text></textarea><div><button class="btn" value="cancel">Cancelar</button> <button class="btn btn-primary" value="ok" data-paste-ok>Substituir passos</button></div></form></dialog>`;
@@ -498,6 +499,7 @@ function settingsPage({ user, categories = [], siteUrl = '' }) {
       <p><small>Basta colar os IDs — os scripts são inseridos automaticamente e respeitam o consentimento de cookies (LGPD / Consent Mode v2).</small></p>
       <div class="row2">${field('Google Analytics 4 (ID de medição)', `<input name="ga4Id" value="${v('ga4Id')}" placeholder="G-XXXXXXXXXX">`)}${field('Google Tag Manager', `<input name="gtmId" value="${v('gtmId')}" placeholder="GTM-XXXXXXX">`)}
       ${field('Meta (Facebook/Instagram) Pixel', `<input name="metaPixelId" value="${v('metaPixelId')}" placeholder="123456789012345">`)}${field('Microsoft Clarity', `<input name="clarityId" value="${v('clarityId')}" placeholder="abcd1234ef">`)}</div>
+      ${field('Cloudflare Web Analytics (token)', `<input name="cfBeaconToken" value="${v('cfBeaconToken')}" placeholder="32 letras e números" spellcheck="false">`, 'Na Cloudflare: Analytics &amp; Logs → Web Analytics → seu site → <b>Manage site</b> → copie o <code>token</code> do trecho de código. <b>Desligue a "instalação automática"</b> (Automatic setup) lá, senão o navegador mostra avisos de CSP, porque o script injetado pela Cloudflare não é autorizado pela política de segurança do site.')}
       <label class="check"><input type="checkbox" name="consentBanner"${s.consentBanner ? ' checked' : ''}> Exibir aviso de cookies e pedir consentimento (recomendado — exigido pela LGPD e pelo Google AdSense)</label>
       ${field('Texto do aviso de cookies', `<input name="privacyText" value="${v('privacyText')}">`)}
     </section>
@@ -572,40 +574,66 @@ function usersPage({ user }) {
 }
 
 function photosPage({ user }) {
-  return adminLayout({ title: 'Fotos automáticas', user, active: 'photos', body: `
-  <header class="admin-head"><h1>Fotos automáticas</h1></header>
-  <p class="lead-admin">Encontre fotos para as receitas que ainda não têm imagem, em bancos gratuitos com licença para uso comercial (inclusive com anúncios). A foto é baixada para o seu servidor, fica leve (WebP/AVIF) e a receita mostra o crédito do fotógrafo.</p>
+  return adminLayout({ title: 'Fotos das receitas', user, active: 'photos', body: `
+  <header class="admin-head"><h1>Fotos das receitas</h1></header>
 
-  <section class="panel">
-    <h2>1. Chaves dos bancos de imagens <small class="muted">(grátis)</small></h2>
-    <div class="stock-keys">
-      <form class="stock-key" data-stock-key="pexels">
-        <div class="stock-key-head"><strong>Pexels</strong><span class="stock-badge" data-stock-badge="pexels"></span></div>
-        <p class="hint">Crie a chave em <a href="https://www.pexels.com/api/new/" target="_blank" rel="noopener">pexels.com/api</a> (entre com sua conta, preencha o motivo "blog de receitas"). Limite: 200 buscas por hora.</p>
-        <div class="inline-form"><input name="key" placeholder="Cole a chave do Pexels" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Salvar</button></div>
-      </form>
-      <form class="stock-key" data-stock-key="pixabay">
-        <div class="stock-key-head"><strong>Pixabay</strong><span class="stock-badge" data-stock-badge="pixabay"></span></div>
-        <p class="hint">Crie uma conta em <a href="https://pixabay.com/accounts/register/" target="_blank" rel="noopener">pixabay.com</a> e copie a chave em <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">pixabay.com/api/docs</a> (aparece no texto "key"). Limite: 100 buscas por minuto.</p>
-        <div class="inline-form"><input name="key" placeholder="Cole a chave do Pixabay" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Salvar</button></div>
-      </form>
+  <section class="panel ph-keys" data-ph-keys>
+    <div class="ph-keys-line" data-ph-keys-line hidden><span data-ph-keys-status></span><button type="button" class="link" data-ph-keys-edit>alterar chaves</button></div>
+    <div class="ph-keys-form" data-ph-keys-form>
+      <h2>Bancos de imagens grátis</h2>
+      <p class="hint">Fotos com licença para uso comercial (inclusive com anúncios). Basta uma chave; com as duas há mais opções.</p>
+      <div class="stock-keys">
+        <form class="stock-key" data-stock-key="pexels">
+          <div class="stock-key-head"><strong>Pexels</strong><span class="stock-badge" data-stock-badge="pexels"></span></div>
+          <p class="hint">Chave grátis em <a href="https://www.pexels.com/api/new/" target="_blank" rel="noopener">pexels.com/api</a>.</p>
+          <div class="inline-form"><input name="key" placeholder="Cole a chave do Pexels" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Salvar</button></div>
+        </form>
+        <form class="stock-key" data-stock-key="pixabay">
+          <div class="stock-key-head"><strong>Pixabay</strong><span class="stock-badge" data-stock-badge="pixabay"></span></div>
+          <p class="hint">Crie a conta em <a href="https://pixabay.com/accounts/register/" target="_blank" rel="noopener">pixabay.com</a> e copie a chave em <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">api/docs</a>.</p>
+          <div class="inline-form"><input name="key" placeholder="Cole a chave do Pixabay" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Salvar</button></div>
+        </form>
+      </div>
     </div>
-    <p class="hint">Basta uma das duas; com as duas há mais opções. As chaves ficam só no servidor e nunca aparecem de novo.</p>
   </section>
 
-  <section class="panel stock-auto">
-    <h2>2. Automático</h2>
-    <p><b data-stock-missing>…</b> receitas publicadas estão sem foto.</p>
-    <p class="hint">Coloca a primeira foto encontrada em cada uma, em segundo plano (você pode fechar a página). Fotos automáticas às vezes não combinam com a receita: confira depois e troque no editor, ou use a revisão abaixo.</p>
-    <div class="form-actions"><button type="button" class="btn btn-primary" data-stock-auto>${icon('camera')} Colocar fotos em todas</button><button type="button" class="btn btn-ghost" data-stock-stop hidden>Parar</button></div>
+  <section class="panel ph-review" data-ph-review hidden>
+    <div class="ph-tabs" role="tablist">
+      <button type="button" role="tab" class="ph-tab on" data-ph-mode="sem" aria-selected="true">Sem foto <b data-ph-count="sem">0</b></button>
+      <button type="button" role="tab" class="ph-tab" data-ph-mode="bancos" aria-selected="false">Fotos dos bancos <b data-ph-count="bancos">0</b><small>conferir</small></button>
+    </div>
+    <div class="ph-undo" data-ph-undo hidden><span data-ph-undo-text></span><button type="button" class="btn btn-sm" data-ph-undo-btn>Desfazer</button></div>
+    <div class="ph-stage" data-ph-stage>
+      <div class="ph-head">
+        <div class="ph-progress"><span data-ph-pos>—</span><div class="nl-bar"><span data-ph-bar></span></div></div>
+        <h2 class="ph-title" data-ph-title>Carregando…</h2>
+        <p class="ph-desc" data-ph-desc></p>
+        <div class="ph-current" data-ph-current hidden><img alt="" data-ph-current-img><div><small>Foto atual</small><span data-ph-current-credit></span><button type="button" class="link danger" data-ph-remove>Remover esta foto</button></div></div>
+      </div>
+      <div class="ph-search">
+        <span class="ph-chip" data-ph-chip></span>
+        <form class="ph-q" data-ph-q hidden><input name="q" aria-label="Buscar outra coisa" placeholder="Ex.: carrot cake, feijoada"><button class="btn btn-sm btn-primary">Buscar</button></form>
+        <button type="button" class="link" data-ph-q-open>buscar outra coisa</button>
+      </div>
+      <div class="ph-grid" data-ph-grid></div>
+      <div class="ph-actions">
+        <button type="button" class="btn btn-ghost" data-ph-prev>← Anterior</button>
+        <span class="ph-keys-hint">Teclas: <kbd>1</kbd>–<kbd>6</kbd> escolher · <kbd>→</kbd> pular</span>
+        <button type="button" class="btn" data-ph-skip>Nenhuma combina · pular →</button>
+      </div>
+    </div>
+    <div class="ph-empty" data-ph-empty hidden></div>
+  </section>
+
+  <section class="panel ph-auto" data-ph-auto hidden>
+    <h2>Automático</h2>
+    <p class="hint">Coloca foto sozinho só quando a descrição da foto confirma o prato (ex.: "carrot cake" para bolo de cenoura). As que ficarem em dúvida continuam na aba <b>Sem foto</b> para você escolher.</p>
+    <div class="form-actions">
+      <button type="button" class="btn btn-primary" data-stock-auto>${icon('camera')} Buscar fotos para as sem foto</button>
+      <button type="button" class="btn btn-ghost" data-stock-stop hidden>Parar</button>
+      <button type="button" class="btn btn-ghost danger" data-ph-remove-all><span>Remover todas as fotos dos bancos (<b data-ph-count="bancos2">0</b>)</span></button>
+    </div>
     <div class="stock-progress" data-stock-progress hidden><div class="nl-bar"><span data-stock-bar></span></div><p data-stock-progress-text></p><ul class="stock-log" data-stock-log></ul></div>
-  </section>
-
-  <section class="panel">
-    <h2>3. Com revisão (recomendado)</h2>
-    <p class="hint">Para cada receita aparecem algumas opções. Toque na foto que combina; se nenhuma servir, mude o termo da busca ou pule.</p>
-    <div class="stock-list" data-stock-list></div>
-    <div class="form-actions"><button type="button" class="btn" data-stock-more hidden>Mostrar mais receitas</button></div>
   </section>`, scripts: ['/js/stock.js'] });
 }
 

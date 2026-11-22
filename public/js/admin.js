@@ -259,19 +259,23 @@
         results.innerHTML = '<p class="muted">Buscando…</p>';
         try {
           const d = await api(`/fotos/buscar?q=${encodeURIComponent(q)}`);
+          const chip = $('[data-stock-chip]', dlg);
+          if (chip) chip.textContent = d.query && d.query.toLowerCase() !== q.toLowerCase() ? `Buscando em inglês: “${d.query}”` : '';
           if (!d.items.length) { results.innerHTML = '<p class="muted">Nenhuma foto encontrada. Tente um termo mais curto ou em inglês.</p>'; return; }
           results.replaceChildren(...d.items.map((ph) => {
             const b = document.createElement('button');
             b.type = 'button';
-            b.className = 'stock-opt';
-            b.title = `Usar como capa (${ph.author} / ${NAMES[ph.provider]})`;
-            const img = Object.assign(document.createElement('img'), { src: ph.thumb, alt: ph.alt || q, loading: 'lazy' });
-            const cap = document.createElement('span');
-            cap.textContent = `${ph.author} · ${NAMES[ph.provider]}`;
-            b.append(img, cap);
+            b.className = 'ph-opt';
+            b.setAttribute('aria-label', `Usar como capa: ${ph.alt || q} (${ph.author} / ${NAMES[ph.provider]})`);
+            const img = Object.assign(document.createElement('img'), { src: ph.thumb, alt: '', loading: 'lazy', decoding: 'async' });
+            if (ph.fallback) img.addEventListener('error', () => { if (img.src !== ph.fallback) img.src = ph.fallback; }, { once: true });
+            const use = Object.assign(document.createElement('span'), { className: 'ph-use', textContent: 'Usar como capa' });
+            const cap = Object.assign(document.createElement('span'), { className: 'ph-meta', textContent: `${ph.author} · ${NAMES[ph.provider]}` });
+            b.append(img, use, cap);
+            if (ph.score >= 2) b.append(Object.assign(document.createElement('span'), { className: 'ph-match', textContent: '✓ combina', title: 'A descrição da foto cita o prato' }));
             b.addEventListener('click', async () => {
-              $$('.stock-opt', results).forEach((x) => { x.disabled = true; });
-              b.classList.add('busy');
+              $$('.ph-opt', results).forEach((x) => { x.disabled = true; });
+              b.classList.add('chosen');
               try {
                 const f = await api('/fotos/baixar', { method: 'POST', body: { photo: ph } });
                 credits.set(f.url, { credit: f.credit, url: f.creditUrl });
@@ -281,8 +285,8 @@
                 toast('📷 Foto definida como capa. Clique em Salvar para gravar.');
               } catch (err) {
                 toast(`⚠️ ${err.message}`);
-                $$('.stock-opt', results).forEach((x) => { x.disabled = false; });
-                b.classList.remove('busy');
+                $$('.ph-opt', results).forEach((x) => { x.disabled = false; });
+                b.classList.remove('chosen');
               }
             });
             return b;

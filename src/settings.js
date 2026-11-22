@@ -18,6 +18,7 @@ const DEFAULTS = {
   gtmId: '',
   metaPixelId: '',
   clarityId: '',
+  cfBeaconToken: '', // Cloudflare Web Analytics (sem cookies; carregado pelo site, com nonce)
   googleSiteVerification: '',
   bingSiteVerification: '',
   pinterestVerification: '',
@@ -66,6 +67,7 @@ const PATTERNS = {
   gtmId: [/^(GTM-[A-Z0-9]{4,12})?$/, 'ID do Tag Manager inválido (ex.: GTM-ABC1234)'],
   metaPixelId: [/^(\d{5,20})?$/, 'ID do Meta Pixel inválido (apenas números)'],
   clarityId: [/^([a-z0-9]{5,20})?$/i, 'ID do Microsoft Clarity inválido'],
+  cfBeaconToken: [/^([a-f0-9]{32})?$/i, 'Token do Cloudflare Web Analytics inválido (32 letras/números)'],
   googleSiteVerification: [/^([\w-]{5,100})?$/, 'Código de verificação do Google inválido'],
   bingSiteVerification: [/^([\w-]{5,100})?$/, 'Código de verificação do Bing inválido'],
   pinterestVerification: [/^([\w-]{5,100})?$/, 'Código de verificação do Pinterest inválido'],

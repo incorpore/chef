@@ -92,6 +92,9 @@ ${s.adsEnabled && s.adsenseClient ? "(window.adsbygoogle=window.adsbygoogle||[])
     out.push(`<meta name="google-adsense-account" content="${esc(s.adsenseClient)}">`);
     out.push(`<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${esc(s.adsenseClient)}" crossorigin="anonymous"></script>`);
   }
+  // Cloudflare Web Analytics: sem cookies (não precisa de consentimento). Carregado pelo próprio site com nonce;
+  // a injeção automática da Cloudflare é bloqueada pela CSP (sem nonce) e deve ficar desligada no painel dela.
+  if (s.cfBeaconToken) out.push(`<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='${esc(JSON.stringify({ token: s.cfBeaconToken }))}'></script>`);
   // Configuração lida pelo app.js (Pixel e Clarity só carregam depois do consentimento)
   out.push(`<script type="application/json" id="chef-config">${JSON.stringify({ consent: needsConsent, ga4: s.ga4Id || '', gtm: s.gtmId || '', pixel: s.metaPixelId || '', clarity: s.clarityId || '' }).replace(/</g, '\\u003c')}</script>`);
   return out.join('\n');

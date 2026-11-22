@@ -724,13 +724,18 @@ router.put('/fotos/chaves', auth.requireAdmin, rateLimit('stock-key', 20, 10 * 6
 }));
 router.get('/fotos/pendentes', auth.requireAdmin, (req, res) => {
   const offset = Math.max(0, Math.min(100000, Number(req.query.offset) || 0));
-  res.json({ items: stock.missing(12, offset), total: stock.status().missing });
+  res.json(stock.missing(20, offset, req.query.modo === 'bancos' ? 'bancos' : 'sem'));
+});
+router.post('/fotos/remover-bancos', auth.requireAdmin, (req, res) => {
+  const n = stock.removeStockCovers();
+  auth.audit(req, 'fotos.remover-bancos', `${n} receitas`);
+  res.json({ removed: n, ...stock.status() });
 });
 router.get('/fotos/sugestoes/:id', auth.requireAdmin, rateLimit('stock-search', 120, 60e3), stockWrap(async (req, res) => {
   const r = recipes.getById(idParam(req.params.id));
   if (!r) return notFound(res, 'Receita não encontrada');
   const q = sec.cleanText(String(req.query.q || ''), 100).trim() || r.title;
-  res.json({ query: stock.queryFor(q), items: await stock.search(q, { perPage: 4 }) });
+  res.json(await stock.search(q, { perPage: 3 }));
 }));
 router.post('/fotos/aplicar', auth.requireAdmin, rateLimit('stock-apply', 120, 60e3), stockWrap(async (req, res) => {
   const r = await stock.apply(idParam(req.body?.recipeId), req.body?.photo || {}, req.user.id);
@@ -742,7 +747,7 @@ router.get('/fotos/buscar', auth.requireUser, rateLimit('stock-search', 120, 60e
   if (!stock.configured()) return res.status(400).json({ error: isAdmin(req) ? 'Configure a chave do Pexels ou do Pixabay em Painel → Fotos automáticas' : 'A busca de fotos ainda não foi configurada pelo administrador' });
   const q = sec.cleanText(String(req.query.q || ''), 100).trim();
   if (!q) return res.json({ query: '', items: [] });
-  res.json({ query: stock.queryFor(q), items: await stock.search(q, { perPage: 6 }) });
+  res.json(await stock.search(q, { perPage: 4 }));
 }));
 router.post('/fotos/baixar', auth.requireUser, rateLimit('stock-apply', 60, 60e3), stockWrap(async (req, res) => {
   const d = await stock.download(req.body?.photo || {}, req.user.id);

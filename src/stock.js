@@ -13,6 +13,7 @@ const crypto = require('node:crypto');
 const config = require('./config');
 const db = require('./db');
 const sec = require('./security');
+const foodterms = require('./foodterms');
 
 const endpoints = {
   pexels: 'https://api.pexels.com/v1/search',
@@ -20,6 +21,7 @@ const endpoints = {
 };
 // Só baixa imagens destes servidores (os testes acrescentam o servidor falso)
 const IMAGE_HOSTS = new Set(['images.pexels.com', 'pixabay.com', 'cdn.pixabay.com']);
+const MIN_SCORE = 2; // automático: a foto precisa citar o tipo de prato (vale 2) ou dois ingredientes
 const MIN_INTERVAL = { pexels: 20000, pixabay: 1000 }; // respeita os limites gratuitos (Pexels: 180/h)
 const keyFile = () => path.join(config.dataDir, 'stock-keys.json');
 const NAMES = { pexels: 'Pexels', pixabay: 'Pixabay' };
@@ -41,6 +43,7 @@ function status() {
     pexels: { configured: !!k.pexels, fromEnv: !!process.env.PEXELS_API_KEY },
     pixabay: { configured: !!k.pixabay, fromEnv: !!process.env.PIXABAY_API_KEY },
     missing: db.get().prepare("SELECT COUNT(*) AS n FROM recipes WHERE status = 'published' AND (cover IS NULL OR cover = '')").get().n,
+    fromBanks: db.get().prepare(`SELECT COUNT(*) AS n FROM recipes WHERE status = 'published' AND ${STOCK_COVER}`).get().n,
     job: job ? { ...job, log: job.log.slice(-8) } : null,
   };
 }
@@ -77,9 +80,9 @@ async function getJson(url, headers) {
   return res.json();
 }
 
-async function searchPexels(q, perPage, key) {
+async function searchPexels(q, perPage, key, lang = 'en') {
   await pace('pexels');
-  const url = `${endpoints.pexels}?${new URLSearchParams({ query: q, per_page: String(perPage), orientation: 'landscape', locale: 'pt-BR' })}`;
+  const url = `${endpoints.pexels}?${new URLSearchParams({ query: q, per_page: String(perPage), orientation: 'landscape', locale: lang === 'pt' ? 'pt-BR' : 'en-US' })}`;
   const d = await getJson(url, { authorization: key });
   return (d.photos || []).map((p) => ({
     provider: 'pexels', id: String(p.id), width: p.width, height: p.height,
@@ -88,40 +91,53 @@ async function searchPexels(q, perPage, key) {
   }));
 }
 
-async function searchPixabay(q, perPage, key) {
+async function searchPixabay(q, perPage, key, lang = 'en') {
   await pace('pixabay');
-  const url = `${endpoints.pixabay}?${new URLSearchParams({ key, q, lang: 'pt', image_type: 'photo', orientation: 'horizontal', category: 'food', safesearch: 'true', per_page: String(Math.max(3, perPage)) })}`;
+  const url = `${endpoints.pixabay}?${new URLSearchParams({ key, q, lang, image_type: 'photo', orientation: 'horizontal', category: 'food', safesearch: 'true', per_page: String(Math.max(3, perPage)) })}`;
   const d = await getJson(url, {});
   return (d.hits || []).map((h) => ({
     provider: 'pixabay', id: String(h.id), width: h.imageWidth, height: h.imageHeight,
-    thumb: h.webformatURL, full: h.largeImageURL || h.webformatURL,
+    thumb: h.webformatURL, fallback: h.previewURL || '', full: h.largeImageURL || h.webformatURL,
     author: h.user || '', authorUrl: h.user && h.user_id ? `https://pixabay.com/users/${encodeURIComponent(h.user)}-${h.user_id}/` : h.pageURL || '', pageUrl: h.pageURL || '', alt: h.tags || '',
   }));
 }
 
-/** Busca sugestões nos bancos configurados (Pexels primeiro, depois Pixabay). */
+/**
+ * Busca sugestões nos bancos configurados. O nome da receita é traduzido para inglês (os bancos descrevem
+ * as fotos em inglês) e cada foto ganha uma nota: quantas palavras-chave do prato aparecem na descrição ou
+ * nas etiquetas dela. A lista volta da mais relevante para a menos.
+ */
 async function search(term, { perPage = 4, providers } = {}) {
   const k = keys();
   const list = (providers || ['pexels', 'pixabay']).filter((p) => k[p]);
   if (!list.length) throw new StockError('Configure a chave do Pexels ou do Pixabay', 400);
-  const q = queryFor(term);
-  if (!q) return [];
+  const tr = foodterms.translate(term);
+  const q = tr.query || queryFor(term);
+  const lang = tr.query ? 'en' : 'pt';
+  if (!q) return { query: '', items: [] };
+  const keywords = tr.keywords.length ? tr.keywords : q.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
   const out = [];
   for (const p of list) {
     try {
-      out.push(...(await (p === 'pexels' ? searchPexels(q, perPage, k.pexels) : searchPixabay(q, perPage, k.pixabay))));
+      out.push(...(await (p === 'pexels' ? searchPexels(q, perPage + 2, k.pexels, lang) : searchPixabay(q, perPage + 2, k.pixabay, lang))));
     } catch (e) {
       if (list.length === 1) throw e;
       console.warn(`[fotos] ${NAMES[p]}:`, e.message);
     }
-    if (out.length >= perPage * 2) break;
   }
-  return out.filter((x) => x.full && x.thumb).slice(0, perPage * 2);
+  const seen = new Set();
+  const items = out
+    .filter((x) => x.full && x.thumb && !seen.has(`${x.provider}${x.id}`) && seen.add(`${x.provider}${x.id}`))
+    .map((x, i) => ({ ...x, score: foodterms.score(x.alt, keywords), order: i }))
+    .sort((a, b) => b.score - a.score || a.order - b.order)
+    .slice(0, perPage * 2)
+    .map(({ order, ...x }) => x);
+  return { query: q, keywords, items };
 }
 
 /** Baixa a foto escolhida, guarda como WebP otimizado e coloca na receita com o crédito do fotógrafo. */
 /** Baixa a foto escolhida e guarda como WebP otimizado. Devolve o endereço local e o crédito do fotógrafo. */
-async function download(photo, userId = null) {
+async function download(photo, userId = null, { auto = false } = {}) {
   if (!NAMES[photo?.provider]) throw new StockError('Banco de imagens desconhecido', 400);
   let url;
   try { url = new URL(String(photo.full || '')); } catch { throw new StockError('Endereço da foto inválido', 400); }
@@ -138,7 +154,7 @@ async function download(photo, userId = null) {
   fs.writeFileSync(path.join(config.uploadsDir, name), buf);
   const images = require('./images');
   const opt = await images.optimizeUpload(name, mime);
-  db.get().prepare('INSERT INTO uploads (filename, mime, size, original_name, user_id) VALUES (?, ?, ?, ?, ?)').run(opt.name, opt.mime, opt.size || buf.length, `${NAMES[photo.provider]} ${String(photo.id || '').slice(0, 40)}`.slice(0, 200), userId);
+  db.get().prepare('INSERT INTO uploads (filename, mime, size, original_name, user_id) VALUES (?, ?, ?, ?, ?)').run(opt.name, opt.mime, opt.size || buf.length, `${auto ? 'auto: ' : ''}${NAMES[photo.provider]} ${String(photo.id || '').slice(0, 40)}`.slice(0, 200), userId);
   images.warm(opt.name);
   const author = sec.cleanText(String(photo.author || ''), 80).trim();
   return {
@@ -149,19 +165,34 @@ async function download(photo, userId = null) {
 }
 
 /** Baixa a foto e coloca como capa da receita, com o crédito. */
-async function apply(recipeId, photo, userId = null) {
+async function apply(recipeId, photo, userId = null, opts = {}) {
   const recipes = require('./recipes');
   const r = recipes.getById(Number(recipeId));
   if (!r) throw new StockError('Receita não encontrada', 404);
-  const d = await download(photo, userId);
+  const d = await download(photo, userId, opts);
   return recipes.update(r.id, { cover: d.url, cover_credit: d.credit, cover_credit_url: d.creditUrl });
 }
 
 const configured = () => { const k = keys(); return !!(k.pexels || k.pixabay); };
 
-/** Receitas publicadas ainda sem foto (as mais vistas primeiro). */
-function missing(limit = 12, offset = 0) {
-  return db.get().prepare("SELECT id, code, slug, title FROM recipes WHERE status = 'published' AND (cover IS NULL OR cover = '') ORDER BY views DESC, id DESC LIMIT ? OFFSET ?").all(limit, offset);
+const STOCK_COVER = "(cover_credit LIKE 'Foto:%/ Pexels' OR cover_credit LIKE 'Foto:%/ Pixabay' OR cover_credit IN ('Foto: Pexels', 'Foto: Pixabay'))";
+
+/** Receitas para revisar: 'sem' = publicadas sem foto (mais vistas primeiro); 'bancos' = com foto vinda do Pexels/Pixabay. */
+function missing(limit = 12, offset = 0, mode = 'sem') {
+  const where = mode === 'bancos' ? STOCK_COVER : "(cover IS NULL OR cover = '')";
+  const d = db.get();
+  return {
+    total: d.prepare(`SELECT COUNT(*) AS n FROM recipes WHERE status = 'published' AND ${where}`).get().n,
+    items: d.prepare(`SELECT id, code, slug, title, description, cover, cover_credit FROM recipes WHERE status = 'published' AND ${where} ORDER BY views DESC, id DESC LIMIT ? OFFSET ?`).all(limit, offset),
+  };
+}
+
+/** Tira de uma vez as fotos que vieram dos bancos de imagens (as receitas voltam para a capa ilustrada). */
+function removeStockCovers() {
+  const recipes = require('./recipes');
+  const ids = db.get().prepare(`SELECT id FROM recipes WHERE ${STOCK_COVER}`).all().map((r) => r.id);
+  db.tx(() => { for (const id of ids) recipes.update(id, { cover: '', cover_credit: '', cover_credit_url: '' }); });
+  return ids.length;
 }
 
 // ---------------- Modo automático (em segundo plano, respeitando os limites dos bancos) ----------------
@@ -170,7 +201,7 @@ function startAuto(userId, { max = 1000 } = {}) {
   if (job && job.running) throw new StockError('A busca automática já está rodando', 409);
   const k = keys();
   if (!k.pexels && !k.pixabay) throw new StockError('Configure a chave do Pexels ou do Pixabay', 400);
-  const todo = missing(Math.min(5000, max), 0).map((r) => r.id);
+  const todo = missing(Math.min(5000, max), 0).items.map((r) => r.id);
   job = { running: true, total: todo.length, done: 0, applied: 0, skipped: 0, failed: 0, startedAt: new Date().toISOString(), log: [] };
   const mine = job;
   (async () => {
@@ -183,13 +214,15 @@ function startAuto(userId, { max = 1000 } = {}) {
       if (!r || r.cover || r.status !== 'published') { mine.done++; continue; }
       try {
         const found = await search(r.title, { perPage: 3, providers: order });
-        if (found.length) {
-          await apply(id, found[0], userId);
+        const best = found.items[0];
+        // Só coloca sozinho quando a foto descreve o prato (nota mínima); na dúvida, deixa para a revisão
+        if (best && best.score >= MIN_SCORE) {
+          await apply(id, best, userId, { auto: true });
           mine.applied++;
-          mine.log.push(`✅ ${r.title}`);
+          mine.log.push(`✅ ${r.title} (${found.query})`);
         } else {
           mine.skipped++;
-          mine.log.push(`— ${r.title}: nenhuma foto encontrada`);
+          mine.log.push(`— ${r.title}: nenhuma foto confiável para "${found.query || r.title}" (fica para a revisão)`);
         }
       } catch (e) {
         mine.failed++;
@@ -209,4 +242,4 @@ function stopAuto() {
   if (job) { job.running = false; job.stopReason = 'Parada pelo administrador'; }
 }
 
-module.exports = { status, saveKey, search, apply, download, configured, missing, startAuto, stopAuto, queryFor, endpoints, IMAGE_HOSTS, MIN_INTERVAL, StockError, NAMES, _reset: () => { job = null; last.pexels = 0; last.pixabay = 0; } };
+module.exports = { status, saveKey, search, apply, download, configured, removeStockCovers, missing, startAuto, stopAuto, queryFor, endpoints, IMAGE_HOSTS, MIN_INTERVAL, StockError, NAMES, _reset: () => { job = null; last.pexels = 0; last.pixabay = 0; } };

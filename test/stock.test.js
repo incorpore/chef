@@ -34,12 +34,16 @@ function fakeBanks(req, res) {
   if (url.pathname === '/pexels') {
     seen.pexelsAuth.push(req.headers.authorization); seen.queries.push(url.searchParams.get('query'));
     if (/nada/.test(url.searchParams.get('query'))) return json({ photos: [] });
-    return json({ photos: [1, 2].map((i) => ({ id: 100 + i, width: 1600, height: 1200, photographer: 'Ana Lima', photographer_url: 'https://www.pexels.com/@ana', url: `https://www.pexels.com/photo/${100 + i}/`, alt: 'Bolo', src: { medium: `${F}/img/p${i}.jpg`, large2x: `${F}/img/p${i}.jpg` } })) });
+    // como no Pexels real: a 1ª foto nem sempre é a melhor; a descrição (alt) diz o que aparece
+    const alts = ['Woman cooking in a kitchen', /cake/.test(url.searchParams.get('query')) ? 'Slice of carrot cake with frosting' : 'Bowl of black bean stew'];
+    return json({ photos: [1, 2].map((i) => ({ id: 100 + i, width: 1600, height: 1200, photographer: i === 2 ? 'Ana Lima' : 'Bruno Costa', photographer_url: 'https://www.pexels.com/@ana', url: `https://www.pexels.com/photo/${100 + i}/`, alt: alts[i - 1], src: { medium: `${F}/img/p${i}.jpg`, large2x: `${F}/img/p${i}.jpg` } })) });
   }
   if (url.pathname === '/pixabay') {
     seen.pixabayKeys.push(url.searchParams.get('key'));
+    seen.pixabayLang = url.searchParams.get('lang');
     if (/nada/.test(url.searchParams.get('q'))) return json({ hits: [] });
-    return json({ hits: [{ id: 555, imageWidth: 1280, imageHeight: 853, webformatURL: `${F}/img/x.jpg`, largeImageURL: `${F}/img/x.jpg`, user: 'chefpix', user_id: 9, pageURL: 'https://pixabay.com/photos/555/', tags: 'comida' }] });
+    const tags = /flan/.test(url.searchParams.get('q')) ? 'flan, caramel, dessert' : /sorvete/.test(url.searchParams.get('q')) ? 'kitchen, table' : 'food, table';
+    return json({ hits: [{ id: 555, imageWidth: 1280, imageHeight: 853, webformatURL: `${F}/img/x.jpg`, previewURL: `${F}/img/x-prev.jpg`, largeImageURL: `${F}/img/x.jpg`, user: 'chefpix', user_id: 9, pageURL: 'https://pixabay.com/photos/555/', tags }] });
   }
   if (url.pathname.startsWith('/img/')) { res.writeHead(200, { 'content-type': 'image/jpeg' }); return res.end(jpg); }
   if (url.pathname === '/html') { res.writeHead(200, { 'content-type': 'image/jpeg' }); return res.end('<html><script>alert(1)</script>'); }
@@ -115,16 +119,36 @@ test('chaves: formato validado, guardadas no servidor (600) e nunca devolvidas',
   assert.equal(fs.statSync(path.join(process.env.DATA_DIR, 'stock-keys.json')).mode & 0o777, 0o600);
 });
 
-test('sugestões: busca nos dois bancos com as chaves certas e termo limpo', async () => {
+test('sugestões: nome traduzido para inglês, chaves certas e foto mais relevante primeiro', async () => {
   const r = await admin.req('GET', `/api/v1/fotos/sugestoes/${r1.id}`);
   assert.equal(r.status, 200);
-  assert.equal(r.data.query, 'Bolo de cenoura', 'parênteses e "fofinho" saem do termo');
-  assert.deepEqual(r.data.items.map((i) => i.provider), ['pexels', 'pexels', 'pixabay']);
+  assert.equal(r.data.query, 'carrot cake', '"Bolo de cenoura (fofinho)" vira "carrot cake"');
+  assert.equal(seen.queries.at(-1), 'carrot cake');
+  assert.equal(seen.pixabayLang, 'en');
   assert.equal(seen.pexelsAuth.at(-1), PEXELS_KEY);
   assert.equal(seen.pixabayKeys.at(-1), PIXABAY_KEY);
-  assert.equal(r.data.items[0].author, 'Ana Lima');
+  assert.equal(r.data.items[0].alt, 'Slice of carrot cake with frosting', 'a foto que descreve o prato sobe para o topo');
+  assert.ok(r.data.items[0].score >= 2);
+  assert.equal(r.data.items.at(-1).score, 0);
+  assert.equal(r.data.items.find((i) => i.provider === 'pixabay').fallback, `${F}/img/x-prev.jpg`, 'miniatura reserva do Pixabay');
   const q = await admin.req('GET', `/api/v1/fotos/sugestoes/${r1.id}?q=${encodeURIComponent('carrot cake')}`);
-  assert.equal(q.data.query, 'carrot cake', 'termo personalizado');
+  assert.equal(q.data.query, 'carrot cake', 'termo digitado em inglês é usado como está');
+});
+
+test('tradutor de culinária: pratos brasileiros e combinações comuns', () => {
+  const { translate, score } = require('../src/foodterms');
+  const cases = {
+    'Bolo de cenoura com cobertura de chocolate': 'carrot chocolate cake',
+    'Pão de queijo mineiro': 'brazilian cheese bread',
+    'Lasanha de frango': 'chicken lasagna',
+    'Salada de grão-de-bico': 'chickpea salad',
+    'Moqueca de banana-da-terra': 'plantain stew',
+    'Macarrão à carbonara': 'carbonara pasta',
+    'Feijoada completa': 'feijoada black bean stew',
+  };
+  for (const [pt, en] of Object.entries(cases)) assert.equal(translate(pt).query, en, pt);
+  assert.equal(score('Slice of carrot cake on a plate', translate('Bolo de cenoura').keywords), 3);
+  assert.equal(score('Woman cooking in a kitchen', translate('Bolo de cenoura').keywords), 0);
 });
 
 test('aplicar: baixa só dos bancos, confere que é foto, guarda WebP e mostra o crédito', async () => {
@@ -156,7 +180,8 @@ test('automático: coloca foto nas que faltam, pula as sem resultado e informa o
   const done = (await admin.req('GET', '/api/v1/fotos/status')).data;
   assert.deepEqual([done.job.applied, done.job.skipped, done.job.failed, done.missing], [1, 1, 0, 1]);
   const pudim = (await admin.req('GET', `/api/v1/recipes/${r2.code}`)).data;
-  assert.equal(pudim.cover_credit, 'Foto: chefpix / Pixabay', 'Pixabay vem primeiro no automático (mais rápido)');
+  assert.equal(pudim.cover_credit, 'Foto: chefpix / Pixabay', 'Pixabay (etiquetas "flan, caramel") confirma o pudim');
+  assert.ok(db.get().prepare("SELECT 1 FROM uploads WHERE original_name LIKE 'auto: Pixabay%'").get(), 'foto automática fica marcada');
   assert.ok(db.get().prepare("SELECT 1 FROM audit_log WHERE action = 'fotos.auto'").get());
 });
 
@@ -167,18 +192,43 @@ test('editor: autor busca e baixa foto grátis; a receita nova salva capa e cré
   assert.equal((await author.req('GET', '/api/v1/fotos/buscar?q=')).data.items.length, 0);
   const found = await author.req('GET', `/api/v1/fotos/buscar?q=${encodeURIComponent('Feijoada (completa)')}`);
   assert.equal(found.status, 200);
-  assert.equal(found.data.query, 'Feijoada');
+  assert.equal(found.data.query, 'feijoada black bean stew');
   assert.ok(found.data.items.length >= 2);
   assert.equal((await author.req('POST', '/api/v1/fotos/baixar', { photo: { ...found.data.items[0], full: 'https://evil.example.com/a.jpg' } })).status, 400);
   const d = await author.req('POST', '/api/v1/fotos/baixar', { photo: found.data.items[0] });
   assert.equal(d.status, 201);
   assert.match(d.data.url, /^\/uploads\/.+\.webp$/);
-  assert.equal(d.data.credit, 'Foto: Ana Lima / Pexels');
+  assert.equal(d.data.credit, `Foto: ${found.data.items[0].author} / Pexels`);
   const r = (await author.req('POST', '/api/v1/recipes', { title: 'Feijoada completa', cover: d.data.url, cover_credit: d.data.credit, cover_credit_url: d.data.creditUrl, ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'published' })).data;
-  assert.deepEqual([r.cover, r.cover_credit], [d.data.url, 'Foto: Ana Lima / Pexels']);
+  assert.deepEqual([r.cover, r.cover_credit], [d.data.url, d.data.credit]);
   const edit = await author.req('GET', `/admin/receitas/${r.id}`);
-  assert.match(edit.text, /data-cover-credit="Foto: Ana Lima \/ Pexels"/, 'editor conhece o crédito da capa atual');
+  assert.match(edit.text, /data-cover-credit="Foto: .+ \/ Pexels"/, 'editor conhece o crédito da capa atual');
   assert.equal((await author.req('PATCH', `/api/v1/recipes/${r.id}`, { cover_credit_url: 'javascript:alert(1)' })).status, 400);
+});
+
+test('automático só aplica foto que confirma o prato; o resto fica para a revisão', async () => {
+  const sorvete = (await admin.req('POST', '/api/v1/recipes', { title: 'Sorvete caseiro de creme', ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'published' })).data;
+  stock._reset();
+  await admin.req('POST', '/api/v1/fotos/auto');
+  for (let i = 0; i < 100 && (await admin.req('GET', '/api/v1/fotos/status')).data.job.running; i++) await new Promise((r) => setTimeout(r, 50));
+  const st = (await admin.req('GET', '/api/v1/fotos/status')).data;
+  assert.equal((await admin.req('GET', `/api/v1/recipes/${sorvete.code}`)).data.cover, '', 'foto genérica ("kitchen, table") não entra sozinha');
+  assert.ok(st.job.log.some((l) => /Sorvete caseiro de creme: nenhuma foto confiável/.test(l)));
+});
+
+test('conferir e limpar: lista as fotos dos bancos e remove todas de uma vez (sem tocar nas enviadas)', async () => {
+  const mine = (await admin.req('POST', '/api/v1/recipes', { title: 'Receita com foto minha', cover: '/uploads/minha.jpg', ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'published' })).data;
+  const st = (await admin.req('GET', '/api/v1/fotos/status')).data;
+  assert.ok(st.fromBanks >= 1);
+  const list = (await admin.req('GET', '/api/v1/fotos/pendentes?modo=bancos')).data;
+  assert.equal(list.total, st.fromBanks);
+  assert.ok(list.items.every((r) => /Pexels|Pixabay/.test(r.cover_credit)));
+  assert.equal((await author.req('POST', '/api/v1/fotos/remover-bancos')).status, 403);
+  const r = await admin.req('POST', '/api/v1/fotos/remover-bancos');
+  assert.equal(r.data.removed, st.fromBanks);
+  assert.equal(r.data.fromBanks, 0);
+  assert.equal((await admin.req('GET', `/api/v1/recipes/${mine.code}`)).data.cover, '/uploads/minha.jpg', 'foto enviada pelo usuário fica');
+  assert.ok(db.get().prepare("SELECT 1 FROM audit_log WHERE action = 'fotos.remover-bancos'").get());
 });
 
 test('editor sem chave: autor vê aviso claro; admin vê atalho para configurar', async () => {
