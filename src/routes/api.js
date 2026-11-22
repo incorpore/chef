@@ -64,6 +64,10 @@ router.use((req, res, next) => {
 // ---------------- Documentação ----------------
 router.get('/', (req, res) => res.json({ name: 'Chef API', version: 1, docs: `${baseUrl(req)}/api/docs`, openapi: `${baseUrl(req)}/api/v1/openapi.json` }));
 router.get('/openapi.json', (req, res) => res.json(openapi(baseUrl(req))));
+router.get('/health', (req, res) => {
+  db.get().prepare('SELECT 1').get();
+  res.json({ ok: true, version: require('../../package.json').version, uptime: Math.round(process.uptime()), recipes: db.get().prepare("SELECT COUNT(*) n FROM recipes WHERE status = 'published'").get().n });
+});
 
 /**
  * Guarda o endereço do site usado pelo administrador logado (para os links dos e-mails), só se
@@ -229,6 +233,34 @@ router.post('/users', auth.requireAdmin, wrap(async (req, res) => {
   }
   res.status(201).json({ user: auth.publicUser(user), invited: invite && !warning, warning });
 }));
+router.get('/users/:id', auth.requireAdmin, (req, res) => {
+  const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(idParam(req.params.id));
+  if (!user) return notFound(res, 'Usuário não encontrado');
+  res.json({ user: auth.publicUser(user) });
+});
+/** Admin altera nome, bio, foto e papel de outra conta (senha e e-mail só pela própria pessoa ou pelo convite). */
+router.put('/users/:id', auth.requireAdmin, (req, res) => {
+  const d = db.get();
+  const user = d.prepare('SELECT * FROM users WHERE id = ?').get(idParam(req.params.id));
+  if (!user) return notFound(res, 'Usuário não encontrado');
+  const b = req.body || {};
+  const ch = {};
+  if (b.name !== undefined) { ch.name = sec.cleanText(b.name, 80).trim(); if (!ch.name) return res.status(400).json({ error: 'Informe o nome' }); }
+  if (b.bio !== undefined) ch.bio = sec.cleanText(b.bio, 2000);
+  if (b.avatar !== undefined) {
+    ch.avatar = String(b.avatar ?? '').trim();
+    if (ch.avatar && (ch.avatar.length > 500 || !AVATAR_RE.test(ch.avatar))) return res.status(400).json({ error: 'Foto inválida: envie uma imagem ou use um link https' });
+  }
+  if (b.role !== undefined) {
+    if (!['admin', 'author'].includes(b.role)) return res.status(400).json({ error: 'Papel inválido (admin ou author)' });
+    if (user.id === req.user.id && b.role !== 'admin') return res.status(400).json({ error: 'Você não pode remover o seu próprio acesso de administrador' });
+    ch.role = b.role;
+  }
+  const cols = Object.keys(ch);
+  if (cols.length) d.prepare(`UPDATE users SET ${cols.map((c) => `${c} = ?`).join(', ')}${ch.role && ch.role !== user.role ? ', session_version = session_version + 1' : ''} WHERE id = ?`).run(...cols.map((c) => ch[c]), user.id);
+  if (cols.length) auth.audit(req, 'user.update', `${user.email}: ${cols.join(',')}`);
+  res.json({ user: auth.publicUser(d.prepare('SELECT * FROM users WHERE id = ?').get(user.id)) });
+});
 router.post('/users/:id/invite', auth.requireAdmin, wrap(async (req, res) => {
   const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(idParam(req.params.id));
   if (!user) return notFound(res, 'Usuário não encontrado');
@@ -295,6 +327,20 @@ router.get('/recipes/code/:code', (req, res) => {
   const r = recipes.getByCode(req.params.code);
   if (!canView(req, r)) return notFound(res, 'Nenhuma receita com este código');
   res.json(recipes.toPublic(r, baseUrl(req)));
+});
+
+router.get('/recipes/random', (req, res) => {
+  const cat = req.query.category ? sec.cleanText(req.query.category, 80) : '';
+  const row = db.get().prepare(`SELECT r.id FROM recipes r LEFT JOIN categories c ON c.id = r.category_id WHERE r.status = 'published'${cat ? ' AND (c.slug = ? OR c.name = ? COLLATE NOCASE)' : ''} ORDER BY random() LIMIT 1`).get(...(cat ? [cat, cat] : []));
+  if (!row) return notFound(res, 'Nenhuma receita publicada');
+  res.json(recipes.toPublic(recipes.getById(row.id), baseUrl(req)));
+});
+
+router.get('/recipes/:ref/related', (req, res) => {
+  const r = recipes.find(req.params.ref);
+  if (!canView(req, r)) return notFound(res, 'Receita não encontrada');
+  const n = Math.min(12, Math.max(1, Number(req.query.limit) || 4));
+  res.json({ items: recipes.related(r, n).map((x) => recipes.toPublic(x, baseUrl(req))) });
 });
 
 router.get('/recipes/:ref', (req, res) => {
@@ -619,6 +665,12 @@ router.delete('/uploads/:id', auth.requireUser, (req, res) => {
 
 // ---------------- Categorias e tags ----------------
 router.get('/categories', (req, res) => res.json({ items: recipes.categories() }));
+router.get('/categories/:ref', (req, res) => {
+  const ref = String(req.params.ref);
+  const c = recipes.categories().find((x) => String(x.id) === ref || x.slug === ref);
+  if (!c) return notFound(res, 'Categoria não encontrada');
+  res.json(c);
+});
 function categoryPayload(b) {
   const name = sec.cleanText(b.name, 60).trim();
   if (!name) throw Object.assign(new Error('Nome é obrigatório'), { status: 400 });
@@ -636,7 +688,7 @@ router.put('/categories/:id', auth.requireAdmin, (req, res) => {
   res.json(db.get().prepare('SELECT * FROM categories WHERE id = ?').get(c.id));
 });
 router.delete('/categories/:id', auth.requireAdmin, (req, res) => {
-  db.get().prepare('DELETE FROM categories WHERE id = ?').run(idParam(req.params.id));
+  if (!db.get().prepare('DELETE FROM categories WHERE id = ?').run(idParam(req.params.id)).changes) return notFound(res, 'Categoria não encontrada');
   res.json({ ok: true });
 });
 router.get('/tags', (req, res) => res.json({ items: recipes.allTags(200) }));
@@ -672,6 +724,11 @@ function productPayload(b, current = {}) {
 }
 const PRODUCT_COLS = ['title', 'asin', 'url', 'image', 'price', 'description', 'badge', 'keywords', 'active', 'store', 'external_id', 'source_url', 'aff_url', 'price_value', 'utensil', 'category', 'available'];
 const getProduct = (id) => db.get().prepare('SELECT * FROM products WHERE id = ?').get(id);
+router.get('/products/:id', auth.requireUser, (req, res) => {
+  const p = getProduct(idParam(req.params.id));
+  if (!p) return notFound(res, 'Produto não encontrado');
+  res.json(p);
+});
 router.post('/products', auth.requireAdmin, (req, res) => {
   const v = productPayload(req.body || {});
   const dup = v.external_id ? db.get().prepare('SELECT id, title FROM products WHERE store = ? AND external_id = ?').get(v.store, v.external_id) : null;
@@ -689,7 +746,7 @@ router.put('/products/:id', auth.requireAdmin, (req, res) => {
   res.json(getProduct(p.id));
 });
 router.delete('/products/:id', auth.requireAdmin, (req, res) => {
-  db.get().prepare('DELETE FROM products WHERE id = ?').run(idParam(req.params.id));
+  if (!db.get().prepare('DELETE FROM products WHERE id = ?').run(idParam(req.params.id)).changes) return notFound(res, 'Produto não encontrado');
   pageCache.bump();
   res.json({ ok: true });
 });
@@ -752,6 +809,11 @@ function adPayload(b, cur = {}) {
   if (String(a.html || '').length > 20000) throw Object.assign(new Error('Código do anúncio grande demais'), { status: 400 });
   return [sec.cleanText(a.name, 80), a.slot, String(a.html || ''), ['all', 'mobile', 'desktop'].includes(a.device) ? a.device : 'all', a.active === false || a.active === 0 || a.active === '0' ? 0 : 1, Math.min(100, Math.max(1, Number(a.weight) || 1))];
 }
+router.get('/ads/:id', auth.requireAdmin, (req, res) => {
+  const a = db.get().prepare('SELECT * FROM ads WHERE id = ?').get(idParam(req.params.id));
+  if (!a) return notFound(res, 'Anúncio não encontrado');
+  res.json(a);
+});
 router.post('/ads', auth.requireAdmin, (req, res) => {
   const info = db.get().prepare('INSERT INTO ads (name, slot, html, device, active, weight) VALUES (?, ?, ?, ?, ?, ?)').run(...adPayload(req.body || {}));
   auth.audit(req, 'ad.create', `${info.lastInsertRowid}`);
@@ -765,7 +827,7 @@ router.put('/ads/:id', auth.requireAdmin, (req, res) => {
   res.json(db.get().prepare('SELECT * FROM ads WHERE id = ?').get(a.id));
 });
 router.delete('/ads/:id', auth.requireAdmin, (req, res) => {
-  db.get().prepare('DELETE FROM ads WHERE id = ?').run(idParam(req.params.id));
+  if (!db.get().prepare('DELETE FROM ads WHERE id = ?').run(idParam(req.params.id)).changes) return notFound(res, 'Anúncio não encontrado');
   res.json({ ok: true });
 });
 
@@ -795,7 +857,7 @@ router.get('/subscribers', auth.requireAdmin, (req, res) => {
   res.json({ items });
 });
 router.delete('/subscribers/:id', auth.requireAdmin, (req, res) => {
-  db.get().prepare('DELETE FROM subscribers WHERE id = ?').run(idParam(req.params.id));
+  if (!db.get().prepare('DELETE FROM subscribers WHERE id = ?').run(idParam(req.params.id)).changes) return notFound(res, 'Inscrito não encontrado');
   res.json({ ok: true });
 });
 

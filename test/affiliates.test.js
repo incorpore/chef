@@ -47,6 +47,10 @@ function fakeStores(req, res) {
   }
   if (url.pathname === '/amzn-short') { res.writeHead(301, { location: `${F}/Forma-Redonda-Antiaderente-25cm/dp/B0FORMA251?tag=x` }); return res.end(); }
   if (url.pathname.startsWith('/Forma-Redonda')) return send('<html>ok</html>');
+  if (url.pathname.startsWith('/mlblock/')) return send('blocked', 'text/html', 403);
+  if (url.pathname.startsWith('/mlhttp/')) return send('<html><head><meta property="og:title" content="Batedeira X | Mercado Livre"><meta property="og:image" content="http://http2.mlstatic.com/batedeira.jpg"><meta itemprop="price" content="99.90"></head></html>');
+  if (url.pathname === '/mlapi/items/MLB5556667778') return send(JSON.stringify({ title: 'Panela de Pressão 4,5 L', price: 149.9, status: 'active', pictures: [{ secure_url: 'https://http2.mlstatic.com/panela.webp' }] }), 'application/json');
+  if (url.pathname === '/mlapi/products/MLB19639543') return send(JSON.stringify({ name: 'Liquidificador Catálogo', status: 'active', pictures: [{ url: 'https://http2.mlstatic.com/catalogo.webp' }], buy_box_winner: { price: 210 } }), 'application/json');
   if (url.pathname.startsWith('/ml/')) {
     return send(`<html><head><meta property="og:title" content="Liquidificador Turbo 12 Velocidades | Mercado Livre"><meta property="og:image" content="https://http2.mlstatic.com/liquidificador.jpg">
       <script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"Liquidificador Turbo 12 Velocidades","offers":{"@type":"Offer","price":189.9,"availability":"https://schema.org/InStock"}}</script></head></html>`);
@@ -104,6 +108,7 @@ test.before(async () => {
   affiliates.endpoints.amazonPage = (asin) => `${F}/dp/${asin}`;
   affiliates.endpoints.shopeePage = () => `${F}/nada`;
   affiliates.hostAlias.set(new URL(F).host, 'amazon');
+  affiliates.endpoints.mlApi = `${F}/mlapi`;
   shopee.endpoints.graphql = `${F}/graphql`;
   shopee.limits.gapMs = 0;
   db.open(':memory:');
@@ -288,4 +293,18 @@ test('visualizações: só contam visitantes reais (nem equipe, nem robôs, nem 
   assert.equal((await post()).counted, true, 'visitante');
   assert.equal((await post()).counted, false, 'mesma pessoa em seguida');
   assert.equal(views(), v0 + 1);
+});
+
+test('Mercado Livre: foto com http:// vira https e página bloqueada usa a API pública do ML', async () => {
+  affiliates.hostAlias.set(new URL(F).host, 'mercadolivre');
+  try {
+    const h = await admin.req('POST', '/api/v1/products/preview', { url: `${F}/mlhttp/MLB-1112223334-batedeira?matt_tool=1` });
+    assert.equal(h.data.image, 'https://http2.mlstatic.com/batedeira.jpg');
+    const b = await admin.req('POST', '/api/v1/products/preview', { url: `${F}/mlblock/MLB-5556667778-panela-de-pressao?matt_tool=1` });
+    assert.equal(b.status, 200, b.text);
+    assert.deepEqual([b.data.title, b.data.image, b.data.priceValue], ['Panela de Pressão 4,5 L', 'https://http2.mlstatic.com/panela.webp', 149.9]);
+    assert.deepEqual(b.data.warn, []);
+    const c = await admin.req('POST', '/api/v1/products/preview', { url: `${F}/mlblock/liquidificador/p/MLB19639543?matt_tool=1` });
+    assert.deepEqual([c.data.title, c.data.image, c.data.priceValue], ['Liquidificador Catálogo', 'https://http2.mlstatic.com/catalogo.webp', 210]);
+  } finally { affiliates.hostAlias.set(new URL(F).host, 'amazon'); }
 });

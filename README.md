@@ -30,7 +30,10 @@ Site/sistema para publicar e compartilhar suas receitas, com **busca por palavra
 ### Importação e API
 - **Importar por URL**: lê `schema.org/Recipe` (JSON‑LD, o mesmo formato que o Google usa), microdata ou, como último recurso, a estrutura da página. Pode baixar as imagens para o seu servidor e tem proteção contra SSRF.
 - Formas de importar: atalho de navegador (bookmarklet), **"Compartilhar → Chef"** no celular (PWA share target) e importação em lote de JSON (backup).
-- **API REST** `/api/v1` com chaves (Bearer). Documentação em `/api/docs` e OpenAPI em `/api/v1/openapi.json`. A leitura é pública, com CORS.
+- **API REST** `/api/v1` completa (mais de 100 endpoints): tudo o que o painel faz também funciona por integrações (n8n, Zapier, Make, scripts), usando chaves (Bearer).
+  - Documentação navegável em `/api/docs`, gerada da especificação **OpenAPI 3.1** (`/api/v1/openapi.json`, que pode ser importada no Postman, Insomnia ou n8n). Endpoints agrupados por assunto, com parâmetros, corpo, permissões e respostas.
+  - Leitura pública com CORS. Erros sempre como `{"error": "mensagem"}` com o código HTTP certo. Saúde em `/api/v1/health`.
+  - Um teste automático garante que toda rota do servidor está documentada, que cada uma respeita a permissão documentada (público / login / admin) e que nenhuma leitura falha.
 
 ### Monetização
 - **Anúncios** em 9 posições (topo, entre receitas, antes dos ingredientes, entre os passos, barra lateral, tela final do modo cozinha…), com rotação por peso, segmentação celular/desktop e contagem de impressões. Integração com **Google AdSense**, incluindo o `ads.txt` automático.

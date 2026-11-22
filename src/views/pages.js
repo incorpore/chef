@@ -204,13 +204,51 @@ function offline() {
   return layout({ title: 'Sem conexão', noindex: true, body: `<div class="wrap narrow empty-state"><h1>📴 Você está offline</h1><p>As receitas que você já abriu e seus favoritos continuam disponíveis.</p><p><a class="btn btn-primary" href="/favoritos">Ver favoritos</a> <a class="btn btn-ghost" href="/lista">Lista de compras</a></p></div>` });
 }
 
+/** Documentação da API gerada da própria especificação OpenAPI (nunca fica desatualizada). */
 function apiDocs(base) {
-  const body = `<div class="wrap narrow prose"><h1>API do ${esc(settings.all().siteName)}</h1>
-  <p>API REST em JSON. Leitura pública (CORS liberado); escrita exige uma chave gerada em <a href="/admin/api">Painel → API</a>, enviada <b>somente</b> no cabeçalho <code>Authorization: Bearer …</code> (nunca na URL).</p>
-  <p><b>Limites:</b> 600 leituras e 120 escritas por minuto por IP (veja os cabeçalhos <code>RateLimit-Remaining</code> e <code>Retry-After</code>); 20 importações por minuto; corpo JSON até 1 MB (20 MB na importação em lote); até 20 arquivos de ${Number(process.env.MAX_UPLOAD_MB) || 200} MB por envio.</p>
-  <p>Especificação OpenAPI: <a href="/api/v1/openapi.json"><code>/api/v1/openapi.json</code></a></p>
+  const spec = require('../openapi')(base);
+  const ACCESS = { public: ['Público', 'acc-public'], user: ['🔑 Login ou chave', 'acc-user'], admin: ['🔒 Admin', 'acc-admin'] };
+  const typeOf = (sc = {}) => {
+    if (sc.$ref) return sc.$ref.split('/').pop();
+    if (sc.oneOf) return sc.oneOf.map(typeOf).join(' | ');
+    if (sc.enum) return sc.enum.map((x) => JSON.stringify(x)).join(' | ');
+    if (sc.type === 'array') return `${typeOf(sc.items)}[]`;
+    return sc.type || 'objeto';
+  };
+  const resolve = (sc) => (sc?.$ref ? spec.components.schemas[sc.$ref.split('/').pop()] : sc);
+  const fields = (sc) => {
+    const o = resolve(sc);
+    if (!o || !o.properties) return '';
+    const req = new Set(o.required || []);
+    return `<table class="api-fields"><tbody>${Object.entries(o.properties).map(([k, v]) => `<tr><td><code>${esc(k)}</code>${req.has(k) ? ' <b class="req">obrigatório</b>' : ''}</td><td><small>${esc(typeOf(v))}</small></td><td>${esc(v.description || '')}</td></tr>`).join('')}</tbody></table>`;
+  };
+  const groups = new Map(spec.tags.map((t) => [t.name, { ...t, ops: [] }]));
+  let total = 0;
+  for (const [p, ops] of Object.entries(spec.paths)) for (const [m, op] of Object.entries(ops)) { groups.get(op.tags[0]).ops.push({ m, p, op }); total++; }
+  const opHtml = ({ m, p, op }) => {
+    const [accLabel, accCls] = ACCESS[op['x-auth']];
+    const params = op.parameters || [];
+    const body = op.requestBody?.content;
+    const bodySchema = body && (body['application/json'] || body['multipart/form-data'])?.schema;
+    const okCode = Object.keys(op.responses).find((c) => Number(c) < 300);
+    const errs = Object.keys(op.responses).filter((c) => Number(c) >= 400);
+    return `<details class="api-op" id="${esc(op.operationId)}"><summary><span class="api-m api-${m}">${m.toUpperCase()}</span><code class="api-p">/api/v1${esc(p)}</code><span class="api-s">${esc(op.summary)}</span><span class="api-acc ${accCls}">${accLabel}</span></summary>
+      <div class="api-body">${op.description ? `<p>${esc(op.description)}</p>` : ''}
+      ${params.length ? `<h4>Parâmetros</h4><table class="api-fields"><tbody>${params.map((x) => `<tr><td><code>${esc(x.name)}</code>${x.required ? ' <b class="req">obrigatório</b>' : ''}</td><td><small>${x.in === 'path' ? 'no caminho' : 'na URL'} · ${esc(typeOf(x.schema))}</small></td><td>${esc(x.description || '')}</td></tr>`).join('')}</tbody></table>` : ''}
+      ${bodySchema ? `<h4>Corpo ${body['multipart/form-data'] ? '(multipart/form-data)' : '(JSON)'}</h4>${fields(bodySchema) || `<p><small>${esc(typeOf(bodySchema))}</small></p>`}` : ''}
+      <h4>Respostas</h4><p class="api-res"><span class="api-code ok">${okCode}</span> ${esc(typeOf(op.responses[okCode].content?.['application/json']?.schema || {}) === 'objeto' ? 'JSON' : typeOf(op.responses[okCode].content?.['application/json']?.schema || {}))}${errs.map((c) => ` <span class="api-code err" title="${esc(op.responses[c].description)}">${c}</span>`).join('')}</p></div></details>`;
+  };
+  const body = `<div class="wrap narrow api-docs"><div class="prose"><h1>API do ${esc(settings.all().siteName)}</h1>
+  <p>API REST em JSON com <b>${total} endpoints</b>: tudo o que o painel faz também pode ser feito por integrações (n8n, Zapier, Make, scripts, apps).</p>
+  <ul>
+    <li><b>Leitura pública</b> (receitas, categorias, busca) com CORS liberado.</li>
+    <li><b>Escrita</b> com uma chave criada em <a href="/admin/api">Painel → API</a>, enviada <b>só</b> no cabeçalho <code>Authorization: Bearer SUA_CHAVE</code> (nunca na URL). A chave tem as mesmas permissões da sua conta: autor altera só as próprias receitas; 🔒 rotas de admin exigem conta de administrador.</li>
+    <li><b>Erros</b> sempre como <code>{"error": "mensagem"}</code> em português, com o código HTTP certo (400 dados inválidos, 401 sem login, 403 sem permissão, 404 não encontrado, 409 já existe, 429 limite).</li>
+    <li><b>Limites</b>: 600 leituras e 120 escritas por minuto por IP (cabeçalhos <code>RateLimit-Remaining</code> e <code>Retry-After</code>); corpo JSON até 1 MB (20 MB na importação em lote); até 20 arquivos de ${Number(process.env.MAX_UPLOAD_MB) || 200} MB por envio.</li>
+    <li><b>Especificação OpenAPI 3.1</b>: <a href="/api/v1/openapi.json"><code>/api/v1/openapi.json</code></a> (importe no Postman, Insomnia ou n8n). Saúde: <a href="/api/v1/health"><code>/api/v1/health</code></a>.</li>
+  </ul>
   <h2>Exemplos</h2>
-  <pre><code># Buscar por palavra-chave
+  <pre><code># Buscar por palavra-chave (até 60 min)
 curl "${esc(base)}/api/v1/recipes?q=bolo&amp;maxTime=60"
 
 # Buscar por código
@@ -219,10 +257,17 @@ curl "${esc(base)}/api/v1/recipes/code/K7M2QX"
 # O que fazer com o que tenho em casa
 curl "${esc(base)}/api/v1/recipes?ingredients=ovo,tomate"
 
+# Receita aleatória de uma categoria
+curl "${esc(base)}/api/v1/recipes/random?category=bolos"
+
 # Criar receita
 curl -X POST "${esc(base)}/api/v1/recipes" \\
   -H "Authorization: Bearer SUA_CHAVE" -H "Content-Type: application/json" \\
   -d '{"title":"Brigadeiro","ingredients":"1 lata de leite condensado\\n1 colher (sopa) de manteiga\\n4 colheres (sopa) de chocolate em pó","steps":"Misture tudo em fogo baixo.\\nMexa por 10 minutos até desgrudar.","status":"published"}'
+
+# Alterar só o status
+curl -X PATCH "${esc(base)}/api/v1/recipes/K7M2QX" \\
+  -H "Authorization: Bearer SUA_CHAVE" -H "Content-Type: application/json" -d '{"status":"draft"}'
 
 # Importar de uma URL (pré-visualizar ou salvar)
 curl -X POST "${esc(base)}/api/v1/import" \\
@@ -230,11 +275,15 @@ curl -X POST "${esc(base)}/api/v1/import" \\
   -d '{"url":"https://site.com/receita","save":true,"status":"draft"}'
 
 # Enviar foto ou vídeo
-curl -X POST "${esc(base)}/api/v1/uploads" -H "Authorization: Bearer SUA_CHAVE" -F "files=@foto.jpg"</code></pre>
+curl -X POST "${esc(base)}/api/v1/uploads" -H "Authorization: Bearer SUA_CHAVE" -F "files=@foto.jpg"
+
+# Cadastrar produto de afiliado a partir do link (admin)
+curl -X POST "${esc(base)}/api/v1/products/preview" \\
+  -H "Authorization: Bearer SUA_CHAVE" -H "Content-Type: application/json" -d '{"url":"https://link.amazon/xxxx"}'</code></pre>
   <h2>Endpoints</h2>
-  <table class="table"><tbody>
-  ${[['GET', '/recipes', 'Lista/busca (q, code, category, tag, diet, maxTime, difficulty, ingredients, sort, page, perPage)'], ['GET', '/recipes/{id|código|slug}', 'Detalhe'], ['GET', '/recipes/code/{código}', 'Busca exata por código'], ['POST', '/recipes', 'Criar 🔑'], ['PUT/PATCH', '/recipes/{ref}', 'Atualizar 🔑'], ['DELETE', '/recipes/{ref}', 'Remover 🔑'], ['POST', '/recipes/{ref}/duplicate', 'Duplicar 🔑'], ['GET/POST', '/recipes/{ref}/comments', 'Comentários e notas'], ['GET', '/search/suggest?q=', 'Autocomplete'], ['POST', '/import', 'Importar por URL 🔑'], ['POST', '/import/json', 'Importar JSON em lote 🔑'], ['GET', '/export', 'Backup completo 🔑'], ['POST', '/uploads', 'Fotos e vídeos 🔑'], ['GET/POST', '/categories', 'Categorias'], ['GET', '/tags', 'Tags'], ['GET/POST/PUT/DELETE', '/products', 'Produtos de afiliado 🔑'], ['GET/POST/PUT/DELETE', '/ads', 'Anúncios 🔑'], ['GET/PUT', '/settings', 'Configurações 🔑'], ['GET', '/stats', 'Estatísticas 🔑'], ['POST', '/auth/logout-all', 'Sair de todos os aparelhos 🔑'], ['DELETE', '/uploads/{id}', 'Remover arquivo 🔑'], ['GET', '/audit', 'Auditoria (admin) 🔑']].map(([m, p, d]) => `<tr><td><code>${m}</code></td><td><code>/api/v1${esc(p)}</code></td><td>${d}</td></tr>`).join('')}
-  </tbody></table></div>`;
+  <nav class="api-toc">${[...groups.values()].filter((g) => g.ops.length).map((g) => `<a href="#g-${u.slugify(g.name)}">${esc(g.name)} <small>${g.ops.length}</small></a>`).join('')}</nav></div>
+  ${[...groups.values()].filter((g) => g.ops.length).map((g) => `<section class="api-group" id="g-${u.slugify(g.name)}"><h2>${esc(g.name)}</h2><p class="api-gd">${esc(g.description)}</p>${g.ops.map(opHtml).join('')}</section>`).join('')}
+  </div>`;
   return layout({ title: 'API', body });
 }
 

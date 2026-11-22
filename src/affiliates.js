@@ -18,7 +18,7 @@ const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 const STORES = { amazon: 'Amazon', shopee: 'Shopee', mercadolivre: 'Mercado Livre', outra: 'Loja' };
 const bad = (msg, status = 400) => Object.assign(new Error(msg), { status });
 // Endereços lidos (trocados nos testes por servidores falsos)
-const endpoints = { amazonPage: (asin) => `https://www.amazon.com.br/dp/${asin}`, shopeePage: (shopId, itemId) => `https://shopee.com.br/product/${shopId}/${itemId}` };
+const endpoints = { mlApi: 'https://api.mercadolibre.com', amazonPage: (asin) => `https://www.amazon.com.br/dp/${asin}`, shopeePage: (shopId, itemId) => `https://shopee.com.br/product/${shopId}/${itemId}` };
 const hostAlias = new Map(); // host:porta → loja (só testes)
 
 function detectStore(url) {
@@ -42,7 +42,11 @@ const toNumber = (v) => {
 };
 const brl = (n) => (n ? `R$ ${n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')}` : '');
 const clean = (s, n = 200) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
-const httpsOnly = (s) => (/^https:\/\/[^\s"'<>]+$/i.test(String(s || '')) ? String(s) : '');
+// Imagens e links: só https (http:// e //cdn… são convertidos; o site serve em https e a CSP bloquearia http)
+const httpsOnly = (s) => {
+  const v = String(s || '').trim().replace(/^\/\//, 'https://').replace(/^http:\/\//i, 'https://');
+  return /^https:\/\/[^\s"'<>]+$/i.test(v) ? v : '';
+};
 
 /** Dados genéricos de produto: JSON-LD (Product), Open Graph e microdados. */
 function parseProductHtml(html, pageUrl) {
@@ -156,6 +160,20 @@ async function fromShopee(url) {
   };
 }
 
+/** API pública do Mercado Livre: anúncio (MLB123…) ou produto de catálogo (/p/MLB…). Plano B quando a página não abre. */
+async function mlApi(id, catalog) {
+  const get = async (path) => {
+    try { return JSON.parse((await importer.fetchLimited(`${endpoints.mlApi}${path}`, { accept: 'application/json', maxBytes: 2 * 1024 * 1024 })).buffer.toString('utf8')); } catch { return null; }
+  };
+  if (!catalog) {
+    const it = await get(`/items/${id}`);
+    if (it?.title) return { title: clean(it.title), image: httpsOnly(it.pictures?.[0]?.secure_url || it.pictures?.[0]?.url || it.secure_thumbnail || it.thumbnail), priceValue: toNumber(it.price), available: it.status ? it.status === 'active' : null };
+  }
+  const pr = await get(`/products/${id}`);
+  if (pr?.name) return { title: clean(pr.name), image: httpsOnly(pr.pictures?.[0]?.url || pr.pictures?.[0]?.secure_url), priceValue: toNumber(pr.buy_box_winner?.price), available: pr.status ? pr.status === 'active' : null };
+  return null;
+}
+
 async function fromMercadoLivre(url) {
   const host = new URL(url).hostname;
   const isAff = /(^|\.)meli\.la$/i.test(host) || /[?&#](matt_tool|matt_word)=/.test(url);
@@ -163,9 +181,22 @@ async function fromMercadoLivre(url) {
   const finalUrl = p.finalUrl;
   const id = (finalUrl.match(/\b(MLB)-?(\d{6,})/i) || url.match(/\b(MLB)-?(\d{6,})/i) || []).slice(1).join('').toUpperCase();
   const d = p.html ? parseProductHtml(p.html, finalUrl) : {};
+  // Página bloqueada ou sem foto/preço: completa pela API pública (catálogo "/p/MLB…" ou anúncio "MLB-…")
+  if (id && (!d.title || !d.image || d.priceValue == null)) {
+    const catalog = /\/p\/MLB\d/i.test(finalUrl) || /\/p\/MLB\d/i.test(url);
+    const itemId = (finalUrl.match(/[?&#](?:item_id|wid)=(MLB\d{6,})/i) || [])[1];
+    const api = (itemId && await mlApi(itemId.toUpperCase(), false)) || await mlApi(id, catalog);
+    if (api) {
+      d.title ||= api.title;
+      d.image ||= api.image;
+      d.priceValue ??= api.priceValue;
+      d.available ??= api.available;
+    }
+  }
   const warn = [];
   if (!isAff) warn.push('Este não parece um link de afiliado. Gere o link no painel de afiliados do Mercado Livre (meli.la/…) para receber comissão.');
   if (!d.title) warn.push('Não consegui ler a página do Mercado Livre; confira título, foto e preço.');
+  else if (!d.image) warn.push('O Mercado Livre não mostrou a foto; cole o link da imagem no campo "Imagem".');
   let cleanUrl = finalUrl;
   try { const x = new URL(finalUrl); x.search = ''; x.hash = ''; cleanUrl = x.toString(); } catch { /* mantém */ }
   return {

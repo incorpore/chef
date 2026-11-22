@@ -628,3 +628,36 @@ button.code-chip.copied { background: color-mix(in srgb, var(--ok) 20%, #fff); }
 @media print { .photo-credit { position: static; background: none; color: #555; } }
 .hero-media .gallery-dots ~ .photo-credit { bottom: 34px; }
 .prose > h2:first-child, .prose > h3:first-child { margin-top: 0; }
+
+/* ---------------- Documentação da API ---------------- */
+.api-docs { padding-bottom: 48px; }
+.api-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 8px; }
+.api-toc a { padding: .3rem .75rem; border-radius: 999px; border: 1px solid var(--line); text-decoration: none; color: var(--ink-2); font-size: .88rem; }
+.api-toc a small { color: var(--ink-3); }
+.api-group { margin-top: 28px; scroll-margin-top: 80px; }
+.api-group h2 { margin-bottom: 2px; }
+.api-gd { color: var(--ink-3); margin: 0 0 10px; font-size: .92rem; }
+.api-op { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin: 6px 0; scroll-margin-top: 80px; }
+.api-op[open] { box-shadow: 0 2px 10px rgb(0 0 0 / 6%); }
+.api-op summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; cursor: pointer; list-style: none; }
+.api-op summary::-webkit-details-marker { display: none; }
+.api-m { flex: none; min-width: 62px; text-align: center; font: 700 .72rem/1 ui-monospace, monospace; padding: .38em .5em; border-radius: 6px; color: #fff; background: #6b7280; }
+.api-get { background: #2f6f9f; } .api-post { background: #2e8b57; } .api-put { background: #b5651d; } .api-patch { background: #8e5a3c; } .api-delete { background: #c0392b; }
+.api-p { font-size: .88rem; overflow-wrap: anywhere; background: none; padding: 0; }
+.api-s { flex: 1 1 220px; color: var(--ink-2); font-size: .9rem; min-width: 0; }
+.api-acc { font-size: .72rem; font-weight: 600; padding: .2em .6em; border-radius: 999px; background: var(--surface-2); color: var(--ink-3); white-space: nowrap; }
+.acc-user { color: #b5651d; } .acc-admin { color: #c0392b; }
+.api-body { padding: 0 14px 12px; border-top: 1px solid var(--line); font-size: .92rem; }
+.api-body h4 { margin: 12px 0 4px; font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; color: var(--ink-3); }
+.api-fields { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.api-fields td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+.api-fields td:first-child { white-space: nowrap; }
+.api-fields .req { font-size: .68rem; color: #c0392b; font-weight: 600; }
+.api-code { display: inline-block; font: 600 .78rem ui-monospace, monospace; padding: .12em .45em; border-radius: 5px; background: var(--surface-2); }
+.api-code.ok { color: #2e8b57; } .api-code.err { color: #c0392b; }
+@media (max-width: 600px) {
+  .api-fields td:first-child { white-space: normal; }
+  .api-fields tr { display: grid; grid-template-columns: 1fr; }
+  .api-fields td { border-bottom: 0; padding: 2px 0; }
+  .api-fields tr { border-bottom: 1px solid var(--line); padding: 4px 0; }
+}
