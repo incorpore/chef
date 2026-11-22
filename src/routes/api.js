@@ -51,7 +51,7 @@ router.use((req, res, next) => (['GET', 'HEAD'].includes(req.method) ? rateLimit
 // Qualquer escrita invalida o cache de páginas
 router.use((req, res, next) => {
   // Votos não limpam o cache de páginas (o contador na página pode atrasar alguns segundos; o botão atualiza na hora)
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !/\/vote$/.test(req.path)) res.on('finish', () => { if (res.statusCode < 400) pageCache.bump(); });
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !/\/(vote|view|cooked)$/.test(req.path)) res.on('finish', () => { if (res.statusCode < 400) pageCache.bump(); });
   next();
 });
 
@@ -416,6 +416,20 @@ router.post('/recipes/:ref/vote', rateLimit('vote', 30, 60e3), (req, res) => {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(voter)) return res.status(400).json({ error: 'Identificador inválido' });
   const h = (s) => crypto.createHash('sha256').update(`${s}|${config.secret}`).digest('hex').slice(0, 32);
   res.json(recipes.vote(r.id, h(voter), h(req.ip || ''), value));
+});
+
+// Visualização real: enviada pelo navegador depois de alguns segundos com a página aberta.
+// Não conta robôs (não executam o script ou se identificam), a equipe do site, nem a mesma pessoa de novo em 30 min.
+const NOT_HUMAN = /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|pinterest|headless|lighthouse|pagespeed|curl|wget|python|axios|node-fetch|okhttp|go-http|java\/|monitor|uptime|scan|check/i;
+router.post('/recipes/:ref/view', rateLimit('view', 60, 60e3), (req, res) => {
+  const r = recipes.find(req.params.ref);
+  if (!r || r.status !== 'published') return notFound(res, 'Receita não encontrada');
+  let counted = false;
+  if (!auth.isStaffDevice(req) && !NOT_HUMAN.test(req.get('user-agent') || '') && !sec.hit(`view:${req.ip}:${r.id}`, 1, 30 * 60e3).over) {
+    recipes.incrementViews(r.id);
+    counted = true;
+  }
+  res.json({ counted });
 });
 
 router.post('/recipes/:ref/cooked', rateLimit('cooked', 20, 60e3), (req, res) => {

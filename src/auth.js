@@ -66,7 +66,17 @@ function parseCookies(header) {
 
 function setSessionCookie(res, user) {
   const req = res.req;
-  res.setHeader('Set-Cookie', `${cookieName(req)}=${createSessionToken(user)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}${isSecure(req) ? '; Secure' : ''}`);
+  const sec = isSecure(req) ? '; Secure' : '';
+  res.setHeader('Set-Cookie', [
+    `${cookieName(req)}=${createSessionToken(user)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}${sec}`,
+    // Marca o aparelho da equipe (admin/autores): continua sem contar visualizações mesmo depois de sair
+    `${STAFF_COOKIE}=1; Path=/; HttpOnly; SameSite=Lax; Max-Age=${400 * 86400}${sec}`,
+  ]);
+}
+const STAFF_COOKIE = 'chef_staff';
+/** Visita da equipe (logado agora ou aparelho que já entrou no painel): não conta visualização. */
+function isStaffDevice(req) {
+  return !!req.user || parseCookies(req.headers.cookie)[STAFF_COOKIE] === '1';
 }
 
 function clearSessionCookie(res) {
@@ -228,5 +238,5 @@ function bootstrapAdmin() {
 module.exports = {
   COOKIE, hashPassword, verifyPassword, setSessionCookie, clearSessionCookie, loadUser, requireUser, requireAdmin, isAdmin, canEditRecipe,
   sameOrigin, createApiKey, publicUser, userCount, createUser, validatePassword, authenticate, bumpSessionVersion, audit,
-  parseCookies, readSessionToken, createSessionToken, setupToken, bootstrapAdmin, safeEqual, EMAIL_RE, isPlaceholderToken,
+  parseCookies, isStaffDevice, readSessionToken, createSessionToken, setupToken, bootstrapAdmin, safeEqual, EMAIL_RE, isPlaceholderToken,
 };

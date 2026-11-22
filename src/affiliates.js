@@ -24,7 +24,8 @@ const hostAlias = new Map(); // host:porta → loja (só testes)
 function detectStore(url) {
   let h = '';
   try { const x = new URL(url); h = x.hostname.toLowerCase(); if (hostAlias.has(x.host)) return hostAlias.get(x.host); } catch { return ''; }
-  if (/(^|\.)(amazon\.[a-z.]+|amzn\.to|amzn\.eu|a\.co)$/.test(h)) return 'amazon';
+  // amazon.com.br, amzn.to, a.co e os links curtos novos do SiteStripe (link.amazon / *.amazon)
+  if (/(^|\.)(amazon\.[a-z.]+|amazon|amzn\.to|amzn\.eu|amzn\.com|a\.co)$/.test(h)) return 'amazon';
   if (/(^|\.)(shopee\.com\.br|shopee\.[a-z.]+|shp\.ee)$/.test(h)) return 'shopee';
   if (/(^|\.)(mercadolivre\.com\.br|mercadolibre\.[a-z.]+|meli\.la|mercadolivre\.com)$/.test(h)) return 'mercadolivre';
   return 'outra';
@@ -106,6 +107,10 @@ async function fromAmazon(url) {
     asin = u.extractAsin(p.finalUrl);
   }
   if (!asin) throw bad('Não encontrei o código (ASIN) do produto nesse link da Amazon');
+  // Link curto do SiteStripe já traz a tag de quem gerou; vale quando a tag não está nas configurações
+  let linkTag = '';
+  try { linkTag = (new URL(finalUrl).searchParams.get('tag') || '').replace(/[^\w-]/g, '').slice(0, 40); } catch { /* sem tag */ }
+  const affUrl = linkTag && !settings.all().amazonTag ? `https://www.amazon.com.br/dp/${asin}?tag=${linkTag}` : '';
   const page = `https://www.amazon.com.br/dp/${asin}`;
   const p = await readPage(endpoints.amazonPage(asin));
   const d = p.html ? parseProductHtml(p.html, page) : {};
@@ -116,7 +121,7 @@ async function fromAmazon(url) {
     title: (!d.blocked && d.title) || slugTitle(finalUrl, /\/([^/]+)\/dp\//) || `Produto Amazon ${asin}`,
     image: (!d.blocked && d.image) || `https://m.media-amazon.com/images/P/${asin}.01._SCLZZZZZZZ_.jpg`,
     priceValue: d.blocked ? null : d.priceValue ?? null, available: d.blocked ? null : d.available ?? null,
-    affUrl: '', warn,
+    affUrl, warn,
   };
 }
 
@@ -222,6 +227,10 @@ async function refresh(p) {
   if (!source) return p;
   try {
     const d = await fromUrl(source);
+    // Produto salvo antes com a loja errada (ex.: link.amazon como "Loja"): corrige loja, código e link
+    if (d.store !== (p.store || 'amazon') || (!p.external_id && d.externalId)) {
+      dbh.prepare('UPDATE products SET store = ?, external_id = ?, asin = ?, url = ? WHERE id = ?').run(d.store, d.externalId || '', d.asin || '', httpsOnly(d.url) || p.url, p.id);
+    }
     dbh.prepare(`UPDATE products SET price = CASE WHEN ? != '' THEN ? ELSE price END, price_value = COALESCE(?, price_value), available = ?, aff_url = CASE WHEN ? != '' THEN ? ELSE aff_url END,
       image = CASE WHEN image = '' THEN ? ELSE image END, title = CASE WHEN title = '' THEN ? ELSE title END, refreshed_at = ?, refresh_error = '' WHERE id = ?`)
       .run(d.price, d.price, d.priceValue ?? null, d.available === false ? 0 : 1, httpsOnly(d.affUrl), httpsOnly(d.affUrl), httpsOnly(d.image), d.title, nowSql(), p.id);

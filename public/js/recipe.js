@@ -5,6 +5,17 @@
   const dataEl = $('#recipe-data');
   if (!dataEl) return;
   const R = JSON.parse(dataEl.textContent);
+  // Conta a visualização só quando a página fica visível por 3 s (pessoa de verdade lendo)
+  (() => {
+    let sent = false;
+    let t = null;
+    const arm = () => {
+      if (sent || document.visibilityState !== 'visible') { clearTimeout(t); return; }
+      t = setTimeout(() => { sent = true; fetch(`/api/v1/recipes/${R.id}/view`, { method: 'POST', credentials: 'same-origin', keepalive: true }).catch(() => {}); }, 3000);
+    };
+    document.addEventListener('visibilitychange', arm);
+    arm();
+  })();
   const PKEY = `progress:${R.id}`;
 
   // ---------------- Gostei / não gostei (um voto por aparelho; tocar de novo desfaz) ----------------

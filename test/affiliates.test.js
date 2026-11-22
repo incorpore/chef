@@ -268,3 +268,24 @@ test('painel: página nova, ações em massa e produto desativado some do site',
   assert.doesNotMatch(pageAfter.text, /Para: Forma 25 cm/);
   assert.equal((await admin.req('GET', `/go/${auto[0].id}`)).status, 404);
 });
+
+test('link curto novo da Amazon (link.amazon) é reconhecido como Amazon', () => {
+  assert.equal(affiliates.detectStore('https://link.amazon/B05cpbVaD'), 'amazon');
+  assert.equal(affiliates.detectStore('https://amzn.to/3abc'), 'amazon');
+  assert.equal(affiliates.detectStore('https://www.amazon.com.br/dp/B0BATEDOR1'), 'amazon');
+  assert.equal(affiliates.detectStore('https://exemplo.com.br/amazon'), 'outra');
+});
+
+test('visualizações: só contam visitantes reais (nem equipe, nem robôs, nem repetição)', async () => {
+  const views = () => db.get().prepare('SELECT views FROM recipes WHERE id = ?').get(recipe.id).views;
+  const v0 = views();
+  await admin.req('GET', `/receita/${recipe.slug}`);
+  assert.equal(views(), v0, 'abrir a página não conta sozinho (robôs não executam o script)');
+  const post = (headers = {}) => fetch(`${base}/api/v1/recipes/${recipe.id}/view`, { method: 'POST', headers: { 'user-agent': 'Mozilla/5.0 (Linux; Android 14) Chrome/131 Mobile', ...headers } }).then((r) => r.json());
+  assert.equal((await admin.req('POST', `/api/v1/recipes/${recipe.id}/view`)).data.counted, false, 'admin logado');
+  assert.equal((await post({ cookie: 'chef_staff=1' })).counted, false, 'aparelho da equipe, mesmo deslogado');
+  assert.equal((await post({ 'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' })).counted, false, 'robô');
+  assert.equal((await post()).counted, true, 'visitante');
+  assert.equal((await post()).counted, false, 'mesma pessoa em seguida');
+  assert.equal(views(), v0 + 1);
+});

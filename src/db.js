@@ -249,6 +249,8 @@ function migrate(d) {
     if (!exists) d.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
   }
   d.exec("CREATE INDEX IF NOT EXISTS idx_products_ext ON products(store, external_id); CREATE INDEX IF NOT EXISTS idx_products_utensil ON products(utensil)");
+  // Links da Amazon que a 1ª versão não reconhecia (link.amazon…): voltam para a fila de atualização, que corrige a loja
+  d.exec(`UPDATE products SET refreshed_at = NULL WHERE store = 'outra' AND (source_url LIKE 'https://link.amazon/%' OR url LIKE 'https://link.amazon/%' OR source_url LIKE '%amazon.%' OR url LIKE '%amazon.%' OR url LIKE '%amzn.%')`);
   // Categorias sem ícone (ex.: criadas por importação) ganham um emoji a partir do nome
   const { categoryEmoji } = require('./cover');
   for (const c of d.prepare("SELECT id, name FROM categories WHERE icon IS NULL OR trim(icon) = ''").all()) {

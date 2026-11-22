@@ -88,7 +88,7 @@ router.get('/receita/:slug', (req, res) => {
   }
   // Rascunho: só o autor ou um administrador enxerga (não basta estar logado)
   if (!r || (r.status !== 'published' && !auth.canEditRecipe(req.user, r))) return res.status(404).send(pages.notFound(req.user, 'Receita não encontrada'));
-  if (!auth.canEditRecipe(req.user, r) && !/bot|crawl|spider|preview/i.test(req.get('user-agent') || '')) recipes.incrementViews(r.id);
+  // Visualizações: contadas pelo navegador do visitante (POST /api/v1/recipes/:id/view), não aqui
   cache.page(req, res, () => {
     const author = r.author_id ? db.get().prepare('SELECT name, avatar, bio FROM users WHERE id = ?').get(r.author_id) : null;
     r.author_name = author?.name;
