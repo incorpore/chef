@@ -779,7 +779,7 @@ router.get('/affiliates/status', auth.requireAdmin, (req, res) => {
   const s = settings.all();
   const d = db.get();
   res.json({
-    shopee: shopee.status(), amazonTag: s.amazonTag, productAutoRefresh: s.productAutoRefresh, productRefreshHours: s.productRefreshHours, utensilsAuto: s.utensilsAuto,
+    shopee: shopee.status(), amazonTag: s.amazonTag, productAutoRefresh: s.productAutoRefresh, productRefreshHours: s.productRefreshHours, utensilsAuto: s.utensilsAuto, cookModeProducts: s.cookModeProducts,
     counts: d.prepare("SELECT store, COUNT(*) n, SUM(CASE WHEN refresh_error != '' THEN 1 ELSE 0 END) errors FROM products GROUP BY store").all(),
     coverage: affiliates.coverage(), utensils: utensils.options(),
   });
@@ -787,7 +787,7 @@ router.get('/affiliates/status', auth.requireAdmin, (req, res) => {
 router.put('/affiliates/settings', auth.requireAdmin, (req, res) => {
   const b = req.body || {};
   const patch = {};
-  for (const k of ['productAutoRefresh', 'utensilsAuto']) if (k in b) patch[k] = b[k];
+  for (const k of ['productAutoRefresh', 'utensilsAuto', 'cookModeProducts']) if (k in b) patch[k] = b[k];
   if ('productRefreshHours' in b) patch.productRefreshHours = b.productRefreshHours;
   settings.update(patch);
   res.json({ ok: true });

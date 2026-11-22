@@ -308,3 +308,17 @@ test('Mercado Livre: foto com http:// vira https e página bloqueada usa a API p
     assert.deepEqual([c.data.title, c.data.image, c.data.priceValue], ['Liquidificador Catálogo', 'https://http2.mlstatic.com/catalogo.webp', 210]);
   } finally { affiliates.hostAlias.set(new URL(F).host, 'amazon'); }
 });
+
+test('modo cozinha: utensílio com produto vai no passo que o usa; dá para desligar', async () => {
+  const p = (await admin.req('POST', '/api/v1/products', { title: 'Batedeira Planetária 700W', asin: 'B0BATECOOK', utensil: 'batedeira', store: 'amazon' })).data;
+  const r = (await admin.req('POST', '/api/v1/recipes', { title: 'Chantilly caseiro', ingredients: '200 ml de creme de leite fresco\n2 colheres de açúcar', steps: 'Gele o creme por 2 horas.\nBata na batedeira em velocidade alta até firmar.\nSirva.', status: 'published' })).data;
+  const data = (html) => JSON.parse(html.match(/<script[^>]*id="recipe-data"[^>]*>([\s\S]*?)<\/script>/)[1]);
+  const d = data((await admin.req('GET', `/receita/${r.slug}`)).text);
+  assert.ok(p.id);
+  assert.equal(d.steps[0].shop, undefined);
+  const hit = d.shop[d.steps[1].shop]; // batedeira cadastrada (a mais clicada/manual entre as de mesmo utensílio)
+  assert.deepEqual([hit.label, hit.store, hit.u], ['Batedeira', 'Amazon', 'batedeira']);
+  await admin.req('PUT', '/api/v1/affiliates/settings', { cookModeProducts: false });
+  assert.equal(data((await admin.req('GET', `/receita/${r.slug}`)).text).shop, undefined);
+  await admin.req('PUT', '/api/v1/affiliates/settings', { cookModeProducts: true });
+});

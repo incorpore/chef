@@ -31,7 +31,8 @@ const DEFAULTS = {
   affiliateDisclosure: 'Alguns links são de afiliados (Amazon, Shopee, Mercado Livre): posso receber uma comissão, sem custo extra para você.',
   productAutoRefresh: true, // atualiza preço/disponibilidade/link dos produtos sozinho
   productRefreshHours: 24, // de quantas em quantas horas (1 a 100)
-  utensilsAuto: true, // com a API da Shopee: busca produtos para os utensílios citados nas receitas
+  utensilsAuto: true,
+  cookModeProducts: true, // mostra os utensílios (afiliados) de forma discreta no modo cozinha // com a API da Shopee: busca produtos para os utensílios citados nas receitas
   adsEnabled: true,
   adsenseClient: '',
   adsenseAutoAds: false,

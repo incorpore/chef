@@ -326,9 +326,21 @@
         return `<div class="cook-ing${state.ings.includes(i) ? ' got' : ''}" data-cook-ing="${i}"><b>${esc(withDe(ing, qtyText(ing, f)))}</b> ${esc(ing.name)}${ing.note ? ` <small>(${esc(ing.note)})</small>` : ''}</div>`;
       };
       const cards = [];
+      // Afiliados discretos: link pequeno, abre em outra aba (o modo cozinha continua aberto), cada produto aparece uma vez
+      const shop = R.shop || [];
+      const link = (p, inner, cls) => `<a class="${cls}" href="/go/${p.id}" target="_blank" rel="sponsored noopener nofollow" data-cook-aff="${p.id}">${inner}</a>`;
+      const shown = new Set();
+      const stepAff = (s) => {
+        const p = shop[s.shop];
+        if (!p || shown.has(p.id)) return '';
+        shown.add(p.id);
+        return `<p class="cook-aff-line">${link(p, `🛒 ${esc(p.label || 'Utensílio')}: ver na ${esc(p.store)} ↗`, 'cook-aff')}</p>`;
+      };
+      const tools = shop.filter((p) => p.label);
       cards.push(`<section class="cook-card cook-intro"><span class="cook-step-label">Antes de começar</span><h2>${esc(R.title)}</h2>
         <p>Separe tudo (mise en place). Toque para marcar o que já está na bancada. Rendimento: <b>${fmtQty(state.servings)} ${esc(R.servings_unit)}</b>.</p>
-        <div class="cook-checklist">${R.ingredients.map((_, i) => ingRow(i)).join('')}</div></section>`);
+        <div class="cook-checklist">${R.ingredients.map((_, i) => ingRow(i)).join('')}</div>
+        ${tools.length ? `<p class="cook-tools"><span>Utensílios:</span> ${tools.map((p) => link(p, esc(p.label), 'cook-tool')).join('<span aria-hidden="true"> · </span>')}</p>` : ''}</section>`);
       R.steps.forEach((s, i) => {
         cards.push(`<section class="cook-card" data-card-step="${i}">
           <span class="cook-step-label">Passo ${i + 1} de ${R.steps.length}</span>${s.group ? `<span class="cook-group">${esc(s.group)}</span>` : ''}
@@ -336,13 +348,16 @@
           ${s.image ? `<img src="${esc(s.image)}" alt="" loading="lazy">` : ''}
           ${s.ings?.length ? `<div class="cook-ings"><h4>Você vai usar</h4>${s.ings.map(ingRow).join('')}</div>` : ''}
           ${s.timer ? `<button class="timer-btn" data-timer="${s.timer}" data-timer-label="Passo ${i + 1}: ${esc(s.text.slice(0, 40))}">⏱️ Iniciar timer de ${window.Chef.fmtTime(s.timer)}</button>` : ''}
+          ${stepAff(s)}
         </section>`);
       });
       const adTpl = $('[data-cook-done-ad]');
       cards.push(`<section class="cook-card cook-done"><div class="big">🎉</div><h2>Pronto! Bom apetite!</h2><p>Você concluiu <b>${esc(R.title)}</b>.</p>
         <p><button class="btn btn-primary btn-lg" data-cook-finish>Fiz esta receita!</button></p>
         ${$('[data-vote-tpl]') ? `<div class="vote-card vote-card-cook"><p class="vote-q">Gostou?</p>${$('[data-vote-tpl]').innerHTML}</div>` : ''}
-        <p><button class="btn btn-ghost" data-cook-rate>⭐ Avaliar</button> <button class="btn btn-ghost" data-share>Compartilhar</button></p>${adTpl ? adTpl.innerHTML : ''}</section>`);
+        <p><button class="btn btn-ghost" data-cook-rate>⭐ Avaliar</button> <button class="btn btn-ghost" data-share>Compartilhar</button></p>
+        ${shop.length ? `<div class="cook-shop"><p class="cook-shop-h">Utensílios desta receita</p><div class="cook-shop-row">${shop.slice(0, 3).map((p) => link(p, `${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" width="56" height="56">` : '<span class="cook-shop-ph">🛒</span>'}<span><b>${esc(p.t)}</b><small>${p.price ? `${esc(p.price)} · ` : ''}${esc(p.store)}</small></span>`, 'cook-shop-card')).join('')}</div><p class="cook-shop-note">Links de afiliado</p></div>` : ''}
+        ${adTpl ? adTpl.innerHTML : ''}</section>`);
       this.track.innerHTML = cards.join('');
       paintVotes();
       $('.cook-drawer ul').innerHTML = R.ingredients.map((ing, i) => `<li class="${state.ings.includes(i) ? 'got' : ''}"><b>${esc(withDe(ing, qtyText(ing, f)))}</b> ${esc(ing.name)}</li>`).join('');
@@ -463,6 +478,8 @@
       if (e.target.closest('[data-cook-start]')) { cook.start(false); track('cook_mode_start', { item_id: R.code }); }
       if (e.target.closest('[data-cook-resume]')) cook.start(true);
       if (!cook.open) return;
+      const aff = e.target.closest('[data-cook-aff]');
+      if (aff) { track('affiliate_click', { item_id: R.code, product_id: aff.dataset.cookAff, place: 'cook_mode' }); return; }
       if (e.target.closest('[data-cook-close]')) cook.close();
       if (e.target.closest('[data-cook-next]')) cook.next();
       if (e.target.closest('[data-cook-prev]')) cook.prev();

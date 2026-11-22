@@ -496,6 +496,7 @@ function productsPage({ user }) {
         <label class="check"><input type="checkbox" name="productAutoRefresh"> Atualizar preço, estoque e link sozinho</label>
         <label class="aff-hours"><span>A cada</span><select name="productRefreshHours"><option value="6">6 horas</option><option value="12">12 horas</option><option value="24">24 horas</option><option value="48">2 dias</option><option value="72">3 dias</option><option value="96">4 dias</option></select></label>
         <label class="check"><input type="checkbox" name="utensilsAuto"> Buscar na Shopee os utensílios citados nas receitas</label>
+        <label class="check"><input type="checkbox" name="cookModeProducts"> Mostrar os utensílios no modo cozinha (discreto, sem interromper)</label>
       </form>
       <p class="hint">Amazon: tag <b>${s.amazonTag ? esc(s.amazonTag) : '<span class="warn">não configurada</span>'}</b> (<a href="/admin/configuracoes">alterar</a>) — vai em todos os links da Amazon. Mercado Livre: cole o link gerado no painel de afiliados (<code>meli.la/…</code>).</p>
     </section>

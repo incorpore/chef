@@ -4,6 +4,7 @@ const images = require('../images');
 const { layout, icon, avatar } = require('./layout');
 const c = require('./components');
 const { renderAd, renderProducts, productsForIngredients, productLink } = require('../monetization');
+const utensils = require('../utensils');
 const settings = require('../settings');
 const { breadcrumbLd } = require('./head');
 
@@ -133,6 +134,17 @@ function recipePage({ r, base, related, products, productsTitle, adjacent, comme
     id: r.id, code: r.code, slug: r.slug, title: r.title, cover: r.cover || r.cover_auto, servings: r.servings, servings_unit: r.servings_unit,
     ingredients: r.ingredients, steps: r.steps.map((st, i) => ({ ...st, ings: links[i] })), total: r.total_minutes, url: `${base}/receita/${r.slug}`,
   };
+  // Modo cozinha: utensílios com produto (link discreto no passo que usa o utensílio, sem interromper o preparo)
+  if (s.cookModeProducts && products.length) {
+    const STORE = { amazon: 'Amazon', shopee: 'Shopee', mercadolivre: 'Mercado Livre' };
+    const shop = products.slice(0, 6).map((p) => ({ id: p.id, t: p.title, img: p.image ? require('../images').sized(p.image, 160) : '', price: p.price || '', store: STORE[p.store] || 'loja', label: p.forLabel || '', u: p.utensil || '' }));
+    data.shop = shop;
+    data.steps.forEach((st) => {
+      const keys = utensils.detectText(st.text || '', 3).map((t) => t.key);
+      const hit = shop.findIndex((p) => p.u && keys.some((k) => k === p.u || utensils.baseKey(k) === p.u));
+      if (hit >= 0) st.shop = hit;
+    });
+  }
 
   const body = `
 <article class="recipe" data-recipe='${esc(JSON.stringify({ id: r.id, slug: r.slug }))}'>

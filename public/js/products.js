@@ -199,7 +199,7 @@
   const af = $('[data-aff-auto-form]');
   af.addEventListener('change', async () => {
     try {
-      await api('/affiliates/settings', { method: 'PUT', body: { productAutoRefresh: af.productAutoRefresh.checked, utensilsAuto: af.utensilsAuto.checked, productRefreshHours: Number(af.productRefreshHours.value) } });
+      await api('/affiliates/settings', { method: 'PUT', body: { productAutoRefresh: af.productAutoRefresh.checked, utensilsAuto: af.utensilsAuto.checked, cookModeProducts: af.cookModeProducts.checked, productRefreshHours: Number(af.productRefreshHours.value) } });
       toast('✅ Salvo');
     } catch (err) { toast(`⚠️ ${err.message}`); }
   });
@@ -216,6 +216,7 @@
     paintShopee(st.shopee);
     af.productAutoRefresh.checked = !!st.productAutoRefresh;
     af.utensilsAuto.checked = !!st.utensilsAuto;
+    af.cookModeProducts.checked = !!st.cookModeProducts;
     const h = String(st.productRefreshHours);
     if (![...af.productRefreshHours.options].some((o) => o.value === h)) af.productRefreshHours.add(new Option(`${h} horas`, h));
     af.productRefreshHours.value = h;
