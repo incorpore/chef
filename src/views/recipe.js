@@ -182,6 +182,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
       ${renderAd('recipe_top')}
       ${r.video ? `<section id="video" class="video-section"><h2>${icon('play')} Vídeo</h2>${c.videoEmbed(r.video, r.title)}</section>` : ''}
 
+      <div class="cook-cols">
       <section class="ingredients" id="ingredientes">
         <div class="section-head">
           <h2>Ingredientes</h2>
@@ -210,6 +211,7 @@ function recipePage({ r, base, related, products, adjacent, comments, user }) {
         <button class="btn btn-primary btn-block" data-cook-start>${icon('chef')} Cozinhar passo a passo (timers e voz)</button>
         <div class="vote-card"><p class="vote-q">Gostou desta receita?</p>${voteBox(r, 'xl')}</div>
       </section>
+      </div>
 
       ${r.tips ? `<section class="tips prose"><h2>💡 Dicas</h2>${u.miniMarkdown(r.tips)}</section>` : ''}
       ${r.nutrition ? nutritionTable(r) : ''}

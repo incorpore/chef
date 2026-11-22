@@ -17,7 +17,7 @@ try { ({ chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')); }
   process.exit(2);
 }
 
-const WIDTHS = (process.env.WIDTHS || '300,320,360,390,414,768,1024,1366').split(',').map(Number);
+const WIDTHS = (process.env.WIDTHS || '300,320,360,390,414,768,900,1024,1366,1920').split(',').map(Number);
 const SHOTS = process.env.SHOTS === '1';
 const SHOT_DIR = path.join(process.cwd(), 'responsive-shots');
 const LONG = 'SuperCalifragilisticoExpialidociousIngredienteSemEspacosNenhumParaTestarQuebra';
@@ -41,7 +41,7 @@ async function startServer() {
     description: 'Receita de teste com textos muito longos para verificar a responsividade em telas pequenas.',
     ingredients: `## Massa amanteigada de liquidificador para tortas\n3 xícaras (chá) de farinha de trigo especial sem fermento peneirada duas vezes\n2 colheres (sopa) de fermento químico em pó para bolos e tortas\n1 lata de creme de leite fresco sem soro (300 g) bem gelado\n## Recheio\n500 g de peito de frango desfiado temperado com alho, cebola, cheiro-verde e pimenta-do-reino moída na hora\n1 copo de requeijão cremoso tradicional de boa qualidade\n${LONG}\n1 colher (chá) de sal`,
     steps: `## Massa\nBata no liquidificador a farinha de trigo especial, o fermento químico em pó e o creme de leite fresco por 5 minutos.\nDespeje metade da massa na forma untada.\n## Recheio\nEspalhe o peito de frango desfiado temperado e o requeijão cremoso tradicional.\nCubra com o restante da massa e o ${LONG}.\nAsse em forno preaquecido a 200 °C por 45 minutos até dourar, depois deixe descansar 10 minutos.\nSirva com farinha de trigo especial, fermento químico em pó, creme de leite fresco, peito de frango desfiado e requeijão cremoso por cima.`,
-    prep_minutes: 25, cook_minutes: 45, rest_minutes: 10, servings: 10, servings_unit: 'pedaços generosos', tags: `torta salgada, almoço de domingo em família, ${LONG.slice(0, 40)}`, status: 'published',
+    prep_minutes: 25, cook_minutes: 45, rest_minutes: 10, servings: 10, servings_unit: 'pedaços generosos', tips: '- Deixe a massa descansar\n- Sirva morna\n- Congela bem por até 2 meses', nutrition: { calories: '320 kcal', protein: '12 g', carbs: '30 g', fat: '15 g' }, tags: `torta salgada, almoço de domingo em família, ${LONG.slice(0, 40)}`, status: 'published',
   }, uid);
   const { createApp } = require('../src/app');
   const server = createApp().listen(0);
@@ -109,6 +109,25 @@ const detect = () => {
       await p.waitForTimeout(250);
       add(`${w}px ${u.slice(0, 40)}`, await p.evaluate(detect));
     }
+    // Coluna fixa (ingredientes) nunca pode cobrir as seções seguintes ao rolar a página
+    await p.goto(B + '/c/LONGA1', { waitUntil: 'load' });
+    const overlaps = await p.evaluate(async () => {
+      const out = [];
+      const fixed = [...document.querySelectorAll('.ingredients, .recipe-side')].filter((el) => getComputedStyle(el).position === 'sticky');
+      const others = [...document.querySelectorAll('.tips, .nutrition, .comments, .products, .author-card, .adjacent, .related, .newsletter, .footer')];
+      const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+      for (let y = 0; y < document.documentElement.scrollHeight; y += 250) {
+        window.scrollTo({ top: y, behavior: 'instant' }); // o site usa rolagem suave: medir antes de terminar daria falso "ok"
+        await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 20)));
+        for (const f of fixed) {
+          const fr = f.getBoundingClientRect();
+          for (const o of others) if (!f.contains(o) && !o.contains(f) && hit(fr, o.getBoundingClientRect())) out.push(`SOBREPOSIÇÃO ao rolar (y=${y}): .${f.className.split(' ')[0]} cobre .${o.className.split(' ')[0]}`);
+        }
+      }
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      return [...new Set(out)].slice(0, 6);
+    });
+    add(`${w}px /c/LONGA1 (rolagem)`, overlaps);
     // receita longa: lista de compras + timers + toast + modo cozinha
     const R = B + '/c/LONGA1';
     await p.goto(R);

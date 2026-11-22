@@ -100,7 +100,7 @@ function layout({ title, seoTitle, description, body, head = '', canonical = '',
   const t = seoTitle || title;
   const fullTitle = t ? `${t} · ${s.siteName}` : `${s.siteName} — ${s.tagline}`;
   const desc = String(description || s.description).replace(/\s+/g, ' ').trim().slice(0, 300);
-  const navItem = (href, ic, label, key) => `<a href="${href}" class="${nav === key ? 'active' : ''}"${nav === key ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></a>`;
+  const navItem = (href, ic, label, key) => `<a href="${href}" class="${nav === key ? 'active' : ''}"${nav === key ? ' aria-current="page"' : ''} title="${label}">${icon(ic)}<span>${label}</span></a>`;
   return `<!doctype html>
 <html lang="pt-BR">
 <head>

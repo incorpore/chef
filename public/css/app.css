@@ -106,6 +106,8 @@ pre code { background: none; padding: 0; }
 .topnav a { display: flex; align-items: center; gap: .4rem; padding: .5rem .75rem; border-radius: 999px; text-decoration: none; color: var(--ink-2); font-weight: 500; font-size: .95rem; }
 .topnav a:hover, .topnav a.active { background: var(--surface-2); color: var(--ink); }
 @media (min-width: 900px) { .topnav { display: flex; } }
+/* Telas médias (900–1180 px): menu só com ícones, para caber busca + menu + conta sem transbordar */
+@media (min-width: 900px) and (max-width: 1180px) { .topnav a span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } .topnav a { padding: .55rem; } }
 @media (max-width: 899px) { .search { max-width: none; } .topbar .brand span:last-child { display: none; } }
 
 .suggest { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); overflow: hidden; z-index: 40; text-align: left; }
@@ -254,11 +256,12 @@ select { padding: .65rem 2rem .65rem .9rem; border-radius: 999px; border: 1px so
 .ingredients, .method, .tips, .nutrition, .comments, .products, .video-section { background: var(--surface); border-radius: 24px; padding: 22px; box-shadow: var(--shadow); }
 @media (max-width: 560px) { .ingredients, .method, .tips, .nutrition, .comments, .products, .video-section { border-radius: 18px; padding: 16px; } }
 @media (min-width: 900px) {
-  .recipe-main { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 0 28px; align-items: start; }
-  .recipe-main > * { grid-column: 1 / -1; }
-  .recipe-main > .ingredients { grid-column: 1; grid-row: span 3; position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow: auto; margin-top: 0; }
-  .recipe-main > .method { grid-column: 2; margin-top: 0; }
-  .recipe-main > .ad-recipe_middle { grid-column: 2; }
+  /* Ingredientes (fixos ao rolar) + modo de preparo em duas colunas, num bloco só deles:
+     assim a coluna fixa para quando o preparo acaba e nunca passa por cima de dicas e comentários */
+  .cook-cols { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 0 28px; align-items: start; margin: 32px 0; }
+  .cook-cols > * { grid-column: 2; margin-top: 0; }
+  .cook-cols > .ingredients { grid-column: 1; grid-row: 1 / span 3; position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow: auto; margin: 0; }
+  .cook-cols > .method { margin-bottom: 0; }
 }
 .scaler { display: flex; align-items: center; gap: 10px; }
 .scaler span { min-width: 90px; text-align: center; font-size: .9rem; }
@@ -522,8 +525,8 @@ img.img-broken { object-fit: cover; color: transparent; background: var(--surfac
   .gallery { box-shadow: none; aspect-ratio: 1; }
   .gallery figure:not(:first-child) { display: none; }
   .ingredients, .method, .tips, .nutrition { box-shadow: none; padding: 0; break-inside: avoid-page; }
-  .recipe-main { display: block !important; }
-  .recipe-main > .ingredients { position: static; max-height: none; }
+  .cook-cols { display: block !important; }
+  .cook-cols > .ingredients { position: static; max-height: none; }
   .step { break-inside: avoid; grid-template-columns: 32px 1fr; padding: 6px 0; }
   .step-num { width: 28px; height: 28px; font-size: .9rem; }
   .step-img { display: none; }
@@ -623,3 +626,4 @@ button.code-chip.copied { background: color-mix(in srgb, var(--ok) 20%, #fff); }
 .photo-credit a:hover { text-decoration: underline; }
 @media print { .photo-credit { position: static; background: none; color: #555; } }
 .hero-media .gallery-dots ~ .photo-credit { bottom: 34px; }
+.prose > h2:first-child, .prose > h3:first-child { margin-top: 0; }
