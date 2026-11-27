@@ -89,7 +89,7 @@ ok "fotos redimensionadas em AVIF e WebP (sharp funcionando no Alpine)"
 docker restart "$NAME" >/dev/null
 i=0; until [ "$(docker inspect -f '{{.State.Health.Status}}' "$NAME")" = "healthy" ]; do i=$((i+1)); [ $i -gt 60 ] && fail "não voltou após reiniciar"; sleep 1; done
 curl -fsS -b "$JAR" "$BASE/api/v1/auth/me" | grep -q '"email":"dono@exemplo.com"' || fail "sessão perdida após reiniciar"
-curl -fsS "$BASE/c/ZIMA01" -o /dev/null -w '%{http_code}' | grep -q 302 || fail "receita perdida após reiniciar"
+curl -fsS "$BASE/c/ZIMA01" -o /dev/null -w '%{http_code}' | grep -qE "^30[12]$" || fail "receita perdida após reiniciar"
 curl -fsS -o /dev/null "$BASE$URL" || fail "foto perdida após reiniciar"
 ok "após reiniciar: receita, foto e login continuam lá (dados persistentes)"
 
