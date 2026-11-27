@@ -185,6 +185,51 @@ test('oportunidades: buscas quase na 1ª página e páginas com poucos cliques, 
   assert.match(page.text, /Oportunidades para subir no Google/);
 });
 
+test('SEO automático: simula, aplica, respeita texto manual e intervalo de 4 semanas, e desfaz', async () => {
+  const d = require('../src/db').get();
+  const rid = d.prepare("SELECT id FROM recipes WHERE slug = 'bolo-de-fuba'").get().id;
+  const get = () => d.prepare('SELECT seo_title, seo_description FROM recipes WHERE id = ?').get(rid);
+  assert.equal((await author.req('POST', '/api/v1/seo/auto/run', {})).status, 403);
+  const sim = await admin.req('POST', '/api/v1/seo/auto/run', { dryRun: true });
+  assert.equal(sim.status, 200, sim.text);
+  assert.equal(sim.data.changed.length, 1, 'uma receita por vez, mesmo com várias buscas');
+  const c = sim.data.changed[0];
+  assert.equal(c.query, 'bolo de fubá cremoso', 'a busca com mais exibições');
+  assert.match(c.newTitle, /^Bolo de fubá cremoso: /, 'a busca exata vira o nome no título');
+  assert.ok(c.newTitle.length <= 70);
+  assert.match(c.newDesc, /bolo de fubá cremoso/);
+  assert.ok(c.newDesc.length <= 158);
+  assert.equal(get().seo_title, '', 'simulação não muda nada');
+
+  const run = await admin.req('POST', '/api/v1/seo/auto/run', {});
+  assert.equal(run.data.changed.length, 1);
+  assert.deepEqual([get().seo_title, get().seo_description], [c.newTitle, c.newDesc]);
+  const page = await admin.req('GET', '/receita/bolo-de-fuba');
+  assert.match(page.text, new RegExp(`<title>${c.newTitle}`));
+  assert.equal((await admin.req('POST', '/api/v1/seo/auto/run', {})).data.changed.length, 0, 'mesma receita não muda de novo em 4 semanas');
+  const st = (await admin.req('GET', '/api/v1/seo/auto')).data;
+  assert.equal(st.enabled, true);
+  assert.ok(st.lastRun);
+  assert.equal(st.items[0].new_title, c.newTitle);
+
+  // desfazer
+  assert.equal((await admin.req('POST', `/api/v1/seo/auto/${st.items[0].id}/undo`)).status, 200);
+  assert.deepEqual([get().seo_title, get().seo_description], ['', '']);
+  assert.equal((await admin.req('POST', `/api/v1/seo/auto/${st.items[0].id}/undo`)).status, 409);
+
+  // título escrito à mão nunca é trocado (só a descrição, que estava automática)
+  await admin.req('PATCH', `/api/v1/recipes/${rid}`, { seo_title: 'Meu título do bolo de fubá' });
+  const again = await admin.req('POST', '/api/v1/seo/auto/run', {});
+  assert.equal(again.data.changed.length, 1);
+  assert.equal(get().seo_title, 'Meu título do bolo de fubá');
+  assert.match(get().seo_description, /bolo de fubá cremoso/);
+  // editou depois da alteração automática → desfazer recusa (não sobrescreve o que a pessoa fez)
+  await admin.req('PATCH', `/api/v1/recipes/${rid}`, { seo_description: 'Descrição minha.' });
+  const last = (await admin.req('GET', '/api/v1/seo/auto')).data.items[0];
+  assert.equal((await admin.req('POST', `/api/v1/seo/auto/${last.id}/undo`)).status, 409);
+  assert.match((await admin.req('GET', '/admin/google')).text, /SEO automático/);
+});
+
 test('números da receita no editor (autor vê só as dele) e envio do sitemap', async () => {
   const mine = (await author.req('POST', '/api/v1/recipes', { title: 'Cuscuz do autor', ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'published' })).data;
   const p = await author.req('GET', `/api/v1/gsc/page/${mine.code}`);

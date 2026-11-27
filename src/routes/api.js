@@ -951,24 +951,26 @@ router.get('/gsc/report', auth.requireAdmin, rateLimit('gsc', 60, 60e3), gscWrap
 }));
 router.get('/gsc/oportunidades', auth.requireAdmin, rateLimit('gsc', 60, 60e3), gscWrap(async (req, res) => {
   const days = [7, 28, 90].includes(Number(req.query.dias)) ? Number(req.query.dias) : 28;
-  const op = await gsc.opportunities(days);
   // Liga cada página à receita e diz o que já está feito (termo no título / na descrição)
-  const prefix = `${mail.siteUrl()}/receita/`;
-  const norm = (x) => u.stripAccents(String(x || '')).toLowerCase();
-  const words = (q) => norm(q).split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !['com', 'sem', 'para', 'receita', 'receitas', 'como', 'fazer', 'que'].includes(w));
-  for (const it of [...op.almost, ...op.ctr]) {
-    const slug = it.page.startsWith(prefix) ? decodeURIComponent(it.page.slice(prefix.length).split(/[?#]/)[0]) : '';
-    const r = slug ? db.get().prepare('SELECT id, title, seo_title, description, seo_description FROM recipes WHERE slug = ?').get(slug) : null;
-    it.path = it.page.replace(/^https?:\/\/[^/]+/, '') || '/';
-    it.recipeId = r?.id || null;
-    it.title = r?.title || '';
-    const w = words(it.query);
-    const has = (text) => w.length > 0 && w.every((x) => norm(text).includes(x));
-    it.inTitle = !!r && has(`${r.seo_title || ''} ${r.title}`);
-    it.inDescription = !!r && has(`${r.seo_description || ''} ${r.description || ''}`);
-  }
-  res.json(op);
+  res.json(require('../seoauto').annotate(await gsc.opportunities(days), mail.siteUrl()));
 }));
+
+// SEO automático: histórico, rodar agora (ou simular) e desfazer
+router.get('/seo/auto', auth.requireAdmin, (req, res) => {
+  const s = settings.all();
+  res.json({ enabled: s.seoAuto, lastRun: s.seoAutoLastRun || null, ready: gsc.status().configured && !!mail.siteUrl(), items: require('../seoauto').log(50) });
+});
+router.post('/seo/auto/run', auth.requireAdmin, rateLimit('gsc', 60, 60e3), gscWrap(async (req, res) => {
+  if (!gsc.status().configured || !mail.siteUrl()) return res.status(400).json({ error: 'Conecte o Google Search Console (Painel → Google) e defina o endereço do site' });
+  const out = await require('../seoauto').run({ dryRun: req.body?.dryRun === true });
+  if (req.body?.dryRun !== true) auth.audit(req, 'seo.auto', `${out.changed.length} receitas`);
+  res.json(out);
+}));
+router.post('/seo/auto/:id/undo', auth.requireAdmin, (req, res) => {
+  require('../seoauto').undo(idParam(req.params.id));
+  auth.audit(req, 'seo.auto.undo', req.params.id);
+  res.json({ ok: true });
+});
 router.get('/gsc/page/:ref', auth.requireUser, rateLimit('gsc', 60, 60e3), gscWrap(async (req, res) => {
   const r = recipes.find(req.params.ref);
   if (!r || !auth.canEditRecipe(req.user, r)) return notFound(res, 'Receita não encontrada');

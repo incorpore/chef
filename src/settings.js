@@ -41,7 +41,9 @@ const DEFAULTS = {
   commentsModeration: true,
   // E-mail (as credenciais SMTP ficam só nas variáveis de ambiente)
   siteUrl: '',
-  gscProperty: '', // propriedade do Google Search Console (vazio = detecta pelo endereço do site)
+  gscProperty: '',
+  seoAuto: true, // toda semana ajusta título/descrição SEO pelas oportunidades do Search Console (nunca os escritos à mão)
+  seoAutoLastRun: '', // propriedade do Google Search Console (vazio = detecta pelo endereço do site)
   notifyComments: true,
   newsletterDoubleOptIn: true,
   newsletterWelcome: true,

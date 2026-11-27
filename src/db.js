@@ -90,6 +90,21 @@ CREATE TABLE IF NOT EXISTS products (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- SEO automático: cada ajuste de título/descrição feito pelo sistema (para mostrar e desfazer)
+CREATE TABLE IF NOT EXISTS seo_changes (
+  id INTEGER PRIMARY KEY,
+  recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+  query TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT 'almost',
+  position REAL,
+  impressions INTEGER,
+  old_title TEXT DEFAULT '', new_title TEXT DEFAULT '',
+  old_desc TEXT DEFAULT '', new_desc TEXT DEFAULT '',
+  reverted INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_seo_changes_recipe ON seo_changes(recipe_id);
+
 -- Utensílios já buscados automaticamente (evita repetir a busca toda hora)
 CREATE TABLE IF NOT EXISTS utensil_searches (
   key TEXT PRIMARY KEY,

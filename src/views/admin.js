@@ -744,6 +744,15 @@ function googlePage({ user }) {
       <p class="hint" data-gsc-op-hint></p>
       <div data-gsc-ops></div>
     </section>
+    <section class="panel gsc-auto" data-seo-auto>
+      <div class="gsc-chart-head"><h2>SEO automático</h2><small data-seo-auto-last></small></div>
+      <label class="check"><input type="checkbox" data-seo-auto-toggle> Toda semana, ajustar sozinho o título e a descrição SEO das receitas acima (até 10 por semana)</label>
+      <p class="hint">Nunca altera títulos e descrições que você escreveu à mão; a mesma receita só muda de novo depois de 4 semanas. Cada alteração pode ser desfeita.</p>
+      <div class="aff-actions"><button type="button" class="btn btn-sm" data-seo-auto-preview>Ver o que mudaria</button><button type="button" class="btn btn-sm btn-primary" data-seo-auto-run>Ajustar agora</button></div>
+      <div data-seo-auto-preview-out></div>
+      <h3 class="gsc-auto-h">Últimas alterações</h3>
+      <div data-seo-auto-log><p class="empty">Nenhuma alteração automática ainda.</p></div>
+    </section>
     <div class="two-col">
       <section class="panel"><h2>Buscas que trazem visitas</h2><div data-gsc-queries></div></section>
       <section class="panel"><h2>Receitas mais vistas no Google</h2><div data-gsc-pages></div></section>

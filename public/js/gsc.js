@@ -155,6 +155,45 @@
       <div class="gsc-op-meta">${nf(o.impressions)} exibições · ${nf(o.clicks)} cliques · CTR ${pct(o.ctr)} · ${o.recipeId ? `<a href="/admin/receitas/${o.recipeId}">${esc(o.title)}</a>` : `<code>${esc(o.path)}</code>`}</div>
       <div class="gsc-op-todo">👉 ${esc(todo(o))}</div></li>`).join('')}</ol>` : `<p class="empty">${opTab === 'almost' ? 'Nenhuma busca entre a 4ª e a 20ª posição com exibições suficientes neste período.' : 'Nenhuma página do top 10 com poucos cliques. 👏'}</p>`;
   }
+  // ---------------- SEO automático ----------------
+  const autoBox = $('[data-seo-auto]');
+  const changeHtml = (c, undo) => `<li>
+      <div class="gsc-op-q"><b>${esc(c.recipe_title || c.recipeTitle || '')}</b><span class="gsc-op-pos" title="Posição quando ajustada">#${Number(c.position || 0).toFixed(1).replace('.', ',')}</span></div>
+      <div class="gsc-op-meta">${c.kind === 'ctr' ? 'Poucos cliques' : 'Quase na 1ª página'} · busca “${esc(c.query)}”${c.created_at ? ` · ${esc(new Date(`${c.created_at.replace(' ', 'T')}Z`).toLocaleDateString('pt-BR'))}` : ''}${c.reverted ? ' · <b>desfeita</b>' : ''}</div>
+      <div class="seo-diff"><span class="old">${esc(c.old_title ?? c.oldTitle ?? '') || '<i>(título automático)</i>'}</span><span class="new">${esc(c.new_title ?? c.newTitle ?? '')}</span></div>
+      <div class="seo-diff"><span class="old">${esc(c.old_desc ?? c.oldDesc ?? '') || '<i>(descrição automática)</i>'}</span><span class="new">${esc(c.new_desc ?? c.newDesc ?? '')}</span></div>
+      ${undo && !c.reverted ? `<div class="row-actions"><button type="button" class="link" data-seo-undo="${c.id}">desfazer</button> <a href="/admin/receitas/${c.recipe_id}">editar receita</a></div>` : ''}</li>`;
+  async function loadAuto() {
+    if (!autoBox) return;
+    try {
+      const st = await api('/seo/auto');
+      $('[data-seo-auto-toggle]').checked = !!st.enabled;
+      $('[data-seo-auto-last]').textContent = st.lastRun ? `última rodada: ${new Date(st.lastRun).toLocaleDateString('pt-BR')}` : 'ainda não rodou';
+      $('[data-seo-auto-log]').innerHTML = st.items.length ? `<ol class="gsc-ops-list">${st.items.map((c) => changeHtml(c, true)).join('')}</ol>` : '<p class="empty">Nenhuma alteração automática ainda.</p>';
+    } catch (e) { $('[data-seo-auto-log]').innerHTML = `<p class="empty">${esc(e.message)}</p>`; }
+  }
+  if (autoBox) {
+    $('[data-seo-auto-toggle]').addEventListener('change', async (e) => {
+      try { await api('/settings', { method: 'PUT', body: { seoAuto: e.target.checked } }); toast(e.target.checked ? '✅ SEO automático ligado' : 'SEO automático desligado'); } catch (x) { toast(x.message); }
+    });
+    const runAuto = async (dryRun, btn) => {
+      btn.disabled = true;
+      try {
+        const r = await api('/seo/auto/run', { method: 'POST', body: { dryRun } });
+        const out = $('[data-seo-auto-preview-out]');
+        if (dryRun) out.innerHTML = r.changed.length ? `<p class="hint">Mudaria ${r.changed.length} receita(s):</p><ol class="gsc-ops-list">${r.changed.map((c) => changeHtml(c, false)).join('')}</ol>` : '<p class="empty">Nada a ajustar agora.</p>';
+        else { out.innerHTML = ''; toast(r.changed.length ? `✅ ${r.changed.length} receita(s) ajustada(s)` : 'Nada a ajustar agora', 4000); loadAuto(); }
+      } catch (x) { toast(`⚠️ ${x.message}`, 5000); } finally { btn.disabled = false; }
+    };
+    $('[data-seo-auto-preview]').addEventListener('click', (e) => runAuto(true, e.currentTarget));
+    $('[data-seo-auto-run]').addEventListener('click', (e) => { if (confirm('Ajustar agora o título e a descrição SEO das receitas sugeridas?')) runAuto(false, e.currentTarget); });
+    autoBox.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-seo-undo]');
+      if (!b) return;
+      try { await api(`/seo/auto/${b.dataset.seoUndo}/undo`, { method: 'POST' }); toast('Alteração desfeita'); loadAuto(); } catch (x) { toast(`⚠️ ${x.message}`, 5000); }
+    });
+  }
+
   async function loadOps() {
     try {
       ops = await api(`/gsc/oportunidades?dias=${$('[data-gsc-days]').value}`);
@@ -177,6 +216,7 @@
       show('[data-gsc-report]', true); // mostra antes de desenhar: o gráfico usa a largura real do cartão
       kpis(); chart(); lists();
       loadOps();
+      loadAuto();
     } catch (e) {
       show('[data-gsc-report]', false);
       err(e.message);

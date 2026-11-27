@@ -20,6 +20,8 @@ const app = createApp();
 require('./src/notify').kick();
 // Afiliados: atualiza preços/links e busca utensílios automaticamente (a cada 20 min verifica o que venceu)
 require('./src/affiliates').start();
+// SEO automático: uma rodada por semana com as oportunidades do Google Search Console (se estiver configurado)
+require('./src/seoauto').start();
 const mailStatus = require('./src/mail').status();
 console.log(mailStatus.configured ? `✉️  E-mail ativo via ${mailStatus.host}:${mailStatus.port}` : '✉️  E-mail não configurado (opcional: defina SMTP_HOST, SMTP_USER, SMTP_PASS)');
 const server = app.listen(config.port, () => {

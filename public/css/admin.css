@@ -510,3 +510,11 @@ td.row-actions > * + * { margin-left: 10px; }
 .gsc-op-pos { flex: none; font: 700 .82rem ui-monospace, monospace; color: var(--brand); }
 .gsc-op-meta { font-size: .85rem; color: var(--ink-3); margin-top: 2px; overflow-wrap: anywhere; }
 .gsc-op-todo { font-size: .88rem; margin-top: 4px; color: var(--ink-2); }
+
+/* SEO automático */
+.gsc-auto-h { margin: 16px 0 0; font-size: .95rem; }
+.seo-diff { display: grid; gap: 2px; margin-top: 6px; font-size: .86rem; overflow-wrap: anywhere; }
+.seo-diff .old { color: var(--ink-3); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ink-3) 50%, transparent); }
+.seo-diff .old i { text-decoration: none; }
+.seo-diff .new { color: var(--ink); }
+.seo-diff .new::before { content: '→ '; color: #2e8b57; font-weight: 700; }
