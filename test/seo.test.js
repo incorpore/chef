@@ -136,7 +136,7 @@ test('compartilhamento: botões, link curto, QR, embed e imagem padrão', async 
   assert.match(r.text, /utm_source(=|%3D)whatsapp/);
   assert.match(r.text, /data-embed="/);
   const code = recipe.code;
-  assert.equal((await get(`/c/${code}`)).status, 302);
+  assert.equal((await get(`/c/${code}`)).status, 301);
   assert.equal((await get(`/embed/${code}`)).status, 200);
   const other = await get('/conversor');
   assert.equal(meta(other.text, 'property', 'og:image'), 'https://receitas.exemplo.com.br/icons/icon-512.png');
@@ -188,4 +188,29 @@ test('destaque do topo é sorteado entre as 20 mais vistas (com foto têm prefer
     assert.ok(top20.includes(slug), `${slug} está entre as 20 mais vistas`);
     assert.ok(d.prepare('SELECT cover FROM recipes WHERE slug = ?').get(slug).cover, `${slug} tem foto`);
   }
+});
+
+test('capas JPEG para o Google (1:1, 4:3, 16:9): sem foto vira cartão; JSON-LD, og:image e sitemap usam JPEG (nunca SVG)', async () => {
+  const sharp = require('sharp');
+  const recipes = require('../src/recipes');
+  const r = recipes.create({ title: 'Pão de queijo mineiro sem foto', ingredients: 'polvilho\nqueijo\novos', steps: 'Misture.\nAsse.', status: 'published' }, null);
+  const html = await (await fetch(`${base}/receita/${r.slug}`)).text();
+  const ld = JSON.parse(html.match(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/g).map((x) => x.replace(/^<script[^>]*>|<\/script>$/g, '')).find((x) => /"Recipe"/.test(x)));
+  assert.equal(ld.image.length, 3);
+  for (const [i, ratio] of ['1x1', '4x3', '16x9'].entries()) {
+    assert.match(ld.image[i], new RegExp(`/capa/${r.code}-${ratio}\\.jpg`));
+    const res = await fetch(ld.image[i].replace(/^https?:\/\/[^/]+/, base));
+    assert.equal(res.headers.get('content-type'), 'image/jpeg');
+    const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+    assert.equal(meta.format, 'jpeg');
+    assert.ok(meta.width * meta.height >= 50000);
+    assert.equal(Math.round((meta.width / meta.height) * 100), { '1x1': 100, '4x3': 133, '16x9': 178 }[ratio]);
+  }
+  assert.doesNotMatch(JSON.stringify(ld.image), /\.svg/);
+  assert.match(html, new RegExp(`<meta property="og:image" content="[^"]*/capa/${r.code}-16x9\\.jpg`));
+  const sm = await (await fetch(`${base}/sitemap.xml`)).text();
+  assert.match(sm, new RegExp(`/capa/${r.code}-1x1\\.jpg</image:loc>`));
+  assert.equal((await fetch(`${base}/capa/${r.code}-3x2.jpg`)).status, 404);
+  const short = await fetch(`${base}/c/${r.code}`, { redirect: 'manual' });
+  assert.equal(short.status, 301, 'link curto passa relevância (301)');
 });

@@ -125,7 +125,7 @@ test('busca por código: exata, com # e com hífen', async () => {
   r = await req('GET', '/api/v1/recipes/BOLO01', { auth: 'none' });
   assert.equal(r.data.title, 'Bolo de Cenoura');
   r = await req('GET', '/c/BOLO01', { auth: 'none' });
-  assert.equal(r.status, 302);
+  assert.equal(r.status, 301);
   assert.equal(r.headers.get('location'), '/receita/bolo-de-cenoura');
   r = await req('GET', '/busca?q=%23BOLO01', { auth: 'none' });
   assert.equal(r.status, 302);

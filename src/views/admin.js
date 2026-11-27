@@ -733,6 +733,12 @@ function googlePage({ user }) {
       <div class="gsc-chart" data-gsc-chart></div>
       <details class="gsc-table-view"><summary>Ver em tabela</summary><div data-gsc-daily></div></details>
     </section>
+    <section class="panel gsc-ops">
+      <div class="gsc-chart-head"><h2>Oportunidades para subir no Google</h2><small>ajustes de texto com maior chance de ganho</small></div>
+      <div class="gsc-ops-tabs" role="tablist"><button type="button" class="on" data-gsc-op="almost">Quase na 1ª página <b data-gsc-op-n="almost">0</b></button><button type="button" data-gsc-op="ctr">Aparece, mas não clicam <b data-gsc-op-n="ctr">0</b></button></div>
+      <p class="hint" data-gsc-op-hint></p>
+      <div data-gsc-ops></div>
+    </section>
     <div class="two-col">
       <section class="panel"><h2>Buscas que trazem visitas</h2><div data-gsc-queries></div></section>
       <section class="panel"><h2>Receitas mais vistas no Google</h2><div data-gsc-pages></div></section>

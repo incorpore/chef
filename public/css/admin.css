@@ -497,3 +497,16 @@ td.row-actions > * + * { margin-left: 10px; }
   .aff-preview-img { max-width: 160px; }
   .aff-toolbar input { flex: 1 1 100%; }
 }
+
+/* Oportunidades do Google */
+.gsc-ops-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.gsc-ops-tabs button { padding: .4rem .8rem; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink-2); font: 600 .85rem var(--font); cursor: pointer; }
+.gsc-ops-tabs button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.gsc-ops-tabs b { font-weight: 700; opacity: .75; margin-left: 4px; }
+.gsc-ops-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.gsc-ops-list li { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); min-width: 0; }
+.gsc-op-q { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.gsc-op-q b { overflow-wrap: anywhere; }
+.gsc-op-pos { flex: none; font: 700 .82rem ui-monospace, monospace; color: var(--brand); }
+.gsc-op-meta { font-size: .85rem; color: var(--ink-3); margin-top: 2px; overflow-wrap: anywhere; }
+.gsc-op-todo { font-size: .88rem; margin-top: 4px; color: var(--ink-2); }

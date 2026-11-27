@@ -103,7 +103,7 @@ router.get('/receita/:slug', (req, res) => {
 router.get(['/c/:code', '/r/:code'], (req, res) => {
   const r = recipes.getByCode(req.params.code);
   if (!r || (r.status !== 'published' && !auth.canEditRecipe(req.user, r))) return res.status(404).send(pages.notFound(req.user, `Nenhuma receita com o código #${u.normalizeCode(req.params.code)}`));
-  res.redirect(302, `/receita/${r.slug}`);
+  res.redirect(r.status === 'published' ? 301 : 302, `/receita/${r.slug}`); // 301: o Google passa a relevância do link curto para a receita
 });
 
 router.get('/qr/:code.svg', async (req, res) => {
@@ -111,6 +111,19 @@ router.get('/qr/:code.svg', async (req, res) => {
   if (!r || r.status !== 'published') return res.sendStatus(404);
   const svg = await QRCode.toString(`${base(req)}/c/${r.code}`, { type: 'svg', margin: 1, color: { dark: '#1d1a17', light: '#ffffff' } });
   res.type('image/svg+xml').set('Cache-Control', 'public, max-age=86400').send(svg);
+});
+
+// Capas JPEG para o Google e redes sociais (1:1, 4:3, 16:9): recorte da foto ou cartão com o nome da receita
+router.get('/capa/:file', async (req, res, next) => {
+  const m = String(req.params.file).match(/^([A-Za-z0-9_-]{2,40})-(1x1|4x3|16x9)\.jpg$/);
+  if (!m) return next();
+  try {
+    const r = recipes.getByCode(m[1]);
+    if (!r || r.status !== 'published') return res.sendStatus(404);
+    const file = await require('../pin').coverFile(r, m[2]);
+    if (!file) return res.sendStatus(404);
+    res.set('Cache-Control', 'public, max-age=604800').type('image/jpeg').sendFile(file, { dotfiles: 'allow' });
+  } catch (e) { next(e); }
 });
 
 // Capa ilustrada (receitas sem foto)
@@ -189,7 +202,7 @@ router.get('/ads.txt', (req, res) => {
 router.get('/sitemap.xml', (req, res) => {
   const b = base(req);
   const d = db.get();
-  const rows = d.prepare("SELECT slug, title, updated_at, cover FROM recipes WHERE status='published' ORDER BY id DESC LIMIT 45000").all();
+  const rows = d.prepare("SELECT slug, code, title, updated_at, cover FROM recipes WHERE status='published' ORDER BY id DESC LIMIT 45000").all();
   const cats = d.prepare("SELECT c.slug, MAX(r.updated_at) AS lastmod FROM categories c JOIN recipes r ON r.category_id = c.id AND r.status = 'published' GROUP BY c.id").all();
   const tags = d.prepare("SELECT t.tag FROM recipe_tags t JOIN recipes r ON r.id = t.recipe_id AND r.status='published' GROUP BY t.tag HAVING COUNT(*) >= 2 LIMIT 2000").all();
   const urls = [
@@ -200,7 +213,7 @@ router.get('/sitemap.xml', (req, res) => {
     `<url><loc>${b}/sobre</loc></url>`,
     ...cats.map((c) => `<url><loc>${b}/categoria/${u.esc(c.slug)}</loc>${c.lastmod ? `<lastmod>${c.lastmod.slice(0, 10)}</lastmod>` : ''}</url>`),
     ...tags.map((t) => `<url><loc>${b}/tag/${u.esc(encodeURIComponent(t.tag))}</loc></url>`),
-    ...rows.map((r) => `<url><loc>${b}/receita/${u.esc(r.slug)}</loc><lastmod>${r.updated_at.slice(0, 10)}</lastmod>${r.cover ? `<image:image><image:loc>${u.esc((c => (c.startsWith('/') ? b + c : c))(require('../images').sized(r.cover, 1280, 'jpeg')))}</image:loc><image:title>${u.esc(r.title)}</image:title></image:image>` : ''}</url>`),
+    ...rows.map((r) => `<url><loc>${b}/receita/${u.esc(r.slug)}</loc><lastmod>${r.updated_at.slice(0, 10)}</lastmod><image:image><image:loc>${u.esc(r.cover ? (c => (c.startsWith('/') ? b + c : c))(require('../images').sized(r.cover, 1280, 'jpeg')) : `${b}/capa/${encodeURIComponent(r.code)}-1x1.jpg`)}</image:loc><image:title>${u.esc(r.title)}</image:title></image:image></url>`),
   ];
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">${urls.join('')}</urlset>`);
 });

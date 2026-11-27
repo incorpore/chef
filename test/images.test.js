@@ -152,7 +152,10 @@ test('páginas usam srcset com /img e og:image em JPEG; imagens de fora ficam co
   const r = await (await req('POST', '/api/v1/recipes', { body: { title: 'Bolo com foto', cover, ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'published' } })).json();
   const page = await (await fetch(`${base}/receita/${r.slug}`)).text();
   assert.match(page, new RegExp(`srcset="/img/320/${file} 320w, /img/480/${file} 480w, /img/640/${file} 640w, /img/960/${file} 960w, /img/1280/${file} 1280w, /img/1920/${file} 1920w" sizes="\\(min-width: 900px\\) 50vw, 100vw"`));
-  assert.match(page, new RegExp(`property="og:image" content="[^"]*/img/1280/${file}\\?f=jpg"`));
+  assert.match(page, new RegExp(`property="og:image" content="[^"]*/capa/${r.code}-16x9\\.jpg`), 'compartilhamento: recorte 16:9 da foto, em JPEG');
+  const og = await fetch(`${base}/capa/${r.code}-16x9.jpg`);
+  assert.equal(og.headers.get('content-type'), 'image/jpeg');
+  assert.deepEqual(await sharp(Buffer.from(await og.arrayBuffer())).metadata().then((m) => [m.width, m.height]), [1200, 675]);
   const list = await (await fetch(`${base}/receitas`)).text();
   assert.match(list, new RegExp(`src="/img/640/${file}" srcset="/img/320/${file} 320w, /img/480/${file} 480w, /img/640/${file} 640w"`), 'cartão pede no máximo 640 px');
   const ext = await (await req('POST', '/api/v1/recipes', { body: { title: 'Foto externa', cover: 'https://exemplo.com/foto.jpg', ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'published' } })).json();

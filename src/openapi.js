@@ -239,6 +239,7 @@ const ROUTES = [
   ['delete', '/gsc/key', 'Google Search Console', 'admin', 'Remove a chave do Google', { ok: [200, 'Ok'] }],
   ['get', '/gsc/sites', 'Google Search Console', 'admin', 'Propriedades que a conta de serviço enxerga', { ok: [200, S.obj({ items: S.arr({ type: 'object' }), current: S.str() })], errors: [400, 502] }],
   ['get', '/gsc/report', 'Google Search Console', 'admin', 'Cliques, impressões, consultas e páginas', { params: [P.query('dias', '7, 28 (padrão) ou 90', S.int(null, { enum: [7, 28, 90] }))], ok: [200, { type: 'object', additionalProperties: true }], errors: [400, 403, 429, 502] }],
+  ['get', '/gsc/oportunidades', 'Google Search Console', 'admin', 'Oportunidades para subir posição: buscas quase na 1ª página e páginas com poucos cliques', { params: [P.query('dias', '7, 28 (padrão) ou 90', S.int(null, { enum: [7, 28, 90] }))], ok: [200, S.obj({ almost: S.arr({ type: 'object' }), ctr: S.arr({ type: 'object' }), days: S.int() })], errors: [400, 403, 404, 429, 502] }],
   ['get', '/gsc/page/{ref}', 'Google Search Console', 'user', 'Desempenho de uma receita no Google', { params: [P.ref], ok: [200, { type: 'object', additionalProperties: true }], errors: [404, 429] }],
   ['post', '/gsc/sitemap', 'Google Search Console', 'admin', 'Envia o sitemap ao Google', { ok: [200, S.obj({ ok: S.bool(), url: S.str() })], errors: [400, 429, 502] }],
 

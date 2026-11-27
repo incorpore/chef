@@ -132,6 +132,42 @@
     $('[data-gsc-sitemaps]').innerHTML = data.sitemaps.length ? `<ul class="gsc-sitemaps">${data.sitemaps.map((sm) => `<li><code>${esc(sm.path)}</code><span>${sm.pending ? '⏳ aguardando o Google' : sm.errors ? `⚠️ ${sm.errors} erro(s)` : '✅ lido pelo Google'}${sm.lastDownloaded ? ` em ${esc(new Date(sm.lastDownloaded).toLocaleDateString('pt-BR'))}` : ''}${sm.submitted ? ` · ${nf(sm.submitted)} endereços` : ''}</span></li>`).join('')}</ul>` : '<p class="empty">Nenhum sitemap enviado ainda.</p>';
   }
 
+  // ---------------- Oportunidades (busca + página) ----------------
+  let ops = null;
+  let opTab = 'almost';
+  const HINT = {
+    almost: 'Buscas em que a receita aparece entre a 4ª e a 20ª posição. Use o termo exatamente como as pessoas buscam no título, na descrição e no primeiro parágrafo; acrescente dicas e variações que respondam a essa busca.',
+    ctr: 'A receita já aparece no topo, mas poucas pessoas clicam. Reescreva o título SEO e a descrição SEO para ficarem mais convidativos (ex.: tempo de preparo, "sem forno", "fofinho", "fácil").',
+  };
+  function renderOps() {
+    if (!ops) return;
+    for (const k of ['almost', 'ctr']) $(`[data-gsc-op-n="${k}"]`).textContent = ops[k].length;
+    document.querySelectorAll('[data-gsc-op]').forEach((b) => b.classList.toggle('on', b.dataset.gscOp === opTab));
+    $('[data-gsc-op-hint]').textContent = HINT[opTab];
+    const list = ops[opTab];
+    const todo = (o) => {
+      if (opTab === 'ctr') return 'Reescrever título e descrição SEO';
+      const miss = [!o.inTitle && 'título', !o.inDescription && 'descrição'].filter(Boolean);
+      return miss.length ? `Colocar “${o.query}” no ${miss.join(' e na ')}` : 'Já está no título e na descrição: enriqueça o texto (dicas, variações, perguntas comuns)';
+    };
+    $('[data-gsc-ops]').innerHTML = list.length ? `<ol class="gsc-ops-list">${list.map((o) => `<li>
+      <div class="gsc-op-q"><b>${esc(o.query)}</b><span class="gsc-op-pos" title="Posição média">#${o.position.toFixed(1).replace('.', ',')}</span></div>
+      <div class="gsc-op-meta">${nf(o.impressions)} exibições · ${nf(o.clicks)} cliques · CTR ${pct(o.ctr)} · ${o.recipeId ? `<a href="/admin/receitas/${o.recipeId}">${esc(o.title)}</a>` : `<code>${esc(o.path)}</code>`}</div>
+      <div class="gsc-op-todo">👉 ${esc(todo(o))}</div></li>`).join('')}</ol>` : `<p class="empty">${opTab === 'almost' ? 'Nenhuma busca entre a 4ª e a 20ª posição com exibições suficientes neste período.' : 'Nenhuma página do top 10 com poucos cliques. 👏'}</p>`;
+  }
+  async function loadOps() {
+    try {
+      ops = await api(`/gsc/oportunidades?dias=${$('[data-gsc-days]').value}`);
+      renderOps();
+    } catch (e) { $('[data-gsc-ops]').innerHTML = `<p class="empty">${esc(e.message)}</p>`; }
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-gsc-op]');
+    if (!b) return;
+    opTab = b.dataset.gscOp;
+    renderOps();
+  });
+
   async function load() {
     err('');
     root.classList.add('loading');
@@ -140,6 +176,7 @@
       $('[data-gsc-range]').textContent = `${data.site} · ${dfmt(data.range.startDate, true)} a ${dfmt(data.range.endDate, true)} (o Google leva cerca de 2 dias para fechar os números)`;
       show('[data-gsc-report]', true); // mostra antes de desenhar: o gráfico usa a largura real do cartão
       kpis(); chart(); lists();
+      loadOps();
     } catch (e) {
       show('[data-gsc-report]', false);
       err(e.message);

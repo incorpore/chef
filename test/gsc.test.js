@@ -54,6 +54,16 @@ function fakeGoogle(req, res) {
     const old = q.startDate < day(30); // período anterior
     const dim = q.dimensions[0];
     if (dim === 'date') return send(200, { rows: [0, 1, 2].map((i) => ({ keys: [day(3 + i)], clicks: old ? 5 : 10 + i, impressions: old ? 100 : 200, ctr: 0.05, position: old ? 9 : 6 })) });
+    if (dim === 'query' && q.dimensions[1] === 'page') {
+      const P = 'https://receitas.exemplo.com.br/receita/bolo-de-fuba';
+      return send(200, { rows: [
+        { keys: ['bolo de fubá cremoso', P], clicks: 2, impressions: 400, ctr: 0.005, position: 7.4 }, // quase + poucos cliques
+        { keys: ['bolo de fuba', P], clicks: 30, impressions: 300, ctr: 0.1, position: 2.1 }, // já está bem
+        { keys: ['receita de fubá com goiabada', P], clicks: 0, impressions: 120, ctr: 0, position: 14 }, // quase (2ª página)
+        { keys: ['bolo', P], clicks: 0, impressions: 3, ctr: 0, position: 12 }, // poucas exibições: ignora
+        { keys: ['bolo de milho', 'https://receitas.exemplo.com.br/'], clicks: 0, impressions: 200, ctr: 0, position: 45 }, // longe demais
+      ] });
+    }
     if (dim === 'query' && q.dimensionFilterGroups) return send(200, { rows: [{ keys: ['bolo de fubá cremoso'], clicks: 7, impressions: 90, ctr: 0.07, position: 3.2 }] });
     if (dim === 'page' && q.dimensionFilterGroups) return send(200, { rows: [{ keys: [q.dimensionFilterGroups[0].filters[0].expression], clicks: 9, impressions: 120, ctr: 0.075, position: 4.1 }] });
     if (dim === 'query') return send(200, { rows: [{ keys: ['bolo de cenoura'], clicks: 20, impressions: 300, ctr: 0.066, position: 4.5 }] });
@@ -158,6 +168,21 @@ test('relatório: propriedade detectada pelo endereço do site, totais, compara�
   assert.equal((await admin.req('GET', '/api/v1/gsc/sites')).data.current, 'https://outro.com/');
   await admin.req('PUT', '/api/v1/settings', { gscProperty: '' });
   assert.equal((await admin.req('PUT', '/api/v1/settings', { gscProperty: 'javascript:alert(1)' })).status, 400);
+});
+
+test('oportunidades: buscas quase na 1ª página e páginas com poucos cliques, ligadas à receita', async () => {
+  const r = await admin.req('GET', '/api/v1/gsc/oportunidades?dias=28');
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual(r.data.almost.map((o) => o.query), ['bolo de fubá cremoso', 'receita de fubá com goiabada']);
+  assert.deepEqual(r.data.ctr.map((o) => o.query), ['bolo de fubá cremoso']);
+  const o = r.data.almost[0];
+  assert.equal(o.title, 'Bolo de fubá');
+  assert.ok(o.recipeId);
+  assert.equal(o.inTitle, false, '"cremoso" não está no título');
+  assert.equal(r.data.almost[1].inTitle, false);
+  assert.equal((await author.req('GET', '/api/v1/gsc/oportunidades')).status, 403);
+  const page = await admin.req('GET', '/admin/google');
+  assert.match(page.text, /Oportunidades para subir no Google/);
 });
 
 test('números da receita no editor (autor vê só as dele) e envio do sitemap', async () => {

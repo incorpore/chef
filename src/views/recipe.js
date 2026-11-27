@@ -5,6 +5,7 @@ const { layout, icon, avatar } = require('./layout');
 const c = require('./components');
 const { renderAd, renderProducts, productsForIngredients, productLink } = require('../monetization');
 const utensils = require('../utensils');
+const pin = require('../pin');
 const settings = require('../settings');
 const { breadcrumbLd } = require('./head');
 
@@ -25,7 +26,9 @@ function jsonLd(r, base) {
     '@type': 'Recipe',
     name: r.title,
     description: r.seo_description || r.description || autoDescription(r),
-    image: [r.cover, ...r.images.map((i) => i.url)].filter(Boolean).map((x) => images.sized(x, 1280, 'jpeg')).concat(r.cover || r.images.length ? [] : [r.cover_auto]).filter(Boolean).map(abs),
+    // Google: JPEG em 1:1, 4:3 e 16:9 (SVG não vale). Sem foto, cartão com o nome da receita.
+    image: (pin.coverUrl(r, '1x1') ? ['1x1', '4x3', '16x9'].map((k) => pin.coverUrl(r, k)) : [r.cover].filter(Boolean).map((x) => images.sized(x, 1280, 'jpeg')))
+      .concat(r.images.map((i) => images.sized(i.url, 1280, 'jpeg'))).filter(Boolean).map(abs),
     author: { '@type': 'Person', name: r.author_name || s.authorName || s.siteName, url: `${base}/sobre` },
     publisher: { '@id': `${base}/#organization` },
     inLanguage: 'pt-BR',
@@ -286,7 +289,7 @@ function recipePage({ r, base, related, products, productsTitle, adjacent, comme
     seoTitle: r.seo_title || seoTitle(r),
     description: r.seo_description || r.description || autoDescription(r),
     canonical: `${base}/receita/${r.slug}`,
-    image: r.cover ? images.sized(r.cover, 1280, 'jpeg') : '',
+    image: pin.coverUrl(r, '16x9') || (r.cover ? images.sized(r.cover, 1280, 'jpeg') : ''), // WhatsApp/Facebook/X: 16:9 em JPEG
     imageAlt: r.title,
     type: 'article',
     article: { published: r.published_at || r.created_at, modified: r.updated_at, section: r.category?.name, tags: r.tags },

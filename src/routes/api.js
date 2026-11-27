@@ -949,6 +949,26 @@ router.get('/gsc/report', auth.requireAdmin, rateLimit('gsc', 60, 60e3), gscWrap
   }
   res.json(rep);
 }));
+router.get('/gsc/oportunidades', auth.requireAdmin, rateLimit('gsc', 60, 60e3), gscWrap(async (req, res) => {
+  const days = [7, 28, 90].includes(Number(req.query.dias)) ? Number(req.query.dias) : 28;
+  const op = await gsc.opportunities(days);
+  // Liga cada página à receita e diz o que já está feito (termo no título / na descrição)
+  const prefix = `${mail.siteUrl()}/receita/`;
+  const norm = (x) => u.stripAccents(String(x || '')).toLowerCase();
+  const words = (q) => norm(q).split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !['com', 'sem', 'para', 'receita', 'receitas', 'como', 'fazer', 'que'].includes(w));
+  for (const it of [...op.almost, ...op.ctr]) {
+    const slug = it.page.startsWith(prefix) ? decodeURIComponent(it.page.slice(prefix.length).split(/[?#]/)[0]) : '';
+    const r = slug ? db.get().prepare('SELECT id, title, seo_title, description, seo_description FROM recipes WHERE slug = ?').get(slug) : null;
+    it.path = it.page.replace(/^https?:\/\/[^/]+/, '') || '/';
+    it.recipeId = r?.id || null;
+    it.title = r?.title || '';
+    const w = words(it.query);
+    const has = (text) => w.length > 0 && w.every((x) => norm(text).includes(x));
+    it.inTitle = !!r && has(`${r.seo_title || ''} ${r.title}`);
+    it.inDescription = !!r && has(`${r.seo_description || ''} ${r.description || ''}`);
+  }
+  res.json(op);
+}));
 router.get('/gsc/page/:ref', auth.requireUser, rateLimit('gsc', 60, 60e3), gscWrap(async (req, res) => {
   const r = recipes.find(req.params.ref);
   if (!r || !auth.canEditRecipe(req.user, r)) return notFound(res, 'Receita não encontrada');

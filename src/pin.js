@@ -143,4 +143,66 @@ async function file(r) {
   return job;
 }
 
-module.exports = { file, pinUrl, render, version, W, H };
+// ---------------- Capas para o Google (Recipe rich results) e compartilhamento ----------------
+// O Google pede fotos em 1:1, 4:3 e 16:9 (mín. 50 mil pixels) e não aceita SVG. Com foto: recorte inteligente
+// da própria foto. Sem foto: cartão colorido com o nome da receita (mesmo estilo do pin de texto).
+const RATIOS = { '1x1': [1200, 1200], '4x3': [1200, 900], '16x9': [1200, 675] };
+
+async function renderCard(r, cw, ch) {
+  const pad = Math.round(cw * 0.07);
+  const seed = crypto.createHash('sha1').update(`${r.code}|${r.title}`).digest().readUInt32BE(0);
+  const [c1, c2] = PALETTE[seed % PALETTE.length];
+  const bg = await sharp(svgBuf(`<svg xmlns="http://www.w3.org/2000/svg" width="${cw}" height="${ch}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs>
+    <rect width="${cw}" height="${ch}" fill="url(#g)"/><circle cx="${cw - 160 - (seed % 120)}" cy="${120 + ((seed >> 8) % 100)}" r="${Math.round(ch * 0.33)}" fill="#fff" opacity=".09"/><circle cx="${100 + ((seed >> 4) % 100)}" cy="${ch - 60}" r="${Math.round(ch * 0.26)}" fill="#fff" opacity=".07"/></svg>`)).png().toBuffer();
+  const s = settings.all();
+  const scale = Math.min(1, ch / 900);
+  const cat = await text((r.category?.name || 'Receita').toUpperCase(), { font: 'Inter Bold', fontfile: SANS_BOLD, size: Math.round(30 * Math.max(scale, 0.8)), color: '#ffffffd9', width: cw - pad * 2 });
+  const footer = await text(hostOf(s.siteUrl || config.baseUrl) || s.siteName, { font: 'Inter Bold', fontfile: SANS_BOLD, size: Math.round(28 * Math.max(scale, 0.8)), color: '#ffffff', width: cw - pad * 2 });
+  const meta = metaLine(r) ? await text(metaLine(r), { font: 'Inter Medium', fontfile: SANS, size: Math.round(30 * Math.max(scale, 0.8)), color: '#ffffffe6', width: cw - pad * 2 }) : null;
+  const room = ch - pad * 2 - cat.info.height - 30 - footer.info.height - (meta ? meta.info.height + 24 : 0) - 40;
+  const title = await fitTitle(r.title, cw - pad * 2, room, '#ffffff', [104, 92, 82, 72, 64, 56, 48, 42].map((x) => Math.round(x * Math.max(scale, 0.7))));
+  const block = cat.info.height + 30 + title.info.height + (meta ? 24 + meta.info.height : 0);
+  let y = Math.max(pad, Math.round((ch - footer.info.height - pad - block) / 2));
+  const layers = [{ input: bg, top: 0, left: 0 }, { input: cat.data, top: y, left: pad }];
+  y += cat.info.height + 30;
+  layers.push({ input: title.data, top: y, left: pad });
+  y += title.info.height + 24;
+  if (meta) layers.push({ input: meta.data, top: y, left: pad });
+  layers.push({ input: footer.data, top: ch - pad - footer.info.height, left: pad });
+  return sharp({ create: { width: cw, height: ch, channels: 3, background: c2 } }).composite(layers).jpeg({ quality: 86, mozjpeg: true }).toBuffer();
+}
+
+async function renderCover(r, ratio) {
+  const [cw, ch] = RATIOS[ratio];
+  const photo = localCover(r);
+  if (photo) return sharp(photo, { limitInputPixels: 60e6 }).rotate().resize(cw, ch, { fit: 'cover', position: sharp.strategy.attention }).jpeg({ quality: 84, mozjpeg: true }).toBuffer();
+  return renderCard(r, cw, ch);
+}
+
+/** URL da capa JPEG no formato pedido ("1x1", "4x3", "16x9"); vazio se a foto for de outro site. */
+function coverUrl(r, ratio = '16x9') {
+  if (!sharp || !r?.code || !RATIOS[ratio]) return '';
+  if (r.cover && !localCover(r)) return ''; // foto externa: o site não recorta
+  return `/capa/${encodeURIComponent(r.code)}-${ratio}.jpg?v=${version(r)}`;
+}
+
+async function coverFile(r, ratio) {
+  if (!sharp || !RATIOS[ratio]) return null;
+  const v = version(r);
+  const dir = path.join(config.uploadsDir, '.cache', 'capa');
+  const dest = path.join(dir, `${r.code}-${ratio}-${v}.jpg`);
+  if (fs.existsSync(dest)) return dest;
+  if (inflight.has(dest)) return inflight.get(dest);
+  const job = (async () => {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o750 });
+    for (const old of fs.readdirSync(dir)) if (old.startsWith(`${r.code}-${ratio}-`)) fs.rmSync(path.join(dir, old), { force: true });
+    const tmp = `${dest}.${process.pid}.part`;
+    fs.writeFileSync(tmp, await renderCover(r, ratio));
+    fs.renameSync(tmp, dest);
+    return dest;
+  })().finally(() => inflight.delete(dest));
+  inflight.set(dest, job);
+  return job;
+}
+
+module.exports = { file, pinUrl, render, version, W, H, RATIOS, coverUrl, coverFile };

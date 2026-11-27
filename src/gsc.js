@@ -174,6 +174,34 @@ async function report(days = 28) {
   };
 }
 
+/**
+ * Oportunidades: combinações busca + página em que um ajuste no texto costuma subir a posição.
+ * - "quase": posição média entre 4 e 20 (fim da 1ª página / 2ª página) com impressões → usar o termo no título,
+ *   na descrição e no primeiro parágrafo da receita.
+ * - "cliques": já está no top 10, mas quase ninguém clica → reescrever título e descrição (o "anúncio" no Google).
+ */
+async function opportunities(days = 28) {
+  const site = await property();
+  if (!site) throw new GscError('Nenhuma propriedade encontrada. Adicione o e-mail da conta de serviço como usuário no Search Console.', 404);
+  const rows = await query(site, { ...range(days), dimensions: ['query', 'page'], rowLimit: 2000 });
+  const total = rows.reduce((a, r) => a + r.impressions, 0) || 1;
+  const minImpr = Math.max(5, Math.round(total / 2000)); // ignora buscas com pouquíssimas exibições
+  const out = { almost: [], ctr: [], days };
+  for (const r of rows) {
+    const item = { query: r.keys[0], page: r.keys[1], clicks: r.clicks, impressions: r.impressions, ctr: r.ctr, position: r.position };
+    if (r.impressions < minImpr) continue;
+    if (r.position >= 4 && r.position <= 20) out.almost.push(item);
+    if (r.position <= 10 && r.impressions >= minImpr * 3 && r.ctr < (r.position <= 3 ? 0.05 : 0.02)) out.ctr.push(item);
+  }
+  // Mais impressões e mais perto do topo primeiro (maior ganho com menos esforço)
+  const gain = (x) => x.impressions / Math.max(1, x.position - 2);
+  out.almost.sort((a, b) => gain(b) - gain(a));
+  out.ctr.sort((a, b) => b.impressions - a.impressions);
+  out.almost = out.almost.slice(0, 40);
+  out.ctr = out.ctr.slice(0, 20);
+  return out;
+}
+
 /** Números de uma página (para o editor da receita). */
 async function page(url, days = 28) {
   const site = await property();
@@ -208,4 +236,4 @@ function status() {
   return { configured: !!key, email: key?.client_email || '', source: key?.source || '', error, property: settings.all().gscProperty || '' };
 }
 
-module.exports = { status, saveKey, removeKey, sites, property, report, page, submitSitemap, endpoints, GscError, _reset: () => { token = null; cache.clear(); } };
+module.exports = { status, saveKey, removeKey, sites, property, report, opportunities, page, submitSitemap, endpoints, GscError, _reset: () => { token = null; cache.clear(); } };
