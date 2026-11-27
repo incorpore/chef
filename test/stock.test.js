@@ -277,6 +277,27 @@ test('Unsplash: busca (sem fotos pagas), foto fica no Unsplash em tamanhos otimi
   assert.match(only.data.error, /Unsplash/);
 });
 
+test('bancos ligados/desligados individualmente, sem apagar a chave', async () => {
+  for (const [p, k] of [['pexels', PEXELS_KEY], ['pixabay', PIXABAY_KEY], ['unsplash', 'unsplashAccessKey0123456789abcdefGHIJ']]) await admin.req('PUT', '/api/v1/fotos/chaves', { provider: p, key: k });
+  assert.equal((await author.req('PUT', '/api/v1/fotos/bancos', { provider: 'pexels', enabled: false })).status, 403);
+  assert.equal((await admin.req('PUT', '/api/v1/fotos/bancos', { provider: 'outro', enabled: false })).status, 400);
+  let st = (await admin.req('PUT', '/api/v1/fotos/bancos', { provider: 'pexels', enabled: false })).data;
+  st = (await admin.req('PUT', '/api/v1/fotos/bancos', { provider: 'pixabay', enabled: false })).data;
+  assert.deepEqual([st.pexels.configured, st.pexels.enabled, st.pixabay.enabled, st.unsplash.enabled], [true, false, false, true]);
+  stock._reset();
+  const only = await author.req('GET', `/api/v1/fotos/buscar?q=${encodeURIComponent('bolo de cenoura')}`);
+  assert.equal(only.status, 200, only.text);
+  assert.ok(only.data.items.length && only.data.items.every((i) => i.provider === 'unsplash'), 'só o banco ligado');
+  await admin.req('PUT', '/api/v1/fotos/bancos', { provider: 'unsplash', enabled: false });
+  const none = await admin.req('GET', '/api/v1/fotos/buscar?q=bolo');
+  assert.equal(none.status, 400);
+  assert.match(none.data.error, /desativados/);
+  assert.doesNotMatch((await author.req('GET', '/admin/receitas/nova')).text, /data-stock-open/, 'editor esconde a busca quando tudo está desligado');
+  for (const p of ['pexels', 'pixabay', 'unsplash']) st = (await admin.req('PUT', '/api/v1/fotos/bancos', { provider: p, enabled: true })).data;
+  assert.deepEqual([st.pexels.enabled, st.pixabay.enabled, st.unsplash.enabled], [true, true, true]);
+  assert.match((await admin.req('GET', '/admin/fotos')).text, /data-stock-switch="unsplash"/);
+});
+
 test('editor sem chave: autor vê aviso claro; admin vê atalho para configurar', async () => {
   await admin.req('PUT', '/api/v1/fotos/chaves', { provider: 'pexels', key: '' });
   await admin.req('PUT', '/api/v1/fotos/chaves', { provider: 'pixabay', key: '' });

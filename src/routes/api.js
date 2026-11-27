@@ -876,6 +876,12 @@ router.put('/fotos/chaves', auth.requireAdmin, rateLimit('stock-key', 20, 10 * 6
   auth.audit(req, 'fotos.chave', String(req.body?.provider || ''));
   res.json(stock.status());
 }));
+router.put('/fotos/bancos', auth.requireAdmin, stockWrap(async (req, res) => {
+  const provider = String(req.body?.provider || '');
+  stock.setEnabled(provider, req.body?.enabled !== false);
+  auth.audit(req, 'fotos.banco', `${provider}: ${req.body?.enabled !== false ? 'ligado' : 'desligado'}`);
+  res.json(stock.status());
+}));
 router.get('/fotos/pendentes', auth.requireAdmin, (req, res) => {
   const offset = Math.max(0, Math.min(100000, Number(req.query.offset) || 0));
   res.json(stock.missing(20, offset, req.query.modo === 'bancos' ? 'bancos' : 'sem'));
@@ -898,7 +904,7 @@ router.post('/fotos/aplicar', auth.requireAdmin, rateLimit('stock-apply', 120, 6
 }));
 // Editor de receitas (autores também): buscar e baixar uma foto para usar como capa
 router.get('/fotos/buscar', auth.requireUser, rateLimit('stock-search', 120, 60e3), stockWrap(async (req, res) => {
-  if (!stock.configured()) return res.status(400).json({ error: isAdmin(req) ? 'Configure a chave do Pexels, do Pixabay ou do Unsplash em Painel → Fotos das receitas' : 'A busca de fotos ainda não foi configurada pelo administrador' });
+  if (!stock.configured()) return res.status(400).json({ error: !isAdmin(req) ? 'A busca de fotos ainda não foi configurada pelo administrador' : stock.hasAnyKey() ? 'Todos os bancos de imagens estão desativados (Painel → Fotos das receitas)' : 'Configure a chave do Pexels, do Pixabay ou do Unsplash em Painel → Fotos das receitas' });
   const q = sec.cleanText(String(req.query.q || ''), 100).trim();
   if (!q) return res.json({ query: '', items: [] });
   res.json(await stock.search(q, { perPage: 4 }));

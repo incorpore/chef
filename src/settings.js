@@ -42,6 +42,7 @@ const DEFAULTS = {
   // E-mail (as credenciais SMTP ficam só nas variáveis de ambiente)
   siteUrl: '',
   gscProperty: '',
+  stockDisabled: '', // bancos de imagens desligados (sem apagar a chave): "pexels,unsplash"
   seoAuto: true, // toda semana ajusta título/descrição SEO pelas oportunidades do Search Console (nunca os escritos à mão)
   seoAutoLastRun: '', // propriedade do Google Search Console (vazio = detecta pelo endereço do site)
   notifyComments: true,
@@ -86,6 +87,7 @@ const PATTERNS = {
   defaultRecipeImage: [/^((https:\/\/|\/(?!\/))[^\s"'<>]{1,1000})?$/, 'URL da imagem padrão das receitas inválida'],
   shareNetworks: [/^[a-z,]{0,200}$/, 'Lista de redes inválida'],
   gscProperty: [/^(sc-domain:[a-z0-9.-]{3,200}|https?:\/\/[a-z0-9.-]{3,200}(:\d{1,5})?\/[^\s"'<>]{0,200})?$/i, 'Propriedade do Search Console inválida'],
+  stockDisabled: [/^((pexels|pixabay|unsplash)(,(pexels|pixabay|unsplash))*)?$/, 'Lista de bancos de imagens inválida'],
   siteUrl: [/^(https?:\/\/[a-z0-9.-]+(:\d{1,5})?)?$/i, 'Endereço do site inválido (ex.: https://receitas.meusite.com.br, sem barra no final)'],
 };
 const MAX_LEN = { headHtml: 20000, adsTxt: 20000, aboutText: 20000, privacyText: 1000, description: 320, siteName: 60, tagline: 120, amazonDisclosure: 300, affiliateDisclosure: 300, authorName: 80 };

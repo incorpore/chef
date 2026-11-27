@@ -518,3 +518,12 @@ td.row-actions > * + * { margin-left: 10px; }
 .seo-diff .old i { text-decoration: none; }
 .seo-diff .new { color: var(--ink); }
 .seo-diff .new::before { content: '→ '; color: #2e8b57; font-weight: 700; }
+
+/* Bancos de imagens: liga/desliga individual */
+.stock-key-head { flex-wrap: wrap; }
+.stock-switch { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: .85rem; color: var(--ink-2); cursor: pointer; }
+.stock-switch input { width: 18px; height: 18px; accent-color: var(--brand); }
+.stock-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.stock-chip { font: 600 .82rem var(--font); padding: .25rem .7rem; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink-3); cursor: pointer; }
+.stock-chip.on { color: #2e8b57; border-color: color-mix(in srgb, #2e8b57 40%, var(--line)); background: color-mix(in srgb, #2e8b57 8%, var(--surface)); }
+span.stock-chip.off { cursor: default; opacity: .7; }

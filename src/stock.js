@@ -41,16 +41,34 @@ class StockError extends Error {
 function fileKeys() {
   try { return JSON.parse(fs.readFileSync(keyFile(), 'utf8')) || {}; } catch { return {}; }
 }
-function keys() {
+function allKeys() {
   const f = fileKeys();
   return { pexels: process.env.PEXELS_API_KEY || f.pexels || '', pixabay: process.env.PIXABAY_API_KEY || f.pixabay || '', unsplash: process.env.UNSPLASH_ACCESS_KEY || f.unsplash || '' };
 }
+/** Bancos desligados pelo administrador (a chave continua guardada). */
+function disabled() {
+  return new Set(String(require('./settings').all().stockDisabled || '').split(',').filter(Boolean));
+}
+/** Chaves dos bancos LIGADOS (é o que a busca e o automático usam). */
+function keys() {
+  const k = allKeys();
+  for (const p of disabled()) k[p] = '';
+  return k;
+}
+/** Liga/desliga um banco sem apagar a chave. */
+function setEnabled(provider, enabled) {
+  if (!NAMES[provider]) throw new StockError('Banco de imagens desconhecido', 400);
+  const off = disabled();
+  if (enabled) off.delete(provider); else off.add(provider);
+  require('./settings').update({ stockDisabled: PROVIDERS.filter((p) => off.has(p)).join(',') });
+}
 function status() {
-  const k = keys();
+  const k = allKeys();
+  const off = disabled();
   return {
-    pexels: { configured: !!k.pexels, fromEnv: !!process.env.PEXELS_API_KEY },
-    pixabay: { configured: !!k.pixabay, fromEnv: !!process.env.PIXABAY_API_KEY },
-    unsplash: { configured: !!k.unsplash, fromEnv: !!process.env.UNSPLASH_ACCESS_KEY, remaining: unsplashRemaining },
+    pexels: { configured: !!k.pexels, enabled: !off.has('pexels'), fromEnv: !!process.env.PEXELS_API_KEY },
+    pixabay: { configured: !!k.pixabay, enabled: !off.has('pixabay'), fromEnv: !!process.env.PIXABAY_API_KEY },
+    unsplash: { configured: !!k.unsplash, enabled: !off.has('unsplash'), fromEnv: !!process.env.UNSPLASH_ACCESS_KEY, remaining: unsplashRemaining },
     missing: db.get().prepare("SELECT COUNT(*) AS n FROM recipes WHERE status = 'published' AND (cover IS NULL OR cover = '')").get().n,
     fromBanks: db.get().prepare(`SELECT COUNT(*) AS n FROM recipes WHERE status = 'published' AND ${STOCK_COVER}`).get().n,
     job: job ? { ...job, log: job.log.slice(-8) } : null,
@@ -162,7 +180,7 @@ async function trackUnsplash(photo) {
 async function search(term, { perPage = 4, providers } = {}) {
   const k = keys();
   const list = (providers || PROVIDERS).filter((p) => k[p]);
-  if (!list.length) throw new StockError('Configure a chave do Pexels, do Pixabay ou do Unsplash', 400);
+  if (!list.length) throw new StockError(PROVIDERS.some((p) => allKeys()[p]) ? 'Todos os bancos de imagens estão desativados (Painel → Fotos das receitas)' : 'Configure a chave do Pexels, do Pixabay ou do Unsplash', 400);
   const tr = foodterms.translate(term);
   const q = tr.query || queryFor(term);
   const lang = tr.query ? 'en' : 'pt';
@@ -305,4 +323,4 @@ function stopAuto() {
   if (job) { job.running = false; job.stopReason = 'Parada pelo administrador'; }
 }
 
-module.exports = { status, saveKey, search, apply, download, configured, removeStockCovers, missing, startAuto, stopAuto, queryFor, unsplashSized, endpoints, IMAGE_HOSTS, UNSPLASH_HOSTS, MIN_INTERVAL, StockError, NAMES, _reset: () => { job = null; last.pexels = 0; last.pixabay = 0; last.unsplash = 0; unsplashRemaining = null; } };
+module.exports = { status, saveKey, setEnabled, hasAnyKey: () => PROVIDERS.some((p) => allKeys()[p]), search, apply, download, configured, removeStockCovers, missing, startAuto, stopAuto, queryFor, unsplashSized, endpoints, IMAGE_HOSTS, UNSPLASH_HOSTS, MIN_INTERVAL, StockError, NAMES, _reset: () => { job = null; last.pexels = 0; last.pixabay = 0; last.unsplash = 0; unsplashRemaining = null; } };

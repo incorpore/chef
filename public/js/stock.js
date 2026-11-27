@@ -17,18 +17,24 @@
 
   // ---------------- Chaves e situação ----------------
   function paintStatus(st) {
-    const ok = st.pexels.configured || st.pixabay.configured || st.unsplash.configured;
-    for (const p of ['pexels', 'pixabay', 'unsplash']) {
+    const P = ['pexels', 'pixabay', 'unsplash'];
+    const active = (p) => st[p].configured && st[p].enabled;
+    const ok = P.some(active);
+    const anyKey = P.some((p) => st[p].configured);
+    for (const p of P) {
       const b = $(`[data-stock-badge="${p}"]`);
-      b.textContent = st[p].configured ? (st[p].fromEnv ? '✓ configurada (variável)' : '✓ configurada') : 'sem chave';
-      b.classList.toggle('on', st[p].configured);
+      b.textContent = !st[p].configured ? 'sem chave' : !st[p].enabled ? '○ desativado' : st[p].fromEnv ? '✓ configurada (variável)' : '✓ configurada';
+      b.classList.toggle('on', active(p));
+      $(`[data-stock-switch-wrap="${p}"]`).hidden = !st[p].configured;
+      $(`[data-stock-switch="${p}"]`).checked = st[p].enabled;
       const input = $(`[data-stock-key="${p}"] input`);
       input.placeholder = st[p].configured ? 'Chave salva — cole outra para trocar (vazio + Salvar remove)' : `Cole a chave do ${NAMES[p]}`;
       input.disabled = st[p].fromEnv;
     }
-    $('[data-ph-keys-status]').textContent = `Bancos de imagens: ${['pexels', 'pixabay', 'unsplash'].map((p) => `${st[p].configured ? '✓' : '✗'} ${NAMES[p]}`).join(' · ')}`;
-    $('[data-ph-keys-line]').hidden = !ok;
-    $('[data-ph-keys-form]').hidden = ok && !$('[data-ph-keys]').classList.contains('editing');
+    // Atalhos: um toque liga/desliga o banco (sem abrir as chaves)
+    $('[data-stock-chips]').innerHTML = P.filter((p) => st[p].configured).map((p) => `<button type="button" class="stock-chip${st[p].enabled ? ' on' : ''}" data-stock-toggle="${p}" aria-pressed="${st[p].enabled}" title="${st[p].enabled ? 'Ativo: toque para desativar' : 'Desativado: toque para ativar'}">${st[p].enabled ? '✓' : '○'} ${NAMES[p]}</button>`).join('') + P.filter((p) => !st[p].configured).map((p) => `<span class="stock-chip off">✗ ${NAMES[p]}</span>`).join('');
+    $('[data-ph-keys-line]').hidden = !anyKey;
+    $('[data-ph-keys-form]').hidden = anyKey && !$('[data-ph-keys]').classList.contains('editing');
     $('[data-ph-review]').hidden = !ok;
     $('[data-ph-auto]').hidden = !ok;
     $('[data-ph-count="sem"]').textContent = st.missing.toLocaleString('pt-BR');
@@ -52,6 +58,14 @@
   }
   const refresh = async () => { try { return paintStatus(await api('/fotos/status')); } catch { return false; } };
 
+  const toggleBank = async (provider, enabled) => {
+    try {
+      paintStatus(await api('/fotos/bancos', { method: 'PUT', body: { provider, enabled } }));
+      toast(`${NAMES[provider]} ${enabled ? 'ativado' : 'desativado'}`);
+    } catch (err) { toast(`⚠️ ${err.message}`); refresh(); }
+  };
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-stock-toggle]'); if (b) toggleBank(b.dataset.stockToggle, b.getAttribute('aria-pressed') !== 'true'); });
+  $$('[data-stock-switch]').forEach((c) => c.addEventListener('change', () => toggleBank(c.dataset.stockSwitch, c.checked)));
   $('[data-ph-keys-edit]').addEventListener('click', () => { $('[data-ph-keys]').classList.add('editing'); $('[data-ph-keys-form]').hidden = false; });
   $$('[data-stock-key]').forEach((f) => f.addEventListener('submit', async (e) => {
     e.preventDefault();

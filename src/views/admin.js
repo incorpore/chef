@@ -631,23 +631,23 @@ function photosPage({ user }) {
   <header class="admin-head"><h1>Fotos das receitas</h1></header>
 
   <section class="panel ph-keys" data-ph-keys>
-    <div class="ph-keys-line" data-ph-keys-line hidden><span data-ph-keys-status></span><button type="button" class="link" data-ph-keys-edit>alterar chaves</button></div>
+    <div class="ph-keys-line" data-ph-keys-line hidden><span>Bancos de imagens:</span><span class="stock-chips" data-stock-chips></span><button type="button" class="link" data-ph-keys-edit>alterar chaves</button></div>
     <div class="ph-keys-form" data-ph-keys-form>
       <h2>Bancos de imagens grátis</h2>
-      <p class="hint">Fotos com licença para uso comercial (inclusive com anúncios). Basta uma chave; com as duas há mais opções.</p>
+      <p class="hint">Fotos com licença para uso comercial (inclusive com anúncios). Basta uma chave; com mais bancos há mais opções. Cada banco pode ser desativado sem apagar a chave.</p>
       <div class="stock-keys">
         <form class="stock-key" data-stock-key="pexels">
-          <div class="stock-key-head"><strong>Pexels</strong><span class="stock-badge" data-stock-badge="pexels"></span></div>
+          <div class="stock-key-head"><strong>Pexels</strong><span class="stock-badge" data-stock-badge="pexels"></span><label class="stock-switch" data-stock-switch-wrap="pexels" hidden><input type="checkbox" role="switch" data-stock-switch="pexels"> <span>Ativo</span></label></div>
           <p class="hint">Chave grátis em <a href="https://www.pexels.com/api/new/" target="_blank" rel="noopener">pexels.com/api</a>.</p>
           <div class="inline-form"><input name="key" placeholder="Cole a chave do Pexels" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Salvar</button></div>
         </form>
         <form class="stock-key" data-stock-key="pixabay">
-          <div class="stock-key-head"><strong>Pixabay</strong><span class="stock-badge" data-stock-badge="pixabay"></span></div>
+          <div class="stock-key-head"><strong>Pixabay</strong><span class="stock-badge" data-stock-badge="pixabay"></span><label class="stock-switch" data-stock-switch-wrap="pixabay" hidden><input type="checkbox" role="switch" data-stock-switch="pixabay"> <span>Ativo</span></label></div>
           <p class="hint">Crie a conta em <a href="https://pixabay.com/accounts/register/" target="_blank" rel="noopener">pixabay.com</a> e copie a chave em <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">api/docs</a>.</p>
           <div class="inline-form"><input name="key" placeholder="Cole a chave do Pixabay" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Salvar</button></div>
         </form>
         <form class="stock-key" data-stock-key="unsplash">
-          <div class="stock-key-head"><strong>Unsplash</strong><span class="stock-badge" data-stock-badge="unsplash"></span></div>
+          <div class="stock-key-head"><strong>Unsplash</strong><span class="stock-badge" data-stock-badge="unsplash"></span><label class="stock-switch" data-stock-switch-wrap="unsplash" hidden><input type="checkbox" role="switch" data-stock-switch="unsplash"> <span>Ativo</span></label></div>
           <p class="hint">Em <a href="https://unsplash.com/oauth/applications" target="_blank" rel="noopener">unsplash.com/developers</a>, crie um app e copie a <b>Access Key</b>. Modo de teste: 50 buscas/hora; peça a aprovação (grátis) para 5.000/hora. As fotos ficam no servidor do Unsplash.</p>
           <div class="inline-form"><input name="key" placeholder="Cole a Access Key do Unsplash" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Salvar</button></div>
         </form>
