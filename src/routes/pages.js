@@ -73,9 +73,12 @@ router.get('/categoria/:slug', (req, res) => {
     crumbs: [['Início', '/'], ['Categorias', '/categorias'], [cat.name, `/categoria/${cat.slug}`]],
   });
 });
+// Página de tag só entra no Google com pelo menos TAG_MIN_INDEX receitas; as menores continuam no site (noindex)
+const TAG_MIN_INDEX = 8;
 router.get('/tag/:tag', (req, res) => {
   const tag = String(req.params.tag).slice(0, 40);
-  searchPage(req, res, { title: `Receitas: ${tag}`, description: `Receitas com o tema ${tag}, com passo a passo e modo cozinha.`, basePath: `/tag/${encodeURIComponent(tag)}`, extra: { tag }, nav: 'recipes', indexable: true, crumbs: [['Início', '/'], [`#${tag}`, `/tag/${encodeURIComponent(tag)}`]] });
+  const n = db.get().prepare("SELECT COUNT(*) n FROM recipe_tags t JOIN recipes r ON r.id = t.recipe_id AND r.status = 'published' WHERE t.tag = ?").get(tag).n;
+  searchPage(req, res, { title: `Receitas: ${tag}`, description: `Receitas com o tema ${tag}, com passo a passo e modo cozinha.`, basePath: `/tag/${encodeURIComponent(tag)}`, extra: { tag }, nav: 'recipes', indexable: n >= TAG_MIN_INDEX, crumbs: [['Início', '/'], [`#${tag}`, `/tag/${encodeURIComponent(tag)}`]] });
 });
 
 router.get('/receita/:slug', (req, res) => {
@@ -204,7 +207,8 @@ router.get('/sitemap.xml', (req, res) => {
   const d = db.get();
   const rows = d.prepare("SELECT slug, code, title, updated_at, cover FROM recipes WHERE status='published' ORDER BY id DESC LIMIT 45000").all();
   const cats = d.prepare("SELECT c.slug, MAX(r.updated_at) AS lastmod FROM categories c JOIN recipes r ON r.category_id = c.id AND r.status = 'published' GROUP BY c.id").all();
-  const tags = d.prepare("SELECT t.tag FROM recipe_tags t JOIN recipes r ON r.id = t.recipe_id AND r.status='published' GROUP BY t.tag HAVING COUNT(*) >= 2 LIMIT 2000").all();
+  // Só tags com bastante receitas (listas curtas são "conteúdo fraco" e atrasam a indexação das receitas)
+  const tags = d.prepare("SELECT t.tag FROM recipe_tags t JOIN recipes r ON r.id = t.recipe_id AND r.status='published' GROUP BY t.tag HAVING COUNT(*) >= ? ORDER BY COUNT(*) DESC LIMIT 200").all(TAG_MIN_INDEX);
   const urls = [
     `<url><loc>${b}/</loc><changefreq>daily</changefreq></url>`,
     `<url><loc>${b}/receitas</loc></url>`,

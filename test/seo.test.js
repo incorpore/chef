@@ -92,10 +92,11 @@ test('home: Organization, WebSite com busca (sitelinks searchbox) e ItemList', a
   assert.equal(link(r.text, 'canonical'), 'https://receitas.exemplo.com.br/');
 });
 
-test('busca e filtros não são indexados; categorias e tags são', async () => {
+test('busca e filtros não são indexados; categorias são (tags curtas não)', async () => {
   assert.match(meta((await get('/busca?q=bolo')).text, 'name', 'robots'), /^noindex/);
   assert.match(meta((await get('/receitas?sort=popular')).text, 'name', 'robots'), /^noindex/);
-  for (const u of ['/categoria/bolos', '/tag/bolo', '/receitas']) assert.match(meta((await get(u)).text, 'name', 'robots'), /^index/, u);
+  for (const u of ['/categoria/bolos', '/receitas']) assert.match(meta((await get(u)).text, 'name', 'robots'), /^index/, u);
+  assert.match(meta((await get('/tag/bolo')).text, 'name', 'robots'), /^noindex/, 'tag com poucas receitas');
   const cat = await get('/categoria/bolos');
   assert.match(cat.text, /<title>Receitas de bolos · /);
   assert.equal(link(cat.text, 'canonical'), 'https://receitas.exemplo.com.br/categoria/bolos');
@@ -122,7 +123,7 @@ test('sitemap, robots e RSS', async () => {
   const sm = await get('/sitemap.xml');
   assert.match(sm.text, /<loc>https:\/\/receitas\.exemplo\.com\.br\/receita\/bolo-de-fuba-cremoso<\/loc><lastmod>\d{4}-\d\d-\d\d<\/lastmod><image:image>/);
   assert.match(sm.text, /\/categoria\/bolos<\/loc><lastmod>/);
-  assert.match(sm.text, /\/tag\/bolo<\/loc>/);
+  assert.doesNotMatch(sm.text, /\/tag\/bolo<\/loc>/, 'tag com poucas receitas fica fora do sitemap');
   const robots = await get('/robots.txt');
   assert.match(robots.text, /Sitemap: https:\/\/receitas\.exemplo\.com\.br\/sitemap\.xml/);
   assert.match(robots.text, /Disallow: \/admin/);
@@ -213,4 +214,16 @@ test('capas JPEG para o Google (1:1, 4:3, 16:9): sem foto vira cartão; JSON-LD,
   assert.equal((await fetch(`${base}/capa/${r.code}-3x2.jpg`)).status, 404);
   const short = await fetch(`${base}/c/${r.code}`, { redirect: 'manual' });
   assert.equal(short.status, 301, 'link curto passa relevância (301)');
+});
+
+test('tags: só listas com 8+ receitas vão para o Google e para o sitemap (as curtas ficam noindex)', async () => {
+  const recipes = require('../src/recipes');
+  for (let i = 0; i < 8; i++) recipes.create({ title: `Doce de festa ${i}`, ingredients: 'a\nb', steps: 'x\ny', tags: ['festa-junina', ...(i < 2 ? ['raridade'] : [])], status: 'published' }, null);
+  const big = await (await fetch(`${base}/tag/festa-junina`)).text();
+  assert.match(big, /<meta name="robots" content="index/);
+  const small = await (await fetch(`${base}/tag/raridade`)).text();
+  assert.match(small, /<meta name="robots" content="noindex, follow"/);
+  const sm = await (await fetch(`${base}/sitemap.xml`)).text();
+  assert.match(sm, /\/tag\/festa-junina</);
+  assert.doesNotMatch(sm, /\/tag\/raridade</);
 });
