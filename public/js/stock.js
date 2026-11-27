@@ -1,10 +1,10 @@
-/* Chef — Painel → Fotos das receitas: revisão uma receita por vez + automático (Pexels / Pixabay) */
+/* Chef — Painel → Fotos das receitas: revisão uma receita por vez + automático (Pexels / Pixabay / Unsplash) */
 (() => {
   'use strict';
   const { $, $$, esc, toast, api } = window.Chef;
   const stage = $('[data-ph-stage]');
   if (!stage) return;
-  const NAMES = { pexels: 'Pexels', pixabay: 'Pixabay' };
+  const NAMES = { pexels: 'Pexels', pixabay: 'Pixabay', unsplash: 'Unsplash' };
   let mode = 'sem';
   let queue = [];
   let total = 0;
@@ -17,8 +17,8 @@
 
   // ---------------- Chaves e situação ----------------
   function paintStatus(st) {
-    const ok = st.pexels.configured || st.pixabay.configured;
-    for (const p of ['pexels', 'pixabay']) {
+    const ok = st.pexels.configured || st.pixabay.configured || st.unsplash.configured;
+    for (const p of ['pexels', 'pixabay', 'unsplash']) {
       const b = $(`[data-stock-badge="${p}"]`);
       b.textContent = st[p].configured ? (st[p].fromEnv ? '✓ configurada (variável)' : '✓ configurada') : 'sem chave';
       b.classList.toggle('on', st[p].configured);
@@ -26,7 +26,7 @@
       input.placeholder = st[p].configured ? 'Chave salva — cole outra para trocar (vazio + Salvar remove)' : `Cole a chave do ${NAMES[p]}`;
       input.disabled = st[p].fromEnv;
     }
-    $('[data-ph-keys-status]').textContent = `Bancos de imagens: ${['pexels', 'pixabay'].map((p) => `${st[p].configured ? '✓' : '✗'} ${NAMES[p]}`).join(' · ')}`;
+    $('[data-ph-keys-status]').textContent = `Bancos de imagens: ${['pexels', 'pixabay', 'unsplash'].map((p) => `${st[p].configured ? '✓' : '✗'} ${NAMES[p]}`).join(' · ')}`;
     $('[data-ph-keys-line]').hidden = !ok;
     $('[data-ph-keys-form]').hidden = ok && !$('[data-ph-keys]').classList.contains('editing');
     $('[data-ph-review]').hidden = !ok;
@@ -218,7 +218,7 @@
   $('[data-stock-stop]').addEventListener('click', async () => paintStatus(await api('/fotos/auto/parar', { method: 'POST' })));
   $('[data-ph-remove-all]').addEventListener('click', async () => {
     const n = $('[data-ph-count="bancos2"]').textContent;
-    if (!confirm(`Remover as fotos do Pexels/Pixabay de ${n} receitas? Elas voltam para a capa ilustrada. Fotos enviadas por você não são afetadas.`)) return;
+    if (!confirm(`Remover as fotos dos bancos (Pexels, Pixabay e Unsplash) de ${n} receitas? Elas voltam para a capa ilustrada. Fotos enviadas por você não são afetadas.`)) return;
     const r = await api('/fotos/remover-bancos', { method: 'POST' });
     toast(`🗑️ ${r.removed} fotos removidas`);
     paintStatus(r);

@@ -31,7 +31,7 @@ const TAGS = [
   ['Configurações', 'Configurações do site'],
   ['Newsletter', 'Inscrição, inscritos e campanhas por e-mail'],
   ['E-mail', 'Situação e teste do SMTP'],
-  ['Fotos dos bancos', 'Fotos grátis (Pexels/Pixabay) para receitas sem imagem'],
+  ['Fotos dos bancos', 'Fotos grátis (Pexels, Pixabay e Unsplash) para receitas sem imagem'],
   ['Google Search Console', 'Relatório do Google dentro do painel'],
   ['Usuários e chaves', 'Contas da equipe e chaves de API'],
   ['Estatísticas', 'Números do painel e auditoria'],
@@ -223,7 +223,7 @@ const ROUTES = [
 
   // Fotos dos bancos
   ['get', '/fotos/status', 'Fotos dos bancos', 'admin', 'Chaves configuradas e andamento do automático', { ok: [200, { type: 'object', additionalProperties: true }] }],
-  ['put', '/fotos/chaves', 'Fotos dos bancos', 'admin', 'Salva/remove a chave do Pexels ou do Pixabay', { body: B(S.obj({ provider: S.str(null, { enum: ['pexels', 'pixabay'] }), key: S.str('Vazio remove') }, ['provider'])), ok: [200, { type: 'object', additionalProperties: true }], errors: [400] }],
+  ['put', '/fotos/chaves', 'Fotos dos bancos', 'admin', 'Salva/remove a chave do Pexels, do Pixabay ou do Unsplash', { body: B(S.obj({ provider: S.str(null, { enum: ['pexels', 'pixabay', 'unsplash'] }), key: S.str('Vazio remove') }, ['provider'])), ok: [200, { type: 'object', additionalProperties: true }], errors: [400] }],
   ['get', '/fotos/pendentes', 'Fotos dos bancos', 'admin', 'Receitas sem foto ou com foto dos bancos', { params: [P.query('modo', 'sem (padrão) | bancos', S.str(null, { enum: ['sem', 'bancos'] })), P.query('offset', 'Paginação', S.int())], ok: [200, S.obj({ total: S.int(), items: S.arr({ type: 'object' }) })] }],
   ['get', '/fotos/sugestoes/{id}', 'Fotos dos bancos', 'admin', 'Fotos sugeridas para uma receita', { params: [P.id, P.q('Outro termo de busca')], ok: [200, { type: 'object', additionalProperties: true }], errors: [400, 404, 429, 502] }],
   ['get', '/fotos/buscar', 'Fotos dos bancos', 'user', 'Busca livre nos bancos (editor de receita)', { params: [P.q('Termo (traduzido para inglês automaticamente)', true)], ok: [200, S.obj({ query: S.str(), items: S.arr({ type: 'object' }) })], errors: [400, 429, 502] }],

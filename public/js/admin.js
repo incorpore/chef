@@ -236,7 +236,7 @@
       } catch (err) { toast(err.message); }
     };
     on('[data-pick-files]', 'click', async () => addMedia(await pickFiles('image/*,video/*')));
-    // ---- Foto grátis (Pexels/Pixabay): busca, baixa e entra como capa com o crédito do fotógrafo ----
+    // ---- Foto grátis (Pexels/Pixabay/Unsplash): busca, baixa e entra como capa com o crédito do fotógrafo ----
     // Crédito vale só enquanto aquela foto for a capa (a primeira da lista)
     const credits = new Map();
     if (editor.dataset.coverCredit && media.firstElementChild) credits.set(media.firstElementChild.dataset.url, { credit: editor.dataset.coverCredit, url: editor.dataset.coverCreditUrl || '' });
@@ -252,7 +252,7 @@
     if (dlg) {
       const qIn = $('[data-stock-q]', dlg);
       const results = $('[data-stock-results]', dlg);
-      const NAMES = { pexels: 'Pexels', pixabay: 'Pixabay' };
+      const NAMES = { pexels: 'Pexels', pixabay: 'Pixabay', unsplash: 'Unsplash' };
       const runSearch = async () => {
         const q = qIn.value.trim();
         if (!q) return qIn.focus();

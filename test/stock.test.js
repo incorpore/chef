@@ -15,6 +15,7 @@ process.env.UPLOADS_DIR = path.join(tmp, 'uploads');
 process.env.RATE_LIMIT = 'off';
 delete process.env.PEXELS_API_KEY;
 delete process.env.PIXABAY_API_KEY;
+delete process.env.UNSPLASH_ACCESS_KEY;
 
 const db = require('../src/db');
 const auth = require('../src/auth');
@@ -45,6 +46,16 @@ function fakeBanks(req, res) {
     const tags = /flan/.test(url.searchParams.get('q')) ? 'flan, caramel, dessert' : /sorvete/.test(url.searchParams.get('q')) ? 'kitchen, table' : 'food, table';
     return json({ hits: [{ id: 555, imageWidth: 1280, imageHeight: 853, webformatURL: `${F}/img/x.jpg`, previewURL: `${F}/img/x-prev.jpg`, largeImageURL: `${F}/img/x.jpg`, user: 'chefpix', user_id: 9, pageURL: 'https://pixabay.com/photos/555/', tags }] });
   }
+  if (url.pathname === '/unsplash') {
+    seen.unsplashAuth = req.headers.authorization;
+    if (/limit/.test(url.searchParams.get('query'))) { res.writeHead(403, { 'content-type': 'text/plain', 'x-ratelimit-remaining': '0' }); return res.end('Rate Limit Exceeded'); }
+    res.setHeader('x-ratelimit-remaining', '49');
+    return json({ results: [
+      { id: 'u1', width: 4000, height: 3000, premium: false, alt_description: 'slice of carrot cake on a plate', urls: { raw: 'https://images.unsplash.com/photo-1?ixid=abc', small: 'https://images.unsplash.com/photo-1?ixid=abc&w=400' }, user: { name: 'Lia Souza', links: { html: 'https://unsplash.com/@lia' } }, links: { html: 'https://unsplash.com/photos/u1', download_location: `${F}/unsplash-api/photos/u1/download?ixid=abc` } },
+      { id: 'u2', width: 4000, height: 3000, premium: true, alt_description: 'carrot cake premium', urls: { raw: 'https://images.unsplash.com/photo-2', small: 'https://images.unsplash.com/photo-2?w=400' }, user: { name: 'Pago' }, links: {} },
+    ] });
+  }
+  if (url.pathname.startsWith('/unsplash-api/photos/')) { seen.unsplashTrack = `${req.headers.authorization} ${url.pathname}`; return json({ url: 'x' }); }
   if (url.pathname.startsWith('/img/')) { res.writeHead(200, { 'content-type': 'image/jpeg' }); return res.end(jpg); }
   if (url.pathname === '/html') { res.writeHead(200, { 'content-type': 'image/jpeg' }); return res.end('<html><script>alert(1)</script>'); }
   json({ error: 'not found' }, 404);
@@ -81,7 +92,9 @@ test.before(async () => {
   stock.endpoints.pexels = `${F}/pexels`;
   stock.endpoints.pixabay = `${F}/pixabay`;
   stock.IMAGE_HOSTS.add('127.0.0.1');
-  stock.MIN_INTERVAL.pexels = 0; stock.MIN_INTERVAL.pixabay = 0;
+  stock.MIN_INTERVAL.pexels = 0; stock.MIN_INTERVAL.pixabay = 0; stock.MIN_INTERVAL.unsplash = 0;
+  stock.endpoints.unsplash = `${F}/unsplash`;
+  stock.endpoints.unsplashApi = F;
   db.open(':memory:');
   server = createApp().listen(0);
   await new Promise((r) => server.once('listening', r));
@@ -231,9 +244,43 @@ test('conferir e limpar: lista as fotos dos bancos e remove todas de uma vez (se
   assert.ok(db.get().prepare("SELECT 1 FROM audit_log WHERE action = 'fotos.remover-bancos'").get());
 });
 
+test('Unsplash: busca (sem fotos pagas), foto fica no Unsplash em tamanhos otimizados, aviso de uso e crédito', async () => {
+  const KEY = 'unsplashAccessKey0123456789abcdefGHIJ';
+  const st = (await admin.req('PUT', '/api/v1/fotos/chaves', { provider: 'unsplash', key: KEY })).data;
+  assert.equal(st.unsplash.configured, true);
+  assert.doesNotMatch(JSON.stringify(st), new RegExp(KEY));
+  const found = await author.req('GET', `/api/v1/fotos/buscar?q=${encodeURIComponent('bolo de cenoura')}`);
+  assert.equal(found.status, 200, found.text);
+  assert.equal(seen.unsplashAuth, `Client-ID ${KEY}`);
+  const un = found.data.items.filter((i) => i.provider === 'unsplash');
+  assert.deepEqual(un.map((i) => i.id), ['u1'], 'Unsplash+ (pago) fica de fora');
+  assert.equal((await author.req('POST', '/api/v1/fotos/baixar', { photo: { ...un[0], full: 'https://evil.example.com/photo-1' } })).status, 400);
+  const d = await author.req('POST', '/api/v1/fotos/baixar', { photo: un[0] });
+  assert.equal(d.status, 201, d.text);
+  assert.match(d.data.url, /^https:\/\/images\.unsplash\.com\/photo-1\?ixid=abc&w=1600/, 'hotlink com o ixid, não baixa');
+  assert.equal(d.data.credit, 'Foto: Lia Souza / Unsplash');
+  assert.match(d.data.creditUrl, /^https:\/\/unsplash\.com\/@lia\?utm_source=/);
+  assert.equal(seen.unsplashTrack, `Client-ID ${KEY} /unsplash-api/photos/u1/download`, 'avisa o Unsplash do uso');
+  const r = (await author.req('POST', '/api/v1/recipes', { title: 'Bolo de cenoura do Unsplash', cover: d.data.url, cover_credit: d.data.credit, cover_credit_url: d.data.creditUrl, ingredients: 'a\nb\nc', steps: 'x\ny\nz', status: 'published' })).data;
+  const page = await (await fetch(`${base}/receita/${r.slug}`)).text();
+  assert.match(page, /srcset="https:\/\/images\.unsplash\.com\/photo-1\?ixid=abc&amp;w=320[^"]*320w/, 'tamanhos responsivos do próprio Unsplash');
+  assert.match(page, /"image":\["https:\/\/images\.unsplash\.com\/photo-1\?ixid=abc&w=1280[^"]*fm=jpg/, 'Google recebe JPEG');
+  assert.ok((await admin.req('GET', '/api/v1/fotos/pendentes?modo=bancos')).data.items.some((x) => /Unsplash/.test(x.cover_credit)));
+  // cota da hora acabou → mensagem clara (429)
+  stock._reset();
+  const lim = await admin.req('GET', `/api/v1/fotos/sugestoes/${r.id}?q=${encodeURIComponent('limit')}`);
+  assert.ok([200, 429].includes(lim.status));
+  await admin.req('PUT', '/api/v1/fotos/chaves', { provider: 'pexels', key: '' });
+  await admin.req('PUT', '/api/v1/fotos/chaves', { provider: 'pixabay', key: '' });
+  const only = await admin.req('GET', `/api/v1/fotos/buscar?q=${encodeURIComponent('limit')}`);
+  assert.equal(only.status, 429);
+  assert.match(only.data.error, /Unsplash/);
+});
+
 test('editor sem chave: autor vê aviso claro; admin vê atalho para configurar', async () => {
   await admin.req('PUT', '/api/v1/fotos/chaves', { provider: 'pexels', key: '' });
   await admin.req('PUT', '/api/v1/fotos/chaves', { provider: 'pixabay', key: '' });
+  await admin.req('PUT', '/api/v1/fotos/chaves', { provider: 'unsplash', key: '' });
   const a = await author.req('GET', '/api/v1/fotos/buscar?q=bolo');
   assert.equal(a.status, 400);
   assert.match(a.data.error, /administrador/);

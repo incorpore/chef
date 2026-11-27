@@ -57,14 +57,15 @@ Botões só com ícone (👍 👎) na receita, com a contagem ao lado. Um voto p
 - **"Incorporar"**: gera um `<iframe>` com o cartão da receita para outros blogs, com link de volta para o seu site.
 - Imagens e textos de pré‑visualização (Open Graph e Twitter Card) em todas as páginas, com imagem padrão configurável.
 
-### Fotos das receitas (Pexels e Pixabay)
+### Fotos das receitas (Pexels, Pixabay e Unsplash)
 **Painel → Fotos das receitas** encontra fotos para as receitas sem imagem, em bancos gratuitos com licença para uso comercial:
 - **Busca em inglês automática:** os bancos descrevem as fotos em inglês. Um dicionário de culinária traduz o nome do prato, inclusive pratos brasileiros ("pão de queijo" → "brazilian cheese bread"), e cada foto recebe uma nota pela descrição. As que citam o prato ganham o selo **✓ combina** e aparecem primeiro.
 - **Revisão uma por vez:** fotos grandes, "Usar esta foto", pular, voltar, desfazer e teclas 1–6. A aba **Fotos dos bancos** serve para conferir e trocar as que já foram aplicadas.
 - **Automático:** só aplica quando a foto confirma o prato; o resto fica para a revisão. Respeita os limites gratuitos (Pixabay 100/min, Pexels 200/h). Há também um botão para remover de uma vez todas as fotos que vieram dos bancos.
 - **No editor:** o botão **"Buscar foto grátis"** (autores também podem usar) abre a busca já com o nome da receita; a foto escolhida entra como capa, mesmo numa receita ainda não salva.
 - A foto é **baixada** para o servidor (vira WebP/AVIF) e a receita mostra o **crédito do fotógrafo**. Se você trocar a foto depois, o crédito some.
-- As chaves (grátis) ficam em `data/stock-keys.json` (600) ou nas variáveis `PEXELS_API_KEY` / `PIXABAY_API_KEY`. O servidor só baixa imagens dos servidores do Pexels e do Pixabay.
+- As chaves (grátis) ficam em `data/stock-keys.json` (600) ou nas variáveis `PEXELS_API_KEY` / `PIXABAY_API_KEY` / `UNSPLASH_ACCESS_KEY`. O servidor só baixa imagens dos servidores do Pexels e do Pixabay.
+- **Unsplash:** pelas regras da API, a foto não é baixada: fica no servidor do Unsplash (em tamanhos otimizados, WebP/AVIF) com o crédito e o link do fotógrafo, e o site avisa o Unsplash a cada foto escolhida. Modo de teste: 50 buscas/hora; com a aprovação (grátis) no site do Unsplash, 5.000/hora. Fotos Unsplash+ (pagas) não aparecem.
 
 ### Google Search no painel
 **Painel → Google Search** mostra os dados do Google Search Console sem sair do Chef:
@@ -180,7 +181,7 @@ Para gerar a imagem a partir do código: `docker build -t chef .`. Para testar a
 | `MAIL_ADMIN` | admins | Quem recebe os avisos (separe vários por vírgula) |
 | `MAIL_RATE_PER_MIN` | `30` | Velocidade de envio da newsletter |
 | `SHOPEE_APP_ID` / `SHOPEE_SECRET` | — | (Opcional) Credenciais da Open API da Shopee Afiliados (alternativa: Painel → Afiliados) |
-| `PEXELS_API_KEY` / `PIXABAY_API_KEY` | — | (Opcional) Chaves dos bancos de imagens para as fotos automáticas (alternativa: Painel → Fotos automáticas) |
+| `PEXELS_API_KEY` / `PIXABAY_API_KEY` / `UNSPLASH_ACCESS_KEY` | — | (Opcional) Chaves dos bancos de imagens para as fotos das receitas (alternativa: Painel → Fotos das receitas) |
 | `GOOGLE_SERVICE_ACCOUNT` | — | (Opcional) JSON da conta de serviço do Search Console, inteiro ou em base64. Alternativa: enviar o arquivo em Painel → Google Search |
 
 > Em produção, use HTTPS (necessário para PWA, microfone e notificações), por exemplo com Caddy ou Nginx na frente.

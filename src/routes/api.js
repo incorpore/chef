@@ -862,7 +862,7 @@ router.delete('/subscribers/:id', auth.requireAdmin, (req, res) => {
 });
 
 // ---------------- E-mail (SMTP) ----------------
-// ---------------- Fotos automáticas (Pexels / Pixabay) para receitas sem imagem ----------------
+// ---------------- Fotos automáticas (Pexels / Pixabay / Unsplash) para receitas sem imagem ----------------
 const stock = require('../stock');
 const stockWrap = (fn) => wrap(async (req, res) => {
   try { await fn(req, res); } catch (e) {
@@ -898,7 +898,7 @@ router.post('/fotos/aplicar', auth.requireAdmin, rateLimit('stock-apply', 120, 6
 }));
 // Editor de receitas (autores também): buscar e baixar uma foto para usar como capa
 router.get('/fotos/buscar', auth.requireUser, rateLimit('stock-search', 120, 60e3), stockWrap(async (req, res) => {
-  if (!stock.configured()) return res.status(400).json({ error: isAdmin(req) ? 'Configure a chave do Pexels ou do Pixabay em Painel → Fotos automáticas' : 'A busca de fotos ainda não foi configurada pelo administrador' });
+  if (!stock.configured()) return res.status(400).json({ error: isAdmin(req) ? 'Configure a chave do Pexels, do Pixabay ou do Unsplash em Painel → Fotos das receitas' : 'A busca de fotos ainda não foi configurada pelo administrador' });
   const q = sec.cleanText(String(req.query.q || ''), 100).trim();
   if (!q) return res.json({ query: '', items: [] });
   res.json(await stock.search(q, { perPage: 4 }));

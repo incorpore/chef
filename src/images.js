@@ -113,7 +113,9 @@ function isLocal(url) {
 }
 
 /** URL redimensionada de uma foto enviada; outras URLs voltam iguais. */
+const isUnsplash = (url) => typeof url === 'string' && /^https:\/\/images\.unsplash\.com\//.test(url);
 function sized(url, width, format = '') {
+  if (isUnsplash(url)) return require('./stock').unsplashSized(url, fit(width), format);
   if (!isLocal(url)) return url;
   const file = url.slice('/uploads/'.length);
   return `/img/${fit(width)}/${file}${format === 'jpeg' ? '?f=jpg' : ''}`;
@@ -121,7 +123,7 @@ function sized(url, width, format = '') {
 
 /** Atributos src/srcset/sizes para <img>. `max` = maior largura útil para aquele lugar da página. */
 function attrs(url, { sizes = '100vw', max = 1920, min = 320 } = {}) {
-  if (!isLocal(url)) return { src: url, srcset: '', sizes: '' };
+  if (!isLocal(url) && !isUnsplash(url)) return { src: url, srcset: '', sizes: '' };
   const list = WIDTHS.filter((w) => w >= min && w <= fit(max));
   return {
     src: sized(url, Math.min(960, fit(max))),

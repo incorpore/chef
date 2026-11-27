@@ -192,8 +192,8 @@ function editor({ user, recipe, categories, products, stockReady = false }) {
           </div>
           <div class="stock-editor-row">
             ${stockReady
-    ? `<button type="button" class="btn btn-sm" data-stock-open>${icon('search')} Buscar foto grátis</button><small class="muted">Pexels e Pixabay · uso comercial liberado · crédito automático</small>`
-    : user.role === 'admin' ? `<a class="btn btn-ghost btn-sm" href="/admin/fotos">${icon('search')} Ativar busca de fotos grátis</a><small class="muted">Configure uma chave grátis do Pexels ou Pixabay</small>` : ''}
+    ? `<button type="button" class="btn btn-sm" data-stock-open>${icon('search')} Buscar foto grátis</button><small class="muted">Pexels, Pixabay e Unsplash · uso comercial liberado · crédito automático</small>`
+    : user.role === 'admin' ? `<a class="btn btn-ghost btn-sm" href="/admin/fotos">${icon('search')} Ativar busca de fotos grátis</a><small class="muted">Configure uma chave grátis do Pexels, Pixabay ou Unsplash</small>` : ''}
           </div>
           <p class="cover-credit-line" data-cover-credit-line ${r.cover_credit ? '' : 'hidden'}>📷 <span>${esc(r.cover_credit || '')}</span></p>
           <ul class="media-list" data-media>${[r.cover ? { url: r.cover, caption: '' } : null, ...r.images].filter(Boolean).map((m) => mediaItem(m)).join('')}</ul>
@@ -645,6 +645,11 @@ function photosPage({ user }) {
           <div class="stock-key-head"><strong>Pixabay</strong><span class="stock-badge" data-stock-badge="pixabay"></span></div>
           <p class="hint">Crie a conta em <a href="https://pixabay.com/accounts/register/" target="_blank" rel="noopener">pixabay.com</a> e copie a chave em <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">api/docs</a>.</p>
           <div class="inline-form"><input name="key" placeholder="Cole a chave do Pixabay" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Salvar</button></div>
+        </form>
+        <form class="stock-key" data-stock-key="unsplash">
+          <div class="stock-key-head"><strong>Unsplash</strong><span class="stock-badge" data-stock-badge="unsplash"></span></div>
+          <p class="hint">Em <a href="https://unsplash.com/oauth/applications" target="_blank" rel="noopener">unsplash.com/developers</a>, crie um app e copie a <b>Access Key</b>. Modo de teste: 50 buscas/hora; peça a aprovação (grátis) para 5.000/hora. As fotos ficam no servidor do Unsplash.</p>
+          <div class="inline-form"><input name="key" placeholder="Cole a Access Key do Unsplash" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Salvar</button></div>
         </form>
       </div>
     </div>
